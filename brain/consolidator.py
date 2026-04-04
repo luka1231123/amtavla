@@ -34,14 +34,17 @@ def detect_topic_shift(user_input, current_topic):
     if not current_topic:
         return True, ""
     prompt = f"""
-Determine if the user has changed topics.
+Determine if the user has completely changed the subject.
 
 Current Topic: {current_topic}
 New Input: {user_input}
 
+Rules:
+- If the new input is a follow-up question, agreement, or continuation of the current topic, answer NO.
+- ONLY answer YES if the user introduces a drastically different subject.
+- if you're unsure, err on the side of NO to avoid false positives.
+
 Has the topic changed? Answer with ONLY 'YES' or 'NO' followed by a one-line new topic name if YES.
-Example: "YES, user is now asking about weather in Tokyo"
-Example: "NO"
 """
     response = ollama.chat(model=MODEL, messages=[{"role": "user", "content": prompt}])
     answer = response["message"]["content"].strip().upper()

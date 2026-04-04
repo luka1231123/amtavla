@@ -9,3 +9,6 @@
 [DECISION] I'd love to hear about Georgian food. What are some popular dishes you like? | importance: 8.0
 [PREFERENCE] pink cheesecake | importance: 9.0
 [DECISION] I want to order some now! | importance: 8.0
+[PREFERENCE] [DECISION] You're good too, just as I am. | importance: 8.0
+[IMPORTANT] Hello! How's everything? | importance: 8.0
+[IMPORTANT] Georgian greetings include "Hello", "Kialeti", and "Migadza" | importance: 10.0
