@@ -1,0 +1,164 @@
+{
+  "nodes": {
+    "hello": {
+      "label": "Greeting",
+      "category": "general",
+      "strength": 2.4000000000000012,
+      "created_at": 1775319057.7715464,
+      "accessed_at": 1775319611.067658
+    },
+    "help": {
+      "label": "Action",
+      "category": "person",
+      "strength": 2.300000000000001,
+      "created_at": 1775319057.771748,
+      "accessed_at": 1775319611.0680737
+    },
+    "cheesecake": {
+      "label": "Food",
+      "category": "general/fact/project",
+      "strength": 2.000000000000001,
+      "created_at": 1775319086.9682174,
+      "accessed_at": 1775319598.3765748
+    },
+    "understood": {
+      "label": "Understand",
+      "category": "action/interaction",
+      "strength": 1.9000000000000008,
+      "created_at": 1775319137.7288728,
+      "accessed_at": 1775319598.3768811
+    },
+    "happy": {
+      "label": "Happy",
+      "category": "emotion/emotional_state",
+      "strength": 1.5000000000000004,
+      "created_at": 1775319137.7290576,
+      "accessed_at": 1775319516.3464317
+    },
+    "general-topic": {
+      "label": "General Topic",
+      "category": "topic/general",
+      "strength": 1.5000000000000004,
+      "created_at": 1775319275.3744383,
+      "accessed_at": 1775319611.0685222
+    },
+    "gapp": {
+      "label": "G'aap!",
+      "category": "general/topic/person/preference/fact/project",
+      "strength": 1.0,
+      "created_at": 1775319275.374746,
+      "accessed_at": 1775319275.3747463
+    },
+    "general": {
+      "label": "General",
+      "category": "topic",
+      "strength": 1.0,
+      "created_at": 1775319379.9144242,
+      "accessed_at": 1775319379.9144244
+    },
+    "pink_cheesecake": {
+      "label": "Food Item",
+      "category": "food/dessert",
+      "strength": 1.2000000000000002,
+      "created_at": 1775319407.4558647,
+      "accessed_at": 1775319553.319174
+    },
+    "france": {
+      "label": "Country of Origin",
+      "category": "location/country",
+      "strength": 0.9999999999999999,
+      "created_at": 1775319536.0271242,
+      "accessed_at": 1775319611.0666552
+    },
+    "history": {
+      "label": "Dessert History",
+      "category": "information/event",
+      "strength": 0.6,
+      "created_at": 1775319536.0273862,
+      "accessed_at": 1775319536.0273864
+    },
+    "popular_desserts": {
+      "label": "Favorite Desserts",
+      "category": "personal/preference/fact/project",
+      "strength": 0.5,
+      "created_at": 1775319536.0278344,
+      "accessed_at": 1775319536.0278347
+    },
+    "ingredients": {
+      "label": "Ingredients for Cheesecake",
+      "category": "food/drink/ingredient",
+      "strength": 0.6,
+      "created_at": 1775319536.0282261,
+      "accessed_at": 1775319611.0671778
+    },
+    "cheesecake_paris": {
+      "label": "Dessert",
+      "category": "topic/person/preference/fact/project",
+      "strength": 1.0,
+      "created_at": 1775319571.4191535,
+      "accessed_at": 1775319571.4191537
+    }
+  },
+  "edges": [
+    {
+      "source": "hello",
+      "target": "help",
+      "relation": "describes",
+      "strength": 1.0
+    },
+    {
+      "source": "understood",
+      "target": "happy",
+      "relation": "is_a",
+      "strength": 1.0
+    },
+    {
+      "source": "general-topic",
+      "target": "gapp",
+      "relation": "describes",
+      "strength": 1.0
+    },
+    {
+      "source": "preparation",
+      "target": "cheesecake",
+      "relation": "prep/instructions",
+      "strength": 1.0
+    },
+    {
+      "source": "measurement",
+      "target": "ingredients",
+      "relation": "measure/instruction",
+      "strength": 1.0
+    },
+    {
+      "source": "pink_cheesecake",
+      "target": "love",
+      "relation": "likes",
+      "strength": 1.0
+    },
+    {
+      "source": "cheesecake",
+      "target": "france",
+      "relation": "originates_in",
+      "strength": 1.0
+    },
+    {
+      "source": "cheesecake",
+      "target": "history",
+      "relation": "related_to",
+      "strength": 1.0
+    },
+    {
+      "source": "cheesecake",
+      "target": "popular_desserts",
+      "relation": "is_a",
+      "strength": 1.0
+    },
+    {
+      "source": "cheesecake",
+      "target": "ingredients",
+      "relation": "relates_to",
+      "strength": 1.0
+    }
+  ]
+}
