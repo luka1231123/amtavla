@@ -1,35 +1,35 @@
 import os
 
-WORKING_MEMORY_FILE = "brain/working_memory.txt"
+STM_FILE = "brain/working_memory.txt"
 MAX_LINES = 15
 
 
-def read_working_memory():
-    if not os.path.exists(WORKING_MEMORY_FILE):
+def read_stm():
+    if not os.path.exists(STM_FILE):
         return ""
-    with open(WORKING_MEMORY_FILE, "r") as f:
+    with open(STM_FILE, "r") as f:
         return f.read().strip()
 
 
-def write_working_memory(content):
-    with open(WORKING_MEMORY_FILE, "w") as f:
+def write_stm(content):
+    with open(STM_FILE, "w") as f:
         f.write(content)
 
 
-def append_to_working_memory(snippet):
+def append_stm(snippet):
     lines = []
-    if os.path.exists(WORKING_MEMORY_FILE):
-        with open(WORKING_MEMORY_FILE, "r") as f:
+    if os.path.exists(STM_FILE):
+        with open(STM_FILE, "r") as f:
             lines = [l for l in f.read().strip().splitlines() if l.strip()]
     lines.append(snippet)
     if len(lines) > MAX_LINES:
         lines = lines[-MAX_LINES:]
-    with open(WORKING_MEMORY_FILE, "w") as f:
+    with open(STM_FILE, "w") as f:
         f.write("\n".join(lines) + "\n")
-    print(f"   [DEBUG-STM] -> Appended to working memory: {snippet}")
+    print(f"   [DEBUG-STM] -> Appended: {snippet}")
 
 
-def clear_working_memory():
-    if os.path.exists(WORKING_MEMORY_FILE):
-        os.remove(WORKING_MEMORY_FILE)
-        print("   [DEBUG-STM] -> Working memory cleared")
+def clear_stm():
+    if os.path.exists(STM_FILE):
+        os.remove(STM_FILE)
+        print("   [DEBUG-STM] -> Cleared")

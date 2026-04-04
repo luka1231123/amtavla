@@ -1,13 +1,15 @@
 import sys
+from collections import deque
 
 sys.path.insert(0, ".")
 
 from router import classify_intent
-from generator import generate_final_response
+from generator import generate_response
 from tools import tool_weather, tool_bash_simulator
 from brain.memory_controller import MemoryController
 
 MEMORY = MemoryController()
+CONVERSATION_HISTORY = deque(maxlen=5)
 
 
 def run():
@@ -35,24 +37,30 @@ def run():
             continue
 
         context = MEMORY.get_context_for_prompt(user_input)
-        combined_memory = (
-            f"Working Memory:\n{context['working_memory']}\n{context['ltm_context']}"
-        )
 
-        intent = classify_intent(user_input, combined_memory)
-        context_data = ""
+        intent = classify_intent(
+            user_input, context["working_memory"] + context["ltm_context"]
+        )
+        tool_output = ""
 
         if intent == "WEATHER":
-            context_data = tool_weather(user_input, combined_memory)
+            tool_output = tool_weather(user_input, context["working_memory"])
         elif intent == "BASH":
-            context_data = tool_bash_simulator(user_input, combined_memory)
+            tool_output = tool_bash_simulator(user_input, context["working_memory"])
         else:
-            context_data = "No tool used. Just chat."
+            tool_output = "No tool used. Just chat."
 
-        response = generate_final_response(user_input, context_data)
+        response = generate_response(
+            user_input,
+            list(CONVERSATION_HISTORY),
+            context,
+            tool_output,
+        )
         print(f"{response}\n")
 
-        MEMORY.process_turn(user_input, response)
+        CONVERSATION_HISTORY.append((user_input, response))
+
+        MEMORY.process_turn_async(user_input, response)
 
 
 if __name__ == "__main__":

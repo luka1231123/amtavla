@@ -3,51 +3,31 @@ import json
 
 MODEL = "qwen2.5-coder:1.5b"
 
+MARKERS = ["TASK", "CONTEXT", "IMPORTANT", "FACT", "DECISION", "PREFERENCE"]
 
-def consolidate_stm_to_ltm(working_memory, current_topic):
-    print(
-        f"   [DEBUG-CONSOLIDATOR] -> Consolidating working memory to LTM (topic: {current_topic})"
-    )
+
+def summarize_for_stm(user_input, response):
     prompt = f"""
-You are a memory consolidation agent. Your job is to extract important facts from the current working memory and convert them into structured knowledge for long-term storage.
+Summarize this conversation turn into ONE line for short-term memory.
+Choose the best marker from: {MARKERS}
 
-Working Memory:
-{working_memory}
+Available markers:
+[TASK] - what the user wants done
+[CONTEXT] - situational background info
+[IMPORTANT] - preferences, constraints, critical info
+[FACT] - factual claims or concrete details
+[DECISION] - agreements or conclusions reached
 
-Current Topic: {current_topic}
+User: {user_input}
+Assistant: {response}
 
-Extract facts as JSON with this exact format:
-{{
-  "nodes": [
-    {{"id": "unique_id", "label": "Concept Name", "category": "topic/person/preference/fact/project", "strength": 1.0}}
-  ],
-  "edges": [
-    {{"source": "unique_id_1", "target": "unique_id_2", "relation": "describes/depends_on/relates_to/is_a"}}
-  ]
-}}
-
-Rules:
-- Only extract genuinely important facts, not ephemeral details
-- Use lowercase snake_case for IDs
-- Keep labels concise and human-readable
-- Return ONLY valid JSON, no extra text
-- Return empty arrays if nothing worth remembering
+Output format: [MARKER] summary text
+Keep it under 20 words. Output ONLY the line.
 """
     response = ollama.chat(model=MODEL, messages=[{"role": "user", "content": prompt}])
-    content = response["message"]["content"].strip()
-    try:
-        if content.startswith("```"):
-            content = content.split("```")[1]
-            if content.startswith("json"):
-                content = content[4:]
-        result = json.loads(content)
-        print(
-            f"   [DEBUG-CONSOLIDATOR] -> Extracted {len(result.get('nodes', []))} nodes, {len(result.get('edges', []))} edges"
-        )
-        return result
-    except json.JSONDecodeError:
-        print(f"   [DEBUG-CONSOLIDATOR] -> Failed to parse consolidation JSON")
-        return {"nodes": [], "edges": []}
+    snippet = response["message"]["content"].strip()
+    print(f"   [DEBUG-CONSOLIDATOR] -> STM snippet: {snippet}")
+    return snippet
 
 
 def detect_topic_shift(user_input, current_topic):
@@ -67,22 +47,37 @@ Example: "NO"
     answer = response["message"]["content"].strip().upper()
     if answer.startswith("YES"):
         new_topic = response["message"]["content"].strip()[3:].strip().rstrip(".")
-        print(f"   [DEBUG-CONSOLIDATOR] -> Topic shift detected: '{new_topic}'")
+        print(f"   [DEBUG-CONSOLIDATOR] -> Topic shift: '{new_topic}'")
         return True, new_topic
     return False, current_topic
 
 
-def summarize_for_working_memory(user_input, response):
+def promote_stm_to_ltm(stm_lines, current_topic):
+    print(f"   [DEBUG-CONSOLIDATOR] -> Promoting STM to LTM (topic: {current_topic})")
     prompt = f"""
-Create a brief 1-line summary snippet to add to working memory.
-Focus on key facts, decisions, or important details.
+Review these short-term memory lines and decide which ones are important enough for long-term storage.
 
-User: {user_input}
-Assistant: {response}
+STM Lines:
+{stm_lines}
 
-Output ONLY the snippet, nothing else. Keep it under 15 words.
+Current Topic: {current_topic}
+
+For each line worth remembering long-term, output it as a new line with:
+- An appropriate marker from: {MARKERS}
+- The content
+- An importance score from 1.0 to 10.0
+
+Format: [MARKER] content | importance: X.X
+
+Rules:
+- Only promote genuinely important facts, not ephemeral details
+- Skip trivial or already-known information
+- Return ONLY the promoted lines, one per line
+- Return nothing if nothing is worth keeping
 """
     response = ollama.chat(model=MODEL, messages=[{"role": "user", "content": prompt}])
-    snippet = response["message"]["content"].strip()
-    print(f"   [DEBUG-CONSOLIDATOR] -> Working memory snippet: {snippet}")
-    return snippet
+    content = response["message"]["content"].strip()
+
+    promoted = [l.strip() for l in content.splitlines() if l.strip()]
+    print(f"   [DEBUG-CONSOLIDATOR] -> Promoted {len(promoted)} lines to LTM")
+    return promoted
