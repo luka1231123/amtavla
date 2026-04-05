@@ -1,2 +1,42 @@
+# Dependencies
 venv/
+.venv/
+
+# Aider
 .aider*
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Ruff
+.ruff_cache/
+
+# Memory data files
+brain/ltm_tree.json
+brain/ltm_tree.json.lock
+brain/working_memory.txt
+brain/working_memory.txt.lock
+
+# Test artifacts
+tests/conversation_log.json
+tests/*.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Distribution
+dist/
+build/
+*.egg-info/

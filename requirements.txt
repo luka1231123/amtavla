@@ -1,0 +1,4 @@
+filelock
+ollama
+ddgs
+numpy
