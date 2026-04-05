@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import uuid
+from collections import deque
 from functools import lru_cache
 
 import numpy as np
@@ -15,6 +16,7 @@ TREE_FILE = "brain/ltm_tree.json"
 MAX_DEPTH = 4
 RETRIEVAL_THRESHOLD = 0.3
 MERGE_THRESHOLD = 0.85
+FULL_TREE_MERGE_THRESHOLD = 0.75
 MAX_CONTENT_PER_BRANCH = 50
 EMBEDDING_DIM = 768
 
@@ -98,44 +100,43 @@ class LtmTree:
         if nodes is None:
             nodes = self.branches
         result = []
-        for node in nodes:
+        stack = list(nodes)
+        while stack:
+            node = stack.pop()
             result.append(node)
-            result.extend(self._collect_all_nodes(node["children"]))
+            stack.extend(reversed(node["children"]))
         return result
 
     def _collect_subbranch_with_depths(
         self, branch: dict, depth: int = 0
     ) -> list[tuple[dict, int]]:
-        result = [(branch, depth)]
-        for child in branch["children"]:
-            result.extend(self._collect_subbranch_with_depths(child, depth + 1))
+        result = []
+        stack = [(branch, depth)]
+        while stack:
+            node, d = stack.pop()
+            result.append((node, d))
+            stack.extend((c, d + 1) for c in reversed(node["children"]))
         return result
 
     def _depth_of(self, branch_id: str) -> int:
-        def _find(nodes: list[dict], target: str, depth: int) -> int:
-            for node in nodes:
-                if node["id"] == target:
-                    return depth
-                result = _find(node["children"], target, depth + 1)
-                if result != -1:
-                    return result
-            return -1
-
-        return _find(self.branches, branch_id, 0)
-
-    def _parent_of(
-        self, branch_id: str, nodes: list[dict] | None = None
-    ) -> dict | None:
-        if nodes is None:
-            nodes = self.branches
-        for node in nodes:
+        queue = deque()
+        for node in self.branches:
+            queue.append((node, 0))
+        while queue:
+            node, depth = queue.popleft()
             if node["id"] == branch_id:
-                return None
-            if any(c["id"] == branch_id for c in node["children"]):
-                return node
-            result = self._parent_of(branch_id, node["children"])
-            if result:
-                return result
+                return depth
+            for child in node["children"]:
+                queue.append((child, depth + 1))
+        return -1
+
+    def _parent_of(self, branch_id: str) -> dict | None:
+        for node_id, node in self._index.items():
+            if node_id == branch_id:
+                continue
+            for child in node["children"]:
+                if child["id"] == branch_id:
+                    return node
         return None
 
     def _siblings_of(self, branch_id: str) -> list[dict]:
@@ -242,7 +243,9 @@ class LtmTree:
             return False
 
         keep["content"].extend(merge["content"])
-        keep["children"].extend(merge["children"])
+        for child in merge["children"]:
+            if child["id"] not in [c["id"] for c in keep["children"]]:
+                keep["children"].append(child)
         keep["topic"] = _merge_topic_name(keep["topic"], merge["topic"])
         keep["embedding"] = list(_safe_embed(_branch_embedding_text(keep)))
 
@@ -270,32 +273,60 @@ class LtmTree:
         return False
 
     def check_and_merge_siblings(self, branch_id: str):
-        while True:
-            siblings = self._siblings_of(branch_id)
-            if len(siblings) < 2:
-                break
-            merged = False
-            i = 0
-            while i < len(siblings):
-                j = i + 1
-                while j < len(siblings):
-                    sim = _cosine_similarity(
-                        siblings[i]["embedding"], siblings[j]["embedding"]
-                    )
-                    if sim > MERGE_THRESHOLD:
-                        self.merge_branches(siblings[i]["id"], siblings[j]["id"])
-                        merged = True
-                        break
-                    j += 1
-                if merged:
-                    break
-                i += 1
-            if not merged:
-                break
+        queue = deque([branch_id])
+        visited = set()
+        while queue:
+            current_id = queue.popleft()
+            if current_id in visited:
+                continue
+            visited.add(current_id)
 
-        for sib in self._siblings_of(branch_id):
-            if sib["children"]:
-                self.check_and_merge_siblings(sib["id"])
+            while True:
+                siblings = self._siblings_of(current_id)
+                if len(siblings) < 2:
+                    break
+                merged = False
+                i = 0
+                while i < len(siblings):
+                    j = i + 1
+                    while j < len(siblings):
+                        sim = _cosine_similarity(
+                            siblings[i]["embedding"], siblings[j]["embedding"]
+                        )
+                        if sim > MERGE_THRESHOLD:
+                            self.merge_branches(siblings[i]["id"], siblings[j]["id"])
+                            merged = True
+                            break
+                        j += 1
+                    if merged:
+                        break
+                    i += 1
+                if not merged:
+                    break
+
+            for sib in self._siblings_of(current_id):
+                if sib["children"] and sib["id"] not in visited:
+                    queue.append(sib["id"])
+
+    def full_tree_merge(self):
+        changed = True
+        while changed:
+            changed = False
+            nodes = self._collect_all_nodes()
+            for i in range(len(nodes)):
+                for j in range(i + 1, len(nodes)):
+                    a, b = nodes[i], nodes[j]
+                    if a["id"] not in self._index or b["id"] not in self._index:
+                        continue
+                    if self._parent_of(b["id"]) is a or self._parent_of(a["id"]) is b:
+                        continue
+                    sim = _cosine_similarity(a["embedding"], b["embedding"])
+                    if sim > FULL_TREE_MERGE_THRESHOLD:
+                        self.merge_branches(a["id"], b["id"])
+                        changed = True
+                        break
+                if changed:
+                    break
 
     def visualize(self) -> str:
         lines = []

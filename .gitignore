@@ -22,7 +22,6 @@ brain/working_memory.txt
 brain/working_memory.txt.lock
 
 # Test artifacts
-tests/conversation_log.json
 tests/*.lock
 
 # IDE

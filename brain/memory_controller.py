@@ -8,6 +8,7 @@ from brain.consolidator import (
     consolidate_to_tree,
     detect_topic_shift,
     summarize_for_stm,
+    _clean_topic_name,
 )
 
 SAVE_INTERVAL = 5
@@ -82,7 +83,8 @@ class MemoryController:
                     print("   [DEBUG-BRAIN] -> Snippet echoes input, skipping branch")
                     return
 
-                new_branch = self.tree.add_branch(user_input[:50], [snippet])
+                topic = _clean_topic_name(user_input[:40], "Conversation")
+                new_branch = self.tree.add_branch(topic, [snippet])
                 if new_branch:
                     self.current_branch_id = new_branch["id"]
                     print(f"   [DEBUG-BRAIN] -> Initial branch: {new_branch['topic']}")
@@ -93,7 +95,8 @@ class MemoryController:
             if shifted:
                 self._consolidate_and_reset()
                 if new_topic:
-                    new_branch = self.tree.add_branch(new_topic, [snippet])
+                    clean_topic = _clean_topic_name(new_topic, "New Topic")
+                    new_branch = self.tree.add_branch(clean_topic, [snippet])
                     if new_branch:
                         self.current_branch_id = new_branch["id"]
                         print(f"   [DEBUG-BRAIN] -> New branch: {new_branch['topic']}")

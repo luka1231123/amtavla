@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Fast conversation simulation test.
+Conversation simulation test.
 Runs a single realistic multi-turn conversation with the agent and logs everything.
 
 Run: python3 tests/test_conversation.py
@@ -12,28 +12,43 @@ import sys
 import tempfile
 import time
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from brain.memory_controller import MemoryController
-from brain.stm import read_stm, clear_stm
-from router import classify_intent
+from brain.planner import generate_plan
+from brain.stm import read_stm
 from generator import generate_response
 from tools import tool_weather, tool_bash_simulator
+from tools.websearch import tool_websearch
 
 
 CONVERSATION = [
-    ("Hey", "chat"),
-    ("What is Python and why is it so popular?", "chat"),
-    ("Can you show me how decorators work?", "chat"),
-    ("What about classes and inheritance?", "chat"),
-    ("How do I list all files in the current directory?", "bash"),
-    ("What's the weather in Tokyo?", "weather"),
-    ("Interesting. How does React compare to Vue for frontend?", "chat"),
-    ("What are Python context managers?", "chat"),
-    ("Thanks, that's all", "chat"),
+    "Hey",
+    "What is Python and why is it so popular?",
+    "Can you show me how decorators work?",
+    "What about classes and inheritance?",
+    "How do I list all files in the current directory?",
+    "What's the weather in Tokyo?",
+    "Interesting. How does React compare to Vue for frontend?",
+    "What are Python context managers?",
+    "Thanks, that's all",
 ]
+
+
+def execute_plan_step(action, detail, user_input, memory_str):
+    if action == "SEARCH":
+        return action, detail, tool_websearch(detail)
+    elif action == "TOOL":
+        if detail == "weather":
+            return action, detail, tool_weather(user_input, memory_str)
+        elif detail == "bash":
+            return action, detail, tool_bash_simulator(user_input, memory_str)
+    elif action == "THINK":
+        return action, detail, ""
+    return action, detail, ""
 
 
 def run_conversation(turns, stm_file, tree_file):
@@ -47,42 +62,47 @@ def run_conversation(turns, stm_file, tree_file):
     history = deque(maxlen=5)
     start = time.time()
 
-    for i, (user_input, expected_intent) in enumerate(turns):
+    for i, user_input in enumerate(turns):
         turn_start = time.time()
         turn_log = {
             "turn": i + 1,
             "user_input": user_input,
-            "expected_intent": expected_intent,
         }
 
         context = memory.get_context_for_prompt(user_input)
         turn_log["stm_context"] = context["working_memory"]
         turn_log["ltm_context"] = context["ltm_context"]
 
-        intent = classify_intent(
-            user_input, context["working_memory"] + context["ltm_context"]
-        )
-        turn_log["actual_intent"] = intent
-        turn_log["intent_match"] = (
-            intent == expected_intent.upper()
-            if expected_intent != "chat"
-            else intent in ("CHAT", "BASH", "WEATHER")
+        context_text = (
+            (context.get("working_memory", "") or "")
+            + " "
+            + (context.get("ltm_context", "") or "")
         )
 
-        if intent == "WEATHER":
-            tool_output = tool_weather(user_input, context["working_memory"])
-        elif intent == "BASH":
-            tool_output = tool_bash_simulator(user_input, context["working_memory"])
-        else:
-            tool_output = "No tool used. Just chat."
-        turn_log["tool_output"] = tool_output
+        plan = generate_plan(user_input, context_text)
+        turn_log["plan"] = [(a, d) for a, d in plan]
 
-        response = generate_response(
-            user_input,
-            list(history),
-            context,
-            tool_output,
-        )
+        plan_results = []
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {
+                executor.submit(
+                    execute_plan_step, action, detail, user_input, context_text
+                ): (action, detail)
+                for action, detail in plan
+            }
+            for future in as_completed(futures):
+                action, detail = futures[future]
+                try:
+                    result_action, result_detail, result = future.result()
+                    plan_results.append(
+                        (result_action, result_detail, result[:300] if result else "")
+                    )
+                except Exception as e:
+                    plan_results.append((action, detail, f"Error: {e}"))
+
+        turn_log["plan_results"] = [(a, d, r[:100]) for a, d, r in plan_results]
+
+        response = generate_response(user_input, plan, plan_results, context)
         turn_log["response"] = response
         turn_log["duration"] = round(time.time() - turn_start, 2)
 
@@ -91,9 +111,7 @@ def run_conversation(turns, stm_file, tree_file):
 
         log["turns"].append(turn_log)
 
-    if memory._memory_thread and memory._memory_thread.is_alive():
-        memory._memory_thread.join()
-
+    time.sleep(0.5)
     total_time = round(time.time() - start, 2)
     memory.tree.save()
 
@@ -116,9 +134,6 @@ def run_conversation(turns, stm_file, tree_file):
         "tree_visualization": memory.tree.visualize(),
     }
 
-    intent_results = [t["actual_intent"] for t in log["turns"]]
-    log["summary"]["intent_sequence"] = intent_results
-
     return log
 
 
@@ -140,10 +155,8 @@ def main():
     print()
     for turn in log["turns"]:
         print(f"Turn {turn['turn']}: {turn['user_input']}")
-        print(
-            f"  Intent: {turn['actual_intent']} (expected: {turn['expected_intent']})"
-        )
-        print(f"  Tool: {turn['tool_output'][:80]}...")
+        plan_str = ", ".join(f"{a}: {d}" for a, d in turn["plan"])
+        print(f"  Plan: {plan_str}")
         print(f"  Response: {turn['response'][:120]}...")
         print(f"  Duration: {turn['duration']}s")
         print()
@@ -155,7 +168,6 @@ def main():
     print(f"Avg turn time: {s['avg_turn_time']}s")
     print(f"Branches created: {s['branches_created']}")
     print(f"Branch topics: {s['branch_topics']}")
-    print(f"Intent sequence: {s['intent_sequence']}")
     print()
 
     print("--- Tree Visualization ---")

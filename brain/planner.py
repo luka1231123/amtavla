@@ -1,71 +1,92 @@
+import re
+
 from brain.ltm_tree import _safe_chat
 
 MODEL = "qwen2.5-coder:1.5b"
 
-TOOLS_LIST = """
+PLANNER_PROMPT = """You are a planning assistant. Create a short todo list to answer the user's question.
+
 Available tools:
-- weather: for weather, temperature, climate questions (cities: Tokyo, London)
-- bash: for listing files, checking python version, date/time, current user, disk space, pwd
-- websearch: for any topic needing current or detailed information
-"""
-
-PLANNER_PROMPT = """You are a planning assistant. Create a short todo list of steps to fully answer the user's question.
-
-{tools_list}
+- weather: for weather questions (Tokyo, London)
+- bash: for listing files, python version, date, user, disk space, pwd
 
 Rules:
-- Max 5 steps
-- Use these prefixes: SEARCH, TOOL, MEMORY, THINK
-- SEARCH: a short websearch query (max 8 words)
-- TOOL: which tool to use (weather or bash)
-- MEMORY: retrieve relevant context from long-term memory
-- THINK: reasoning step to synthesize the answer
+- Max 5 steps total
+- Use EXACTLY these formats, one per line:
+  SEARCH: short query
+  TOOL: weather
+  TOOL: bash
+  THINK
+
+- SEARCH: write a short search query (max 8 words)
+- TOOL: use weather or bash only if relevant
+- THINK: always include for reasoning
 - Always include at least 1 SEARCH step
-- Keep it brief
+
+Examples:
+User: What is Python?
+SEARCH: Python programming language overview
+TOOL: bash
+THINK
+
+User: Weather in Tokyo?
+SEARCH: current weather Tokyo
+TOOL: weather
+THINK
+
+User: How do decorators work?
+SEARCH: Python decorators tutorial
+THINK
 
 User: {user_input}
-Context: {context}
-
 TODO:
 """
 
 
-def generate_plan(user_input: str, context: str) -> list[str]:
-    prompt = PLANNER_PROMPT.format(
-        tools_list=TOOLS_LIST,
-        user_input=user_input,
-        context=context[:500] if context else "No context available",
-    )
+def generate_plan(user_input: str, context: str) -> list[tuple[str, str]]:
+    prompt = PLANNER_PROMPT.format(user_input=user_input)
     raw = _safe_chat([{"role": "user", "content": prompt}], model=MODEL)
     print(f"   [DEBUG-PLANNER] -> Raw plan:\n{raw}")
 
     steps = []
     for line in raw.splitlines():
-        line = line.strip().lstrip("- ").lstrip("* ").strip()
+        line = line.strip()
+        line = re.sub(r"^[\d\.\-\*\#]+\s*", "", line)
+        line = line.strip()
         if not line:
             continue
         upper = line.upper()
+
         if upper.startswith("SEARCH"):
-            query = (
-                line.split(":", 1)[1].strip().strip('"').strip("'")
-                if ":" in line
-                else line[6:].strip()
-            )
+            query = line.split(":", 1)[1].strip() if ":" in line else line[6:].strip()
+            query = query.strip('"').strip("'").strip("`").strip("*")
+            query = query[:60].strip()
             if query:
                 steps.append(("SEARCH", query))
         elif upper.startswith("TOOL"):
             tool_part = (
                 line.split(":", 1)[1].strip() if ":" in line else line[4:].strip()
             )
-            if "weather" in tool_part.lower():
+            tool_lower = tool_part.lower()
+            if "weather" in tool_lower:
                 steps.append(("TOOL", "weather"))
-            elif "bash" in tool_part.lower():
+            elif "bash" in tool_lower:
                 steps.append(("TOOL", "bash"))
-        elif upper.startswith("MEMORY"):
-            steps.append(("MEMORY", ""))
         elif upper.startswith("THINK"):
             steps.append(("THINK", ""))
 
-    steps = steps[:5]
+    seen = set()
+    deduped = []
+    for step in steps:
+        if step not in seen:
+            seen.add(step)
+            deduped.append(step)
+    steps = deduped[:5]
+
+    if not steps:
+        steps = [("SEARCH", user_input[:60]), ("THINK", "")]
+    elif not any(s[0] == "SEARCH" for s in steps):
+        steps.insert(0, ("SEARCH", user_input[:60]))
+
     print(f"   [DEBUG-PLANNER] -> Parsed steps: {steps}")
     return steps

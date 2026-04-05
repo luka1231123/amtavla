@@ -722,12 +722,8 @@ def run_cli_loop(inputs, stm_file, tree_file):
                             user_input, context.get("working_memory", "")
                         ),
                     )
-            elif action == "MEMORY":
-                return (
-                    action,
-                    detail,
-                    memory.tree.retrieve_context(user_input) or "No memory",
-                )
+            elif action == "THINK":
+                return action, detail, ""
             return action, detail, ""
 
         plan_results = []

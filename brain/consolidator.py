@@ -1,3 +1,5 @@
+import re
+
 from brain.ltm_tree import (
     LtmTree,
     _safe_embed,
@@ -7,6 +9,35 @@ from brain.ltm_tree import (
 )
 
 MODEL = "qwen2.5-coder:1.5b"
+
+APPEND_THRESHOLD = 0.25
+SUBTOPIC_THRESHOLD = 0.15
+
+
+def _clean_topic_name(raw: str, fallback: str) -> str:
+    raw = raw.strip()
+    raw = raw.strip('"').strip("'").strip("`").strip("*").strip("#")
+    raw = re.sub(r"^[\d\.\-\*\#]+\s*", "", raw)
+    raw = raw.strip()
+    for prefix in [
+        "topic name:",
+        "topic:",
+        "the topic is",
+        "one-line topic",
+        "the new input is about",
+        "a possible topic:",
+        "here is",
+        "example of same topic continuation:",
+        "example of different topic:",
+    ]:
+        if prefix in raw.lower():
+            raw = raw.split(prefix, 1)[1]
+    raw = raw.lstrip(".:;,- ").strip()
+    raw = raw[:40].strip()
+    raw = raw.strip('"').strip("'").strip("`")
+    if not raw or len(raw) < 2:
+        return fallback
+    return raw
 
 
 def summarize_for_stm(user_input, response):
@@ -32,7 +63,7 @@ def detect_topic_shift(user_input, current_branch: dict | None):
     branch_embedding = current_branch["embedding"]
     sim = _cosine_similarity(input_embedding, branch_embedding)
 
-    if sim > 0.56:
+    if sim > 0.60:
         return False, current_branch["topic"]
 
     STOP_WORDS = {
@@ -163,15 +194,8 @@ New Input: {user_input}
 
 Output ONLY the topic name, under 5 words. No quotes, no punctuation.
 """
-        new_topic = (
-            _safe_chat([{"role": "user", "content": prompt}], model=MODEL)
-            .strip()
-            .strip('"')
-            .strip("'")
-            .rstrip(".")
-        )
-        if not new_topic:
-            new_topic = user_input[:50]
+        raw_topic = _safe_chat([{"role": "user", "content": prompt}], model=MODEL)
+        new_topic = _clean_topic_name(raw_topic, user_input[:40])
         print(f"   [DEBUG-CONSOLIDATOR] -> Topic shift (sim={sim:.2f}): '{new_topic}'")
         return True, new_topic
 
@@ -195,30 +219,22 @@ Answer SAME or DIFFERENT. If DIFFERENT, also give a one-line topic name.
     answer = _safe_chat([{"role": "user", "content": prompt}], model=MODEL)
     answer_upper = answer.upper()
     if "DIFFERENT" in answer_upper or answer_upper.startswith("YES"):
-        new_topic = ""
+        raw_topic = ""
         if "DIFFERENT" in answer_upper:
             parts = answer.split("DIFFERENT")
             if len(parts) > 1:
-                new_topic = (
-                    parts[1]
-                    .strip()
-                    .rstrip(":")
-                    .strip()
-                    .strip('"')
-                    .strip("'")
-                    .rstrip(".")
-                )
-        if not new_topic:
-            topic_prompt = f"Generate a concise topic name for: {user_input}. Output ONLY the topic name, under 5 words."
-            new_topic = (
-                _safe_chat([{"role": "user", "content": topic_prompt}], model=MODEL)
-                .strip()
-                .strip('"')
-                .strip("'")
-                .rstrip(".")
+                raw_topic = parts[1].strip().rstrip(":").strip()
+        if not raw_topic:
+            raw_topic = _safe_chat(
+                [
+                    {
+                        "role": "user",
+                        "content": f"Generate a concise topic name for: {user_input}. Output ONLY the topic name, under 5 words.",
+                    }
+                ],
+                model=MODEL,
             )
-        if not new_topic:
-            new_topic = user_input[:50]
+        new_topic = _clean_topic_name(raw_topic, user_input[:40])
         print(f"   [DEBUG-CONSOLIDATOR] -> Topic shift (sim={sim:.2f}): '{new_topic}'")
         return True, new_topic
     return False, current_branch["topic"]
@@ -252,43 +268,60 @@ Return nothing if nothing is worth keeping.
     distilled_text = " ".join(distilled)
     distilled_embedding = _safe_embed(distilled_text)
 
-    best_match = tree.find_best_branch(
-        distilled_embedding, exclude_id=current_branch_id
-    )
+    best_match = tree.find_best_branch(distilled_embedding)
 
     if best_match is not None:
-        subtopic_prompt = f"""
+        sim = _cosine_similarity(distilled_embedding, best_match["embedding"])
+
+        if sim >= APPEND_THRESHOLD:
+            tree.append_to_branch(best_match["id"], distilled)
+            print(
+                f"   [DEBUG-CONSOLIDATOR] -> Appended to '{best_match['topic']}' (sim={sim:.2f})"
+            )
+            tree.check_and_merge_siblings(best_match["id"])
+            tree.full_tree_merge()
+            return
+
+        if sim >= SUBTOPIC_THRESHOLD:
+            subtopic_prompt = f"""
 Existing Topic: {best_match["topic"]}
 New Content: {distilled_text}
 
 Is the new content a distinct subtopic of the existing topic, or does it belong directly in the existing topic?
 Answer with ONLY 'SUBTOPIC' or 'SAME'.
 """
-        answer = _safe_chat(
-            [{"role": "user", "content": subtopic_prompt}], model=MODEL
-        ).upper()
+            answer = _safe_chat(
+                [{"role": "user", "content": subtopic_prompt}], model=MODEL
+            ).upper()
 
-        if "SUBTOPIC" in answer:
-            topic_prompt = f"""
+            if "SUBTOPIC" in answer:
+                topic_prompt = f"""
 Given this existing topic and new content, generate a concise topic name for the new content.
 Existing Topic: {best_match["topic"]}
 New Content: {distilled_text}
 Output ONLY the topic name, under 5 words.
 """
-            new_topic = _safe_chat(
-                [{"role": "user", "content": topic_prompt}], model=MODEL
-            ).rstrip(".")
-
-            current_depth = tree._depth_of(best_match["id"])
-            if current_depth < MAX_DEPTH - 1:
-                new_branch = tree.add_branch(
-                    new_topic, distilled, parent_id=best_match["id"]
+                raw_topic = _safe_chat(
+                    [{"role": "user", "content": topic_prompt}], model=MODEL
                 )
-                if new_branch:
-                    print(
-                        f"   [DEBUG-CONSOLIDATOR] -> Created subbranch '{new_topic}' under '{best_match['topic']}'"
+                new_topic = _clean_topic_name(raw_topic, "Related Content")
+
+                current_depth = tree._depth_of(best_match["id"])
+                if current_depth < MAX_DEPTH - 1:
+                    new_branch = tree.add_branch(
+                        new_topic, distilled, parent_id=best_match["id"]
                     )
-                    tree.check_and_merge_siblings(new_branch["id"])
+                    if new_branch:
+                        print(
+                            f"   [DEBUG-CONSOLIDATOR] -> Created subbranch '{new_topic}' under '{best_match['topic']}'"
+                        )
+                        tree.check_and_merge_siblings(new_branch["id"])
+                        tree.full_tree_merge()
+                    else:
+                        tree.append_to_branch(best_match["id"], distilled)
+                        print(
+                            f"   [DEBUG-CONSOLIDATOR] -> Max depth, appended to '{best_match['topic']}'"
+                        )
                 else:
                     tree.append_to_branch(best_match["id"], distilled)
                     print(
@@ -297,25 +330,30 @@ Output ONLY the topic name, under 5 words.
             else:
                 tree.append_to_branch(best_match["id"], distilled)
                 print(
-                    f"   [DEBUG-CONSOLIDATOR] -> Max depth, appended to '{best_match['topic']}'"
+                    f"   [DEBUG-CONSOLIDATOR] -> Appended to '{best_match['topic']}' (sim={sim:.2f})"
                 )
-        else:
-            tree.append_to_branch(best_match["id"], distilled)
-            print(
-                f"   [DEBUG-CONSOLIDATOR] -> Appended to existing branch '{best_match['topic']}'"
-            )
-            tree.check_and_merge_siblings(best_match["id"])
-    else:
-        topic_prompt = f"""
+                tree.check_and_merge_siblings(best_match["id"])
+                tree.full_tree_merge()
+            return
+
+        tree.append_to_branch(best_match["id"], distilled)
+        print(
+            f"   [DEBUG-CONSOLIDATOR] -> Weak match, appended to '{best_match['topic']}' (sim={sim:.2f})"
+        )
+        tree.check_and_merge_siblings(best_match["id"])
+        tree.full_tree_merge()
+        return
+
+    topic_prompt = f"""
 Given this content, generate a concise topic name.
 Content: {distilled_text}
 Output ONLY the topic name, under 5 words.
 """
-        new_topic = _safe_chat(
-            [{"role": "user", "content": topic_prompt}], model=MODEL
-        ).rstrip(".")
+    raw_topic = _safe_chat([{"role": "user", "content": topic_prompt}], model=MODEL)
+    new_topic = _clean_topic_name(raw_topic, "New Topic")
 
-        new_branch = tree.add_branch(new_topic, distilled)
-        if new_branch:
-            print(f"   [DEBUG-CONSOLIDATOR] -> Created new root branch '{new_topic}'")
-            tree.check_and_merge_siblings(new_branch["id"])
+    new_branch = tree.add_branch(new_topic, distilled)
+    if new_branch:
+        print(f"   [DEBUG-CONSOLIDATOR] -> Created new root branch '{new_topic}'")
+        tree.check_and_merge_siblings(new_branch["id"])
+        tree.full_tree_merge()

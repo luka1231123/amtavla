@@ -34,9 +34,6 @@ def execute_plan_step(
         else:
             result = f"Unknown tool: {detail}"
         return action, detail, result
-    elif action == "MEMORY":
-        result = MEMORY.tree.retrieve_context(user_input)
-        return action, detail, result if result else "No relevant memory found."
     elif action == "THINK":
         return action, detail, ""
     return action, detail, ""
