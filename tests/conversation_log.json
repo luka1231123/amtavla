@@ -1,0 +1,208 @@
+{
+  "timestamp": "2026-04-05T11:31:03.050928",
+  "turns": [
+    {
+      "turn": 1,
+      "user_input": "Hey",
+      "expected_intent": "chat",
+      "stm_context": "",
+      "ltm_context": "",
+      "actual_intent": "CHAT",
+      "intent_match": true,
+      "tool_output": "No tool used. Just chat.",
+      "response": "Hello! How can I assist you today?",
+      "duration": 0.54
+    },
+    {
+      "turn": 2,
+      "user_input": "What is Python and why is it so popular?",
+      "expected_intent": "chat",
+      "stm_context": "",
+      "ltm_context": "",
+      "actual_intent": "BASH",
+      "intent_match": true,
+      "tool_output": "STDOUT for ````\npython --version\n````: \nfile1.txt, hidden_folder, system_log.csv",
+      "response": "Python is a widely-used high-level programming language known for its simplicity and readability. It was developed by Guido van Rossum and first released in 1991. Python's popularity stems from several reasons:\n\n1. **Readability**: Python's syntax is clean and easy to understand, making it an excellent choice for beginners.\n2. **Versatility**: Python can be used for web development, data analysis, artificial intelligence (AI), machine learning, and more.\n3. **Ecosystem**: There are numerous libraries and frameworks available, making it easier to integrate different components of a project.\n4. **Cross-Platform Compatibility**: Python is compatible with multiple operating systems including Windows, macOS, and Linux.\n5. **Ease of Use for Data Science**: Its simplicity makes it great for data manipulation and analysis.\n\nIf you have any specific questions about Python or want more information on its usage, feel free to ask!",
+      "duration": 1.96
+    },
+    {
+      "turn": 3,
+      "user_input": "Can you show me how decorators work?",
+      "expected_intent": "chat",
+      "stm_context": "Hello! How may I help you today?",
+      "ltm_context": "## Hey\n  - Hello! How may I help you today?",
+      "actual_intent": "BASH",
+      "intent_match": true,
+      "tool_output": "STDOUT for ````bash\npython -c \"from functools import wraps; def decorator(func): @wraps(func); return func; @decorator; def my_function(): print('Hello, World!'); my_function();\"\n````: \nfile1.txt, hidden_folder, system_log.csv",
+      "response": "Decorators in Python are a powerful feature that allows you to modify the behavior of functions or methods without changing their source code. They are defined using the `@decorator` syntax and can be applied to any function.\n\nHere's an example of a simple decorator:\n\n```python\ndef my_decorator(func):\n    def wrapper():\n        print(\"Something is happening before the function is called.\")\n        func()\n        print(\"Something is happening after the function is called.\")\n    return wrapper\n\n@my_decorator\ndef say_hello():\n    print(\"Hello, World!\")\n\nsay_hello()\n```\n\nIn this example, `my_decorator` is a decorator that adds some functionality to the `say_hello` function. When you call `say_hello()`, it first prints \"Something is happening before the function is called.\", then calls the original `say_hello` function, and finally prints \"Something is happening after the function is called.\"",
+      "duration": 2.41
+    },
+    {
+      "turn": 4,
+      "user_input": "What about classes and inheritance?",
+      "expected_intent": "chat",
+      "stm_context": "",
+      "ltm_context": "## Python Programming Language\n  - Python is a high-level programming language known for ease of use and wide applications in web development, AI, machine learning, and data analysis.\n  - Python's ecosystem includes libraries and frameworks making it popular.\n\n## Python Programming Basics\n  - Python is a high-level, easy-to-read programming language with broad applications in web development, AI, machine learning, and data analysis, making it popular for its simplicity and ecosystem of libraries and frameworks.\n\n## Hey\n  - Hello! How may I help you today?",
+      "actual_intent": "CHAT",
+      "intent_match": true,
+      "tool_output": "No tool used. Just chat.",
+      "response": "In Python, classes are used to create objects that encapsulate data and behavior. They allow you to reuse code by defining a blueprint for creating similar objects.\n\n- **Classes**: You define a class using the `class` keyword followed by the class name.\n  ```python\n  class MyClass:\n      pass\n  ```\n\n- **Attributes and Methods**: You can add attributes and methods to classes using dot notation (`<class_name>.<attribute_name> = <value>`).\n  ```python\n  class MyClass:\n      def __init__(self, attribute):\n          self.attribute = attribute\n\n      def method(self):\n          print(\"This is a method.\")\n  ```\n\n- **Inheritance**: You can define classes that inherit from other classes using the `class` keyword followed by the new class name and specifying the parent class using parentheses.\n  ```python\n  class ParentClass:\n      def __init__(self, parent_attr):\n          self.parent_attr = parent_attr\n\n  class ChildClass(ParentClass):\n      def __init__(self, child_attr, parent_attr):\n          super().__init__(parent_attr)  # Call the constructor of the parent class\n          self.child_attr = child_attr\n  ```\n\n- **Polymorphism**: You can override methods in subclasses to provide different implementations.\n  ```python\n  class ParentClass:\n      def method(self):\n          print(\"Parent method\")\n\n  class ChildClass(ParentClass):\n      def method(self):\n          print(\"Child method\")\n  ```\n\nThese concepts form the foundation of object-oriented programming in Python and are fundamental for building more complex applications.",
+      "duration": 2.73
+    },
+    {
+      "turn": 5,
+      "user_input": "How do I list all files in the current directory?",
+      "expected_intent": "bash",
+      "stm_context": "",
+      "ltm_context": "## Decorator Tutorial\n  - Decorators in Python allow modifying functions without changing their source code, using a simple syntax. They are applied to any function with the `@decorator` syntax. This example demonstrates a basic decorator that adds some functionality before and after calling another function.\n\n## Decorators in Python\n  - Decorators in Python allow modifying functions without changing their source code.\n  - They are applied to any function with the `@decorator` syntax.\n  - Basic decorators add some functionality before and after calling another function.\n\n## Python Programming Basics\n  - Python is a high-level, easy-to-read programming language with broad applications in web development, AI, machine learning, and data analysis, making it popular for its simplicity and ecosystem of libraries and frameworks.",
+      "actual_intent": "BASH",
+      "intent_match": true,
+      "tool_output": "STDOUT for `ls`: \nfile1.txt, hidden_folder, system_log.csv",
+      "response": "You can use the `ls` command to list all files and directories in the current directory. Here's how you can do it:\n\n```sh\nls\n```\n\nThis will output a list of files and directories in the current working directory, similar to the example provided: `file1.txt, hidden_folder, system_log.csv`.",
+      "duration": 1.35
+    },
+    {
+      "turn": 6,
+      "user_input": "What's the weather in Tokyo?",
+      "expected_intent": "weather",
+      "stm_context": "",
+      "ltm_context": "## Inheritance and OOP Basics\n  - Python classes, inheritance, methods, and polymorphism.\n\n## Python Class Basics\n  - - Python classes are blueprints that define behavior.\n  - - They encapsulate data and methods into a single entity.\n  - - Inheritance allows for code reuse by creating new classes based on existing ones.\n  - - Methods within classes can perform actions or operations.\n  - - Polymorphism enables the same method to behave differently depending on the object it is called on.\n\n## Python Programming Basics\n  - Python is a high-level, easy-to-read programming language with broad applications in web development, AI, machine learning, and data analysis, making it popular for its simplicity and ecosystem of libraries and frameworks.\n  ## Python Class Basics\n    - - Python classes are blueprints that define behavior.\n    - - They encapsulate data and methods into a single entity.\n    - - Inheritance allows for code reuse by creating new classes based on existing ones.\n    - - Methods within classes can perform actions or operations.\n    - - Polymorphism enables the same method to behave differently depending on the object it is called on.",
+      "actual_intent": "WEATHER",
+      "intent_match": true,
+      "tool_output": "Tokyo: Sunny, 22C.",
+      "response": "It's sunny today with a temperature of 22 degrees Celsius.",
+      "duration": 1.0
+    },
+    {
+      "turn": 7,
+      "user_input": "Interesting. How does React compare to Vue for frontend?",
+      "expected_intent": "chat",
+      "stm_context": "",
+      "ltm_context": "## Files and Directories in Python**\n  - - Use `ls` to see all files in the current directory.\n  - - The `ls` command lists files and directories.\n\n## Listing Files in Current Directory\n  - To view all files in the current directory, use the `ls` command.\n\n## Decorator Tutorial\n  - Decorators in Python allow modifying functions without changing their source code, using a simple syntax. They are applied to any function with the `@decorator` syntax. This example demonstrates a basic decorator that adds some functionality before and after calling another function.",
+      "actual_intent": "BASH",
+      "intent_match": true,
+      "tool_output": "STDOUT for `node_modules/react-dom; node_modules/vue; node_modules/axios`: \nfile1.txt, hidden_folder, system_log.csv",
+      "response": "React and Vue are both popular frameworks used for building user interfaces, but they have different strengths and use cases.\n\n- **React** is a JavaScript library that is commonly used for building single-page applications (SPA). It uses a virtual DOM to efficiently update the user interface based on changes in the application state. React is known for its simplicity and ease of integration with other libraries.\n  - **Pros**: Simple, easy to learn, lightweight, and widely used by developers.\n  - **Cons**: Some older projects may need to be converted to React if they are not compatible.\n\n- **Vue** is a progressive JavaScript framework that is often used for building single-page applications (SPA). Vue uses a different approach called reactive programming, which allows components to be more reusable and maintainable. Vue is known for its flexibility and ease of use.\n  - **Pros**: Flexible, lightweight, and widely adopted by developers.\n  - **Cons**: More complex than React for beginners, but easier to learn once you have a good understanding of the basics.\n\nIn summary, both React and Vue are excellent choices for building user interfaces in modern web development. The choice between them depends on your specific project requirements and personal preference.",
+      "duration": 2.54
+    },
+    {
+      "turn": 8,
+      "user_input": "What are Python context managers?",
+      "expected_intent": "chat",
+      "stm_context": "Today's weather forecast in Tokyo suggests sunshine and mild temperatures at 22\u00b0C.",
+      "ltm_context": "## Files and Directories in Python**\n  - - Use `ls` to see all files in the current directory.\n  - - The `ls` command lists files and directories.\n\n## Listing Files in Current Directory\n  - To view all files in the current directory, use the `ls` command.\n\n## Decorator Tutorial\n  - Decorators in Python allow modifying functions without changing their source code, using a simple syntax. They are applied to any function with the `@decorator` syntax. This example demonstrates a basic decorator that adds some functionality before and after calling another function.",
+      "actual_intent": "BASH",
+      "intent_match": true,
+      "tool_output": "STDOUT for ````bash\npython -c \"print('Python context managers allow you to manage resources efficiently by encapsulating the setup, execution, and cleanup of code blocks.')\"\n````: \nfile1.txt, hidden_folder, system_log.csv",
+      "response": "Python context managers are objects that manage resources automatically, such as file handles or database connections. They use the `with` statement to ensure that resources are properly cleaned up after their suite finishes executing.\n\nHere's an example of a simple context manager:\n\n```python\nclass MyContextManager:\n    def __enter__(self):\n        print(\"Entering the context.\")\n        return self\n\n    def __exit__(self, exc_type, exc_val, traceback):\n        print(\"Exiting the context.\")\n        if exc_type is not None:\n            print(f\"An exception occurred: {exc_type}\")\n\nwith MyContextManager() as obj:\n    print(\"Inside the with block.\")\n```\n\nIn this example, `MyContextManager` is a class that implements the `__enter__` and `__exit__` methods. The `with` statement creates an instance of `MyContextManager`, which manages a file handle. When the suite finishes executing (i.e., after the `print(\"Inside the with block.\")` statement), the `__exit__` method is called, and any exceptions that occurred during the execution are handled.\n\nThis approach ensures that resources such as files are properly closed even if an error occurs, preventing resource leaks.\n\n```bash\nEntering the context.\nInside the with block.\nExiting the context.\n```\n\nBy using context managers, you can write more robust code by automatically handling cleanup tasks without having to worry about explicitly closing resources.",
+      "duration": 3.03
+    },
+    {
+      "turn": 9,
+      "user_input": "Thanks, that's all",
+      "expected_intent": "chat",
+      "stm_context": "Today's weather forecast in Tokyo suggests sunshine and mild temperatures at 22\u00b0C.\nBoth React and Vue are popular front-end frameworks for building user interfaces; choose based on project needs and personal experience.",
+      "ltm_context": "## Python Programming Language\n  - Python is a high-level programming language known for ease of use and wide applications in web development, AI, machine learning, and data analysis.\n  - Python's ecosystem includes libraries and frameworks making it popular.\n  - Python is a high-level, easy-to-read programming language with broad applications in web development, AI, machine learning, and data analysis, making it popular for its simplicity and ecosystem of libraries and frameworks.\n  ## Decorators in Python\n    - Decorators in Python allow modifying functions without changing their source code.\n    - They are applied to any function with the `@decorator` syntax.\n    - Basic decorators add some functionality before and after calling another function.\n  ## Files and Directories in Python**\n    - - Use `ls` to see all files in the current directory.\n    - - The `ls` command lists files and directories.\n  ## Python Class Basics\n    - - Python classes are blueprints that define behavior.\n    - - They encapsulate data and methods into a single entity.\n    - - Inheritance allows for code reuse by creating new classes based on existing ones.\n    - - Methods within classes can perform actions or operations.\n    - - Polymorphism enables the same method to behave differently depending on the object it is called on.\n\n## Decorator Tutorial\n  - Decorators in Python allow modifying functions without changing their source code, using a simple syntax. They are applied to any function with the `@decorator` syntax. This example demonstrates a basic decorator that adds some functionality before and after calling another function.",
+      "actual_intent": "CHAT",
+      "intent_match": true,
+      "tool_output": "No tool used. Just chat.",
+      "response": "You're welcome! If you have any other questions or need further assistance, feel free to ask.",
+      "duration": 1.06
+    }
+  ],
+  "summary": {
+    "total_turns": 9,
+    "total_time_seconds": 24.59,
+    "avg_turn_time": 2.73,
+    "branches_created": 12,
+    "branch_topics": [
+      "Hey",
+      "Weather Forecast & Frameworks",
+      "Thank You Answer",
+      "Python Programming Language",
+      "Decorators in Python",
+      "Files and Directories in Python**",
+      "Python Class Basics",
+      "Decorator Tutorial",
+      "Inheritance and OOP Basics",
+      "Listing Files in Current Directory",
+      "Python Context Managers: Managing Resources Safely",
+      "Feedback Response"
+    ],
+    "branch_details": [
+      {
+        "topic": "Hey",
+        "content_count": 3,
+        "children": 2
+      },
+      {
+        "topic": "Weather Forecast & Frameworks",
+        "content_count": 3,
+        "children": 0
+      },
+      {
+        "topic": "Thank You Answer",
+        "content_count": 2,
+        "children": 0
+      },
+      {
+        "topic": "Python Programming Language",
+        "content_count": 3,
+        "children": 3
+      },
+      {
+        "topic": "Decorators in Python",
+        "content_count": 3,
+        "children": 0
+      },
+      {
+        "topic": "Files and Directories in Python**",
+        "content_count": 2,
+        "children": 0
+      },
+      {
+        "topic": "Python Class Basics",
+        "content_count": 5,
+        "children": 0
+      },
+      {
+        "topic": "Decorator Tutorial",
+        "content_count": 1,
+        "children": 0
+      },
+      {
+        "topic": "Inheritance and OOP Basics",
+        "content_count": 1,
+        "children": 0
+      },
+      {
+        "topic": "Listing Files in Current Directory",
+        "content_count": 1,
+        "children": 0
+      },
+      {
+        "topic": "Python Context Managers: Managing Resources Safely",
+        "content_count": 1,
+        "children": 0
+      },
+      {
+        "topic": "Feedback Response",
+        "content_count": 1,
+        "children": 0
+      }
+    ],
+    "final_stm": "",
+    "tree_visualization": "\u251c\u2500\u2500 Hey\n\u2502   [Hello! How may I help you today?; - Tokyo's current weather forecast calls for sunny conditions with mild temperatures.; - The predicted temperature in Tokyo today is 22\u00b0C.]\n  \u251c\u2500\u2500 Weather Forecast & Frameworks\n  \u2502   [Today's weather forecast shows clear skies in Tokyo with mild temperatures at 22\u00b0C.; React and Vue are both popular front-end frameworks; choose based on project requirements and personal experience.; Python context managers ensure resources are closed properly, reducing resource leaks and enhancing code readability.]\n  \u251c\u2500\u2500 Thank You Answer\n  \u2502   [Thank you for your help.; I will be glad to assist with any additional questions.]\n\u251c\u2500\u2500 Python Programming Language\n\u2502   [Python is a high-level programming language known for ease of use and wide applications in web development, AI, machine learning, and data analysis.; Python's ecosystem includes libraries and frameworks making it popular.; Python is a high-level, easy-to-read programming language with broad applications in web development, AI, machine learning, and data analysis, making it popular for its simplicity and ecosystem of libraries and frameworks.]\n  \u251c\u2500\u2500 Decorators in Python\n  \u2502   [Decorators in Python allow modifying functions without changing their source code.; They are applied to any function with the `@decorator` syntax.; Basic decorators add some functionality before and after calling another function.]\n  \u251c\u2500\u2500 Files and Directories in Python**\n  \u2502   [- Use `ls` to see all files in the current directory.; - The `ls` command lists files and directories.]\n  \u251c\u2500\u2500 Python Class Basics\n  \u2502   [- Python classes are blueprints that define behavior.; - They encapsulate data and methods into a single entity.; - Inheritance allows for code reuse by creating new classes based on existing ones. (+2 more)]\n\u251c\u2500\u2500 Decorator Tutorial\n\u2502   [Decorators in Python allow modifying functions without changing their source code, using a simple syntax. They are applied to any function with the `@decorator` syntax. This example demonstrates a basic decorator that adds some functionality before and after calling another function.]\n\u251c\u2500\u2500 Inheritance and OOP Basics\n\u2502   [Python classes, inheritance, methods, and polymorphism.]\n\u251c\u2500\u2500 Listing Files in Current Directory\n\u2502   [To view all files in the current directory, use the `ls` command.]\n\u251c\u2500\u2500 Python Context Managers: Managing Resources Safely\n\u2502   [Python context managers are objects that manage resources for you, ensuring they are properly closed after execution, preventing resource leaks and making your code cleaner and easier to read.]\n\u251c\u2500\u2500 Feedback Response\n\u2502   [You thanked for your help; if there's anything else I can assist with, please let me know.]",
+    "intent_sequence": [
+      "CHAT",
+      "BASH",
+      "BASH",
+      "CHAT",
+      "BASH",
+      "WEATHER",
+      "BASH",
+      "BASH",
+      "CHAT"
+    ]
+  }
+}
