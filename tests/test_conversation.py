@@ -95,26 +95,30 @@ def run_conversation(turns, stm_file, tree_file):
             + (context.get("ltm_context", "") or "")
         )
 
-        plan = generate_plan(user_input, context_text)
+        plan, thinking = generate_plan(user_input, context_text)
         turn_log["plan"] = [(a, d) for a, d in plan]
 
-        plan_results = []
+        plan_results = [None] * len(plan)
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = {
                 executor.submit(
                     execute_plan_step, action, detail, user_input, context_text
-                ): (action, detail)
-                for action, detail in plan
+                ): (idx, action, detail)
+                for idx, (action, detail) in enumerate(plan)
             }
             for future in as_completed(futures):
-                action, detail = futures[future]
+                idx, action, detail = futures[future]
                 try:
                     result_action, result_detail, result = future.result()
-                    plan_results.append(
-                        (result_action, result_detail, result[:300] if result else "")
+                    plan_results[idx] = (
+                        result_action,
+                        result_detail,
+                        result[:300] if result else "",
                     )
                 except Exception as e:
-                    plan_results.append((action, detail, f"Error: {e}"))
+                    plan_results[idx] = (action, detail, f"Error: {e}")
+
+        plan_results = [r for r in plan_results if r is not None]
 
         turn_log["plan_results"] = [(a, d, r[:100]) for a, d, r in plan_results]
 
@@ -127,7 +131,7 @@ def run_conversation(turns, stm_file, tree_file):
 
         log["turns"].append(turn_log)
 
-    time.sleep(0.5)
+    memory.wait_for_idle(timeout=2.0)
     total_time = round(time.time() - start, 2)
     memory.tree.save()
 

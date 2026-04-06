@@ -16,3 +16,12 @@ def tool_bash_simulator(user_prompt, memory):
     if any(kw in user_lower for kw in ["disk", "space", "df", "storage"]):
         return "Filesystem      Size  Used Avail Use%\n/dev/sda1       500G  120G  380G  24%"
     return f"Simulated output for: {user_prompt}"
+
+
+def tool_weather(user_prompt, memory):
+    prompt = user_prompt.lower()
+    if "tokyo" in prompt:
+        return "Tokyo weather: Sunny, 22C"
+    if "london" in prompt:
+        return "London weather: Cloudy, 14C"
+    return "Weather for that location is unknown."

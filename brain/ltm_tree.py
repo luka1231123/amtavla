@@ -56,11 +56,6 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
     return float(np.dot(arr_a, arr_b) / (norm_a * norm_b))
 
 
-    def _branch_embedding_text(branch: dict) -> str:
-        content = branch.get("content") or []
-        return branch["topic"] + " " + " ".join(content)
-
-
 class LtmTree:
     def __init__(self, tree_file: str | None = None):
         self.branches: list[dict] = []
@@ -71,6 +66,10 @@ class LtmTree:
         self._index.clear()
         for node in self._collect_all_nodes():
             self._index[node["id"]] = node
+
+    def _branch_embedding_text(self, branch: dict) -> str:
+        content = branch.get("content") or []
+        return branch["topic"] + " " + " ".join(content)
 
     def load(self):
         if os.path.exists(self._tree_file):

@@ -28,7 +28,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("test.integration")
 
-from brain.stm import read_stm, append_stm, clear_stm, STM_FILE, MAX_LINES
+from brain.stm import read_stm, append_stm, clear_stm, STM_FILE, MAX_ENTRIES
 from brain.ltm_tree import (
     LtmTree,
     _safe_embed,
@@ -93,7 +93,10 @@ def cleanup(paths):
 
 
 def wait_memory_thread(mc):
-    pass
+    if hasattr(mc, "wait_for_idle"):
+        mc.wait_for_idle(timeout=2.0)
+    else:
+        time.sleep(0.2)
 
 
 # ─── STM Tests ───────────────────────────────────────────────────────────────
@@ -102,11 +105,11 @@ def wait_memory_thread(mc):
 def test_stm_append_and_read():
     f = temp_stm_file()
     try:
-        append_stm("first line", stm_file=f)
-        append_stm("second line", stm_file=f)
+        append_stm("first line", "response one", stm_file=f)
+        append_stm("second line", "response two", stm_file=f)
         content = read_stm(stm_file=f)
         lines = content.splitlines()
-        return len(lines) == 2 and "first line" in content and "second line" in content
+        return len(lines) == 4 and "first line" in content and "second line" in content
     finally:
         cleanup([f])
 
@@ -114,11 +117,12 @@ def test_stm_append_and_read():
 def test_stm_max_lines():
     f = temp_stm_file()
     try:
-        for i in range(MAX_LINES + 5):
-            append_stm(f"line {i}", stm_file=f)
+        for i in range(MAX_ENTRIES + 5):
+            append_stm(f"line {i}", f"resp {i}", stm_file=f)
         content = read_stm(stm_file=f)
         lines = [l for l in content.splitlines() if l.strip()]
-        return len(lines) == MAX_LINES and "line 5" in lines[0]
+        expected = MAX_ENTRIES * 2
+        return len(lines) == expected and "line 5" in lines[0]
     finally:
         cleanup([f])
 
@@ -126,7 +130,7 @@ def test_stm_max_lines():
 def test_stm_clear():
     f = temp_stm_file()
     try:
-        append_stm("data", stm_file=f)
+        append_stm("data", "response", stm_file=f)
         clear_stm(stm_file=f)
         return read_stm(stm_file=f) == ""
     finally:
@@ -431,8 +435,12 @@ def test_consolidation_creates_root_branch():
     sf = temp_stm_file()
     try:
         tree = LtmTree(tree_file=tf)
-        append_stm("Python is a programming language created by Guido", stm_file=sf)
-        append_stm("Python uses dynamic typing and garbage collection", stm_file=sf)
+        append_stm(
+            "Python is a programming language created by Guido", "Noted", stm_file=sf
+        )
+        append_stm(
+            "Python uses dynamic typing and garbage collection", "Captured", stm_file=sf
+        )
         consolidate_to_tree(read_stm(stm_file=sf), tree, None)
         return len(tree.branches) == 1 and len(tree.branches[0]["content"]) > 0
     finally:
@@ -445,7 +453,7 @@ def test_consolidation_excludes_current_branch():
     try:
         tree = LtmTree(tree_file=tf)
         b1 = tree.add_branch("Python", ["Python basics"])
-        append_stm("Python has decorators and context managers", stm_file=sf)
+        append_stm("Python has decorators and context managers", "Stored", stm_file=sf)
         consolidate_to_tree(read_stm(stm_file=sf), tree, b1["id"])
         nodes = tree._collect_all_nodes()
         for n in nodes:
@@ -521,25 +529,25 @@ def test_tool_websearch_empty():
 
 
 def test_planner_generates_steps():
-    steps = generate_plan("What is Python?", "No context")
+    steps, _ = generate_plan("What is Python?", "No context")
     return len(steps) > 0 and len(steps) <= 5
 
 
 def test_planner_includes_search():
-    steps = generate_plan("What is Python?", "No context")
+    steps, _ = generate_plan("What is Python?", "No context")
     actions = [s[0] for s in steps]
     return "SEARCH" in actions
 
 
 def test_planner_max_5_steps():
-    steps = generate_plan(
+    steps, _ = generate_plan(
         "Tell me everything about quantum computing and its applications", "No context"
     )
     return len(steps) <= 5
 
 
 def test_planner_no_json():
-    steps = generate_plan("What is Python?", "No context")
+    steps, _ = generate_plan("What is Python?", "No context")
     for action, detail in steps:
         assert isinstance(action, str)
         assert isinstance(detail, str)
@@ -716,7 +724,7 @@ def run_cli_loop(inputs, stm_file, tree_file):
             + (context.get("ltm_context", "") or "")
         )
 
-        plan = generate_plan(user_input, context_text)
+        plan, _ = generate_plan(user_input, context_text)
 
         def execute_step(action, detail):
             if action == "SEARCH":
@@ -740,19 +748,21 @@ def run_cli_loop(inputs, stm_file, tree_file):
                 return action, detail, ""
             return action, detail, ""
 
-        plan_results = []
+        plan_results = [None] * len(plan)
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = {
-                executor.submit(execute_step, action, detail): (action, detail)
-                for action, detail in plan
+                executor.submit(execute_step, action, detail): (idx, action, detail)
+                for idx, (action, detail) in enumerate(plan)
             }
             for future in as_completed(futures):
-                action, detail = futures[future]
+                idx, action, detail = futures[future]
                 try:
                     result = future.result()
-                    plan_results.append(result)
+                    plan_results[idx] = result
                 except Exception as e:
-                    plan_results.append((action, detail, f"Error: {e}"))
+                    plan_results[idx] = (action, detail, f"Error: {e}")
+
+        plan_results = [r for r in plan_results if r is not None]
 
         response = generate_response(user_input, plan, plan_results, context)
         outputs.append((user_input, plan, response))
@@ -761,7 +771,7 @@ def run_cli_loop(inputs, stm_file, tree_file):
 
     import time
 
-    time.sleep(0.5)
+    memory.wait_for_idle(timeout=2.0)
     memory.tree.save()
     return outputs, memory
 

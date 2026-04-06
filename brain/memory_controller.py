@@ -1,7 +1,9 @@
 import atexit
 import logging
+import queue
 import re
 import threading
+import time
 
 from brain.stm import read_stm, append_stm, clear_stm
 from brain.ltm_tree import LtmTree
@@ -26,16 +28,53 @@ class MemoryController:
         self.tree = LtmTree(tree_file=tree_file)
         self.tree.load()
         self.current_branch_id = None
-        self.turn_count = 0
-        self._cached_ltm_context = ""
+        self._has_meaningful_turn = False
         self._turns_since_save = 0
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
+        self._turn_queue: queue.Queue[tuple[str, str] | None] = queue.Queue()
+        self._stop_event = threading.Event()
+        self._worker_thread = threading.Thread(target=self._worker_loop, daemon=True)
+        self._worker_thread.start()
 
         active = self.tree.get_most_active_branch()
         if active and len(active.get("content", [])) > 0:
             self.current_branch_id = active["id"]
+            self._has_meaningful_turn = True
 
-        atexit.register(self._save_on_exit)
+        atexit.register(self._shutdown_on_exit)
+
+    def _shutdown_on_exit(self):
+        self.wait_for_idle(timeout=2.0)
+        self._stop_event.set()
+        self._turn_queue.put(None)
+        if self._worker_thread.is_alive():
+            self._worker_thread.join(timeout=1.0)
+        self.tree.save()
+
+    def _worker_loop(self):
+        while not self._stop_event.is_set():
+            try:
+                item = self._turn_queue.get(timeout=0.1)
+            except queue.Empty:
+                continue
+
+            if item is None:
+                self._turn_queue.task_done()
+                break
+
+            user_input, response = item
+            try:
+                self._process_turn(user_input, response)
+            finally:
+                self._turn_queue.task_done()
+
+    def wait_for_idle(self, timeout: float = 2.0) -> bool:
+        end = time.time() + timeout
+        while time.time() < end:
+            if self._turn_queue.unfinished_tasks == 0:
+                return True
+            time.sleep(0.01)
+        return self._turn_queue.unfinished_tasks == 0
 
     def _save_on_exit(self):
         self.tree.save()
@@ -47,42 +86,34 @@ class MemoryController:
 
     def get_context_for_prompt(self, user_input):
         stm = read_stm(stm_file=self._stm_file)
-        if self._cached_ltm_context:
-            ltm_context = self._cached_ltm_context
-        else:
-            ltm_context = self.tree.retrieve_context(user_input)
+        ltm_context = self.tree.retrieve_context(user_input)
         return {
             "working_memory": stm,
             "ltm_context": ltm_context,
         }
 
     def process_turn_async(self, user_input, response):
-        t = threading.Thread(
-            target=self._process_turn, args=(user_input, response), daemon=True
-        )
-        t.start()
+        self._turn_queue.put((user_input, response))
 
     def _is_greeting(self, text: str) -> bool:
         return bool(GREETING_PATTERNS.match(text.strip()))
 
     def _process_turn(self, user_input, response):
         try:
-            with self._lock:
-                self.turn_count += 1
             snippet = summarize_for_stm(user_input, response)
 
             if not snippet or not snippet.strip():
                 logger.debug("Empty snippet, skipping turn")
                 return
 
-            append_stm(user_input, response, stm_file=self._stm_file)
+            is_trivial_greeting = self._is_greeting(user_input) and len(snippet) < 15
+            if is_trivial_greeting and not self._has_meaningful_turn:
+                logger.debug("Greeting turn, skipping branch creation")
+                return
 
-            current_branch = self._get_current_branch()
+            if not self._has_meaningful_turn:
+                append_stm(user_input, response, stm_file=self._stm_file)
 
-            if self.turn_count == 1:
-                if self._is_greeting(user_input) and len(snippet) < 15:
-                    logger.debug("Greeting turn, skipping branch creation")
-                    return
                 if snippet.lower() == user_input.lower().strip():
                     logger.debug("Snippet echoes input, skipping branch")
                     return
@@ -91,38 +122,48 @@ class MemoryController:
                 new_branch = self.tree.add_branch(topic, [snippet])
                 if new_branch:
                     self.current_branch_id = new_branch["id"]
+                    self._has_meaningful_turn = True
                     logger.debug("Initial branch: %s", new_branch["topic"])
-                    self._cached_ltm_context = self.tree.retrieve_context(user_input)
+                self._maybe_save_tree()
                 return
 
+            current_branch = self._get_current_branch()
             shifted, new_topic = detect_topic_shift(user_input, current_branch)
             if shifted:
-                self._consolidate_and_reset()
+                stm_before_shift = read_stm(stm_file=self._stm_file)
+                self._consolidate_and_reset(stm_before_shift)
                 if new_topic:
                     clean_topic = _clean_topic_name(new_topic, "New Topic")
-                    new_branch = self.tree.add_branch(clean_topic, [snippet])
-                    if new_branch:
-                        self.current_branch_id = new_branch["id"]
-                        logger.debug("New branch: %s", new_branch["topic"])
-                        self._cached_ltm_context = self.tree.retrieve_context(
-                            user_input
-                        )
                 else:
-                    self._cached_ltm_context = ""
-            else:
-                self._cached_ltm_context = self.tree.retrieve_context(user_input)
+                    clean_topic = _clean_topic_name(user_input[:40], "New Topic")
 
-            with self._lock:
-                self._turns_since_save += 1
-                if self._turns_since_save >= SAVE_INTERVAL:
-                    self.tree.save()
-                    self._turns_since_save = 0
+                new_branch = self.tree.add_branch(clean_topic, [snippet])
+                if new_branch:
+                    self.current_branch_id = new_branch["id"]
+                    logger.debug("New branch: %s", new_branch["topic"])
+
+                append_stm(user_input, response, stm_file=self._stm_file)
+            else:
+                append_stm(user_input, response, stm_file=self._stm_file)
+
+            self._maybe_save_tree()
         except Exception as e:
             logger.error("Error in _process_turn: %s", e)
 
-    def _consolidate_and_reset(self):
+    def _maybe_save_tree(self):
+        with self._lock:
+            self._turns_since_save += 1
+            if self._turns_since_save >= SAVE_INTERVAL:
+                self.tree.save()
+                self._turns_since_save = 0
+
+    def _consolidate_and_reset(self, stm_snapshot: str | None = None):
         logger.debug("Consolidating STM to tree")
-        stm = read_stm(stm_file=self._stm_file)
+        stm = (
+            stm_snapshot
+            if stm_snapshot is not None
+            else read_stm(stm_file=self._stm_file)
+        )
         if stm.strip():
             consolidate_to_tree(stm, self.tree, self.current_branch_id)
             self.tree.save()

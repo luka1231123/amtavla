@@ -3,33 +3,31 @@ import sys
 import time
 import threading
 import select
-from collections import deque
+import queue
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.insert(0, ".")
 
-from brain.planner import generate_plan, get_thinking
+from brain.planner import generate_plan
 from brain.memory_controller import MemoryController
 from generator import generate_response
 from tools import tool_bash_simulator
 from tools.websearch import tool_websearch
+import llama_client
 
 MEMORY = MemoryController()
+logger = logging.getLogger("amtavla.main")
 
-GREETING_RESPONSES = {
-    "hi": "Hey! How can I help?",
-    "hello": "Hello! What can I do for you?",
-    "hey": "Hey there! What's up?",
-}
-
-command_queue = []
+command_queue = queue.Queue()
 stop_command_poller = False
 
 
 def _poll_commands():
     import urllib.request
     import json
-    global command_queue, stop_command_poller
+
+    global stop_command_poller
     while not stop_command_poller:
         try:
             req = urllib.request.Request("http://127.0.0.1:8081/command")
@@ -37,13 +35,15 @@ def _poll_commands():
                 data = response.read()
                 resp = json.loads(data)
                 if resp.get("command"):
-                    command_queue.append(resp["command"])
-                    urllib.request.urlopen(
-                        urllib.request.Request("http://127.0.0.1:8081/command/ack"),
-                        timeout=2
+                    ack_req = urllib.request.Request(
+                        "http://127.0.0.1:8081/command/ack",
+                        data=b"{}",
+                        headers={"Content-Type": "application/json"},
                     )
+                    urllib.request.urlopen(ack_req, timeout=2)
+                    command_queue.put(resp["command"])
         except Exception:
-            pass
+            logger.debug("Command poll failed", exc_info=True)
         time.sleep(0.5)
 
 
@@ -51,11 +51,12 @@ def _send_response_to_ui(response: str):
     try:
         import urllib.request
         import json
+
         data = json.dumps({"text": response}).encode("utf-8")
         req = urllib.request.Request(
             "http://127.0.0.1:8081/response",
             data=data,
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json"},
         )
         urllib.request.urlopen(req, timeout=5)
     except Exception:
@@ -81,30 +82,42 @@ def execute_plan_step(
 
 def run():
     global stop_command_poller
-    
+
+    try:
+        llama_client._ensure_server_running()
+    except Exception as e:
+        print(f"[FATAL] Failed to start llama-server: {e}")
+        print(
+            "Please install/build llama.cpp server and ensure a .gguf model exists in ~/llama.cpp/models."
+        )
+        sys.exit(1)
+
     poller_thread = threading.Thread(target=_poll_commands, daemon=True)
     poller_thread.start()
-    
+
     print("amtavla - CLI assistant (type 'exit' to quit, '/brain <mode>' for debug)\n")
     print("Or use phone UI at http://127.0.0.1:8081\n")
 
     while True:
         try:
             user_input = None
-            
+
             # Check for phone commands first
-            if command_queue:
-                user_input = command_queue.pop(0)
-                print(f"[PHONE] {user_input}")
+            if not command_queue.empty():
+                try:
+                    user_input = command_queue.get_nowait()
+                    print(f"[PHONE] {user_input}")
+                except queue.Empty:
+                    user_input = None
             # Check for stdin input (non-blocking)
-            elif sys.platform != 'win32' and select.select([sys.stdin], [], [], 0)[0]:
+            elif sys.platform != "win32" and select.select([sys.stdin], [], [], 0)[0]:
                 user_input = sys.stdin.readline()
                 if user_input:
                     user_input = user_input.strip()
             else:
                 time.sleep(0.1)
                 continue
-                
+
             if not user_input:
                 continue
         except (EOFError, KeyboardInterrupt):
@@ -125,58 +138,49 @@ def run():
             print()
             continue
 
-        lower = user_input.lower()
-        for greeting, resp in GREETING_RESPONSES.items():
-            if (
-                lower == greeting
-                or lower.startswith(greeting + " ")
-                or lower.startswith(greeting + "!")
-            ):
-                print(f"{resp}\n")
-                MEMORY.process_turn_async(user_input, resp)
-                break
-        else:
-            try:
-                context = MEMORY.get_context_for_prompt(user_input)
-                context_text = (
-                    (context.get("working_memory", "") or "")
-                    + " "
-                    + (context.get("ltm_context", "") or "")
-                )
+        try:
+            context = MEMORY.get_context_for_prompt(user_input)
+            context_text = (
+                (context.get("working_memory", "") or "")
+                + " "
+                + (context.get("ltm_context", "") or "")
+            )
 
-                plan, thinking = generate_plan(user_input, context_text)
+            plan, _ = generate_plan(user_input, context_text)
 
-                plan_results = []
-                with ThreadPoolExecutor(max_workers=5) as executor:
-                    futures = {
-                        executor.submit(
-                            execute_plan_step, action, detail, user_input, context_text
-                        ): (action, detail)
-                        for action, detail in plan
-                    }
-                    for future in as_completed(futures):
-                        action, detail = futures[future]
-                        try:
-                            result_action, result_detail, result = future.result()
-                            plan_results.append((result_action, result_detail, result))
-                        except Exception as e:
-                            plan_results.append((action, detail, f"Error: {e}"))
+            plan_results = [None] * len(plan)
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                futures = {
+                    executor.submit(
+                        execute_plan_step, action, detail, user_input, context_text
+                    ): (idx, action, detail)
+                    for idx, (action, detail) in enumerate(plan)
+                }
+                for future in as_completed(futures):
+                    idx, action, detail = futures[future]
+                    try:
+                        result_action, result_detail, result = future.result()
+                        plan_results[idx] = (result_action, result_detail, result)
+                    except Exception as e:
+                        plan_results[idx] = (action, detail, f"Error: {e}")
 
-                response = generate_response(
-                    user_input,
-                    plan,
-                    plan_results,
-                    context,
-                )
-                print(f"{response}\n")
-                
-                _send_response_to_ui(response)
+            plan_results = [r for r in plan_results if r is not None]
 
-                MEMORY.process_turn_async(user_input, response)
+            response = generate_response(
+                user_input,
+                plan,
+                plan_results,
+                context,
+            )
+            print(f"{response}\n")
 
-            except Exception as e:
-                print(f"   [ERROR] {e}")
-                print("I'm having trouble right now. Please try again.\n")
+            _send_response_to_ui(response)
+
+            MEMORY.process_turn_async(user_input, response)
+
+        except Exception as e:
+            print(f"   [ERROR] {e}")
+            print("I'm having trouble right now. Please try again.\n")
 
     stop_command_poller = True
 

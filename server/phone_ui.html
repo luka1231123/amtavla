@@ -48,13 +48,13 @@
         .dictation-area {
             flex: 0 0 20%;
             display: flex;
-            align-items: center;
-            justify-content: center;
+            flex-direction: column;
+            gap: 10px;
             padding: 20px;
         }
         #dictateBtn {
             width: 100%;
-            height: 80%;
+            height: 52px;
             font-size: 24px;
             font-weight: 600;
             background: #2d5a2d;
@@ -81,6 +81,30 @@
             text-align: center;
             padding: 8px;
         }
+        .input-row {
+            width: 100%;
+            display: flex;
+            gap: 8px;
+        }
+        #textInput {
+            flex: 1;
+            min-width: 0;
+            border: 1px solid #444;
+            background: #121212;
+            color: #e0e0e0;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 16px;
+        }
+        #sendBtn {
+            border: none;
+            background: #236a8a;
+            color: #fff;
+            border-radius: 10px;
+            padding: 0 14px;
+            font-size: 16px;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -93,6 +117,10 @@
         </div>
         <div class="dictation-area">
             <button id="dictateBtn">Hold to Talk</button>
+            <div class="input-row">
+                <input id="textInput" type="text" placeholder="Type a message" autocomplete="off">
+                <button id="sendBtn">Send</button>
+            </div>
         </div>
     </div>
     <div id="status" class="status"></div>
@@ -101,10 +129,30 @@
         const textContent = document.getElementById('textContent');
         const responseContent = document.getElementById('responseContent');
         const dictateBtn = document.getElementById('dictateBtn');
+        const textInput = document.getElementById('textInput');
+        const sendBtn = document.getElementById('sendBtn');
         const status = document.getElementById('status');
         let recognition = null;
         let isListening = false;
         let isProcessing = false;
+
+        const sendCommand = async (text) => {
+            const finalText = (text || '').trim();
+            if (!finalText) return;
+            textContent.textContent = finalText;
+            status.textContent = 'Processing...';
+            isProcessing = true;
+            try {
+                await fetch('http://127.0.0.1:8081/command', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({text: finalText})
+                });
+            } catch (e) {
+                isProcessing = false;
+                status.textContent = 'Failed to send command';
+            }
+        };
 
         if ('webkitSpeechRecognition' in window) {
             recognition = new webkitSpeechRecognition();
@@ -137,13 +185,7 @@
                 isListening = false;
                 dictateBtn.classList.remove('listening');
                 const finalText = textContent.textContent.trim();
-                if (finalText) {
-                    fetch('http://127.0.0.1:8081/command', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({text: finalText})
-                    });
-                }
+                sendCommand(finalText);
                 if (!isProcessing) {
                     status.textContent = '';
                 }
@@ -183,6 +225,16 @@
         dictateBtn.addEventListener('mouseleave', stopListening);
         dictateBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startListening(); });
         dictateBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopListening(); });
+        sendBtn.addEventListener('click', () => {
+            sendCommand(textInput.value);
+            textInput.value = '';
+        });
+        textInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                sendBtn.click();
+            }
+        });
 
         let lastResponse = '';
         setInterval(async () => {
