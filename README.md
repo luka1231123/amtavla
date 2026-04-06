@@ -19,9 +19,9 @@ cd llama.cpp
 cmake -B build
 cmake --build build --config Release -j 8
 
-# Download model (Qwen2.5-coder-7B-instruct-F16.gguf)
+# Download model (Qwen2.5-Coder-7B-Instruct-Q4_0_4_4.gguf)
 mkdir -p ~/llama.cpp/models
-# Put model in: ~/llama.cpp/models/Qwen2.5-coder-7B-instruct-F16.gguf
+# Put model in: ~/llama.cpp/models/Qwen2.5-Coder-7B-Instruct-Q4_0_4_4.gguf
 ```
 
 ### 3. Install llama-embed (for embeddings)
