@@ -7,6 +7,7 @@ Run: python3 tests/test_conversation.py
 """
 
 import json
+import logging
 import os
 import sys
 import tempfile
@@ -16,6 +17,19 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+LOG_DIR = os.path.join(os.path.dirname(__file__), "..", "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(os.path.join(LOG_DIR, "conversation_test.log")),
+        logging.StreamHandler(),
+    ],
+)
+logger = logging.getLogger("test.conversation")
 
 from brain.memory_controller import MemoryController
 from brain.planner import generate_plan
@@ -46,6 +60,8 @@ def execute_plan_step(action, detail, user_input, memory_str):
             return action, detail, tool_weather(user_input, memory_str)
         elif detail == "bash":
             return action, detail, tool_bash_simulator(user_input, memory_str)
+        else:
+            return action, detail, f"Unknown tool: {detail}"
     elif action == "THINK":
         return action, detail, ""
     return action, detail, ""
@@ -178,7 +194,7 @@ def main():
     print(s["final_stm"] or "(empty)")
     print()
 
-    log_path = os.path.join(os.path.dirname(__file__), "conversation_log.json")
+    log_path = os.path.join(LOG_DIR, "conversation_log.json")
     with open(log_path, "w") as f:
         json.dump(log, f, indent=2)
     print(f"Full log saved to: {log_path}")

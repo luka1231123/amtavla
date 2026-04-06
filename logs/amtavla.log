@@ -1,0 +1,713 @@
+2026-04-06 10:59:40,878 - filelock - DEBUG - Attempting to acquire lock 4430665376 on brain/ltm_tree.json.lock
+2026-04-06 10:59:40,878 - filelock - DEBUG - Lock 4430665376 acquired on brain/ltm_tree.json.lock
+2026-04-06 10:59:40,878 - filelock - DEBUG - Attempting to release lock 4430665376 on brain/ltm_tree.json.lock
+2026-04-06 10:59:40,878 - filelock - DEBUG - Lock 4430665376 released on brain/ltm_tree.json.lock
+2026-04-06 10:59:44,577 - httpcore.connection - DEBUG - connect_tcp.started host='127.0.0.1' port=11434 local_address=None timeout=None socket_options=None
+2026-04-06 10:59:44,580 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x10816aa50>
+2026-04-06 10:59:44,580 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-04-06 10:59:44,580 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-06 10:59:44,580 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-04-06 10:59:44,580 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-06 10:59:44,580 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-04-06 10:59:44,847 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Mon, 06 Apr 2026 06:59:44 GMT'), (b'Content-Length', b'332')])
+2026-04-06 10:59:44,848 - httpx - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-04-06 10:59:44,849 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-04-06 10:59:44,849 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-06 10:59:44,849 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-06 10:59:44,849 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-06 10:59:44,849 - brain.consolidator - DEBUG - STM snippet: Hello! How can I assist you today?
+2026-04-06 10:59:44,850 - filelock - DEBUG - Attempting to acquire lock 4431316304 on brain/working_memory.txt.lock
+2026-04-06 10:59:44,850 - filelock - DEBUG - Lock 4431316304 acquired on brain/working_memory.txt.lock
+2026-04-06 10:59:44,851 - filelock - DEBUG - Attempting to release lock 4431316304 on brain/working_memory.txt.lock
+2026-04-06 10:59:44,851 - filelock - DEBUG - Lock 4431316304 released on brain/working_memory.txt.lock
+2026-04-06 10:59:44,851 - brain.stm - DEBUG - Appended: Hello! How can I assist you today?
+2026-04-06 10:59:44,852 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-04-06 10:59:44,852 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-06 10:59:44,852 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-04-06 10:59:44,852 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-06 10:59:44,852 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-04-06 10:59:44,864 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Mon, 06 Apr 2026 06:59:44 GMT'), (b'Transfer-Encoding', b'chunked')])
+2026-04-06 10:59:44,865 - httpx - INFO - HTTP Request: POST http://127.0.0.1:11434/api/embeddings "HTTP/1.1 200 OK"
+2026-04-06 10:59:44,865 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-04-06 10:59:44,865 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-06 10:59:44,865 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-06 10:59:44,865 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-06 10:59:44,866 - brain.memory_controller - DEBUG - Initial branch: hi there
+2026-04-06 10:59:44,867 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-04-06 10:59:44,867 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-06 10:59:44,867 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-04-06 10:59:44,867 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-06 10:59:44,867 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-04-06 10:59:44,875 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Mon, 06 Apr 2026 06:59:44 GMT'), (b'Transfer-Encoding', b'chunked')])
+2026-04-06 10:59:44,875 - httpx - INFO - HTTP Request: POST http://127.0.0.1:11434/api/embeddings "HTTP/1.1 200 OK"
+2026-04-06 10:59:44,875 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-04-06 10:59:44,876 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-06 10:59:44,876 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-06 10:59:44,876 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-06 10:59:52,989 - filelock - DEBUG - Attempting to acquire lock 4430379152 on brain/working_memory.txt.lock
+2026-04-06 10:59:52,989 - filelock - DEBUG - Lock 4430379152 acquired on brain/working_memory.txt.lock
+2026-04-06 10:59:52,990 - filelock - DEBUG - Attempting to release lock 4430379152 on brain/working_memory.txt.lock
+2026-04-06 10:59:52,990 - filelock - DEBUG - Lock 4430379152 released on brain/working_memory.txt.lock
+2026-04-06 10:59:52,991 - httpcore.connection - DEBUG - close.started
+2026-04-06 10:59:52,992 - httpcore.connection - DEBUG - close.complete
+2026-04-06 10:59:52,992 - httpcore.connection - DEBUG - connect_tcp.started host='127.0.0.1' port=11434 local_address=None timeout=None socket_options=None
+2026-04-06 10:59:52,992 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x108208690>
+2026-04-06 10:59:52,992 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-04-06 10:59:52,992 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-06 10:59:52,993 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-04-06 10:59:52,993 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-06 10:59:52,993 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-04-06 10:59:56,104 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Mon, 06 Apr 2026 06:59:56 GMT'), (b'Content-Length', b'1603')])
+2026-04-06 10:59:56,104 - httpx - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-04-06 10:59:56,105 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-04-06 10:59:56,105 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-06 10:59:56,105 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-06 10:59:56,105 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-06 10:59:56,105 - brain.planner - DEBUG - Raw plan:
+- **Hello! How can I assist you today?**
+  - **SEARCH:** How do decorators work?
+  - **TOOL:** python version
+  - **THINK: Decorators allow users to add new functionality to existing objects without modifying their structure. They are a powerful way to extend the behavior of methods, classes, or functions.**
+
+- **How do decorators work?**
+  - **SEARCH:** Python decorators tutorial
+  - **TOOL:** bash
+  - **THINK: Decorators can be defined as functions that take another function and extend its behavior without explicitly modifying it. They are a powerful tool for adding functionality to existing code in a clean, readable manner.**
+
+- **Python decorators tutorial**
+  - **SEARCH:** Python decorators tutorial
+  - **TOOL:** bash
+  - **THINK: Python decorators provide a way to add new functionality to an existing object without modifying its structure. They are particularly useful for adding logging, authentication, and other features to functions, methods, or classes.**
+
+- **What's 5+5?**
+  - **SEARCH:** Python addition
+  - **TOOL:** python version
+  - **THINK: The addition of two numbers, in this case 5 and 5, results in 10. In Python, you can add two integers using the `+` operator. This is a fundamental arithmetic operation that is commonly used to compute sums.**
+2026-04-06 10:59:56,105 - brain.planner - DEBUG - Parsed steps: [('SEARCH', "what's 5+5"), ('THINK', '')]
+2026-04-06 10:59:56,242 - rustls.webpki.anchors - DEBUG - add_parsable_certificates processed 159 valid and 0 invalid certs
+2026-04-06 10:59:56,245 - reqwest.connect - DEBUG - starting new connection: https://en.wikipedia.org/
+2026-04-06 10:59:56,245 - reqwest.connect - DEBUG - starting new connection: https://grokipedia.com/
+2026-04-06 10:59:56,263 - hyper_util.client.legacy.connect.http - DEBUG - connecting to 185.15.59.224:443
+2026-04-06 10:59:56,264 - hyper_util.client.legacy.connect.http - DEBUG - connecting to 104.18.18.2:443
+2026-04-06 10:59:56,299 - hyper_util.client.legacy.connect.http - DEBUG - connected to 104.18.18.2:443
+2026-04-06 10:59:56,302 - rustls.client.hs - DEBUG - No cached session for DnsName("grokipedia.com")
+2026-04-06 10:59:56,303 - rustls.client.hs - DEBUG - Not resuming any session
+2026-04-06 10:59:56,323 - rustls.client.hs - DEBUG - Browser emulation: Some(BrowserEmulator { browser_type: Safari, version: BrowserVersion { major: 26, minor: 3, patch: 0 }, extension_order_seed: Some(39548), cipher_suites: Some([TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, CipherSuite(0x9d), CipherSuite(0x9c), CipherSuite(0x35), CipherSuite(0x2f), CipherSuite(0xc008), CipherSuite(0xc012), CipherSuite(0xa)]), signature_algorithms: Some([ECDSA_NISTP256_SHA256, RSA_PSS_SHA256, RSA_PKCS1_SHA256, ECDSA_NISTP384_SHA384, RSA_PSS_SHA384, RSA_PSS_SHA384, RSA_PKCS1_SHA384, RSA_PSS_SHA512, RSA_PKCS1_SHA512, RSA_PKCS1_SHA1]), named_groups: Some([X25519MLKEM768, X25519, secp256r1, secp384r1]), os_type: Some(MacOS), include_status_request_v2: true })
+2026-04-06 10:59:56,323 - rustls.client.hs - DEBUG - Using extension_order_seed: 40628
+2026-04-06 10:59:56,325 - rustls.client.hs - DEBUG - Browser emulation: Some(BrowserEmulator { browser_type: Safari, version: BrowserVersion { major: 26, minor: 3, patch: 0 }, extension_order_seed: Some(39548), cipher_suites: Some([TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, CipherSuite(0x9d), CipherSuite(0x9c), CipherSuite(0x35), CipherSuite(0x2f), CipherSuite(0xc008), CipherSuite(0xc012), CipherSuite(0xa)]), signature_algorithms: Some([ECDSA_NISTP256_SHA256, RSA_PSS_SHA256, RSA_PKCS1_SHA256, ECDSA_NISTP384_SHA384, RSA_PSS_SHA384, RSA_PSS_SHA384, RSA_PKCS1_SHA384, RSA_PSS_SHA512, RSA_PKCS1_SHA512, RSA_PKCS1_SHA1]), named_groups: Some([X25519MLKEM768, X25519, secp256r1, secp384r1]), os_type: Some(MacOS), include_status_request_v2: true })
+2026-04-06 10:59:56,325 - rustls.client.hs - DEBUG - Cipher suites count: 20
+2026-04-06 10:59:56,325 - rustls.client.hs - DEBUG -   [0] TLS13_AES_128_GCM_SHA256
+2026-04-06 10:59:56,325 - rustls.client.hs - DEBUG -   [1] TLS13_AES_256_GCM_SHA384
+2026-04-06 10:59:56,325 - rustls.client.hs - DEBUG -   [2] TLS13_CHACHA20_POLY1305_SHA256
+2026-04-06 10:59:56,325 - rustls.client.hs - DEBUG -   [3] TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+2026-04-06 10:59:56,325 - rustls.client.hs - DEBUG -   [4] TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+2026-04-06 10:59:56,325 - rustls.client.hs - DEBUG -   [5] TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+2026-04-06 10:59:56,325 - rustls.client.hs - DEBUG -   [6] TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+2026-04-06 10:59:56,325 - rustls.client.hs - DEBUG -   [7] TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+2026-04-06 10:59:56,325 - rustls.client.hs - DEBUG -   [8] TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+2026-04-06 10:59:56,325 - rustls.client.hs - DEBUG -   [9] TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA
+2026-04-06 10:59:56,325 - rustls.client.hs - DEBUG -   [10] TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA
+2026-04-06 10:59:56,325 - rustls.client.hs - DEBUG -   [11] TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA
+2026-04-06 10:59:56,325 - rustls.client.hs - DEBUG -   [12] TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
+2026-04-06 10:59:56,325 - rustls.client.hs - DEBUG -   [13] CipherSuite(0x9d)
+2026-04-06 10:59:56,325 - rustls.client.hs - DEBUG -   [14] CipherSuite(0x9c)
+2026-04-06 10:59:56,325 - rustls.client.hs - DEBUG -   [15] CipherSuite(0x35)
+2026-04-06 10:59:56,325 - rustls.client.hs - DEBUG -   [16] CipherSuite(0x2f)
+2026-04-06 10:59:56,325 - rustls.client.hs - DEBUG -   [17] CipherSuite(0xc008)
+2026-04-06 10:59:56,325 - rustls.client.hs - DEBUG -   [18] CipherSuite(0xc012)
+2026-04-06 10:59:56,325 - rustls.client.hs - DEBUG -   [19] CipherSuite(0xa)
+2026-04-06 10:59:56,325 - rustls.client.hs - DEBUG - Final cipher suites for ClientHello: [TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, CipherSuite(0x9d), CipherSuite(0x9c), CipherSuite(0x35), CipherSuite(0x2f), CipherSuite(0xc008), CipherSuite(0xc012), CipherSuite(0xa)]
+2026-04-06 10:59:56,365 - rustls.client.hs - DEBUG - Using ciphersuite TLS13_AES_128_GCM_SHA256
+2026-04-06 10:59:56,366 - rustls.client.tls13 - DEBUG - Not resuming
+2026-04-06 10:59:56,366 - rustls.client.tls13 - DEBUG - TLS1.3 encrypted extensions: ServerExtensions { server_name_ack: (), selected_protocol: SingleProtocolName(ProtocolName(6832)), unknown_extensions: {}, .. }
+2026-04-06 10:59:56,366 - rustls.client.hs - DEBUG - ALPN protocol is Some(b"h2")
+2026-04-06 10:59:56,367 - h2.client - DEBUG - binding client connection
+2026-04-06 10:59:56,367 - h2.client - DEBUG - client connection bound
+2026-04-06 10:59:56,367 - h2.client - DEBUG - handshake2: settings header_table_size=None, enable_push=Some(false), initial_window_size=Some(2097152), max_frame_size=None, max_header_list_size=None
+2026-04-06 10:59:56,367 - h2.client - DEBUG - handshake2: sending initial settings frame
+2026-04-06 10:59:56,368 - h2.codec.framed_write - DEBUG - send frame=Settings { flags: (0x0), enable_push: 0, max_concurrent_streams: 100, initial_window_size: 2097152, no_rfc7540_priorities: 1 }
+2026-04-06 10:59:56,368 - h2.frame.settings - DEBUG - encoding SETTINGS; len=24, order=SettingsOrder { ids: [EnablePush, MaxConcurrentStreams, InitialWindowSize, NoRfc7540Priorities] }, header_table_size=None, enable_push=Some(0), initial_window_size=Some(2097152), max_frame_size=None, max_header_list_size=None
+2026-04-06 10:59:56,368 - h2.frame.settings - DEBUG - encoding setting; val=EnablePush(0)
+2026-04-06 10:59:56,368 - h2.frame.settings - DEBUG - encoding setting; val=MaxConcurrentStreams(100)
+2026-04-06 10:59:56,368 - h2.frame.settings - DEBUG - encoding setting; val=InitialWindowSize(2097152)
+2026-04-06 10:59:56,368 - h2.frame.settings - DEBUG - encoding setting; val=NoRfc7540Priorities(1)
+2026-04-06 10:59:56,368 - h2.proto.connection - DEBUG - Connection; peer=Client
+2026-04-06 10:59:56,368 - hyper_util.client.legacy.pool - DEBUG - pooling idle connection for ("https", grokipedia.com)
+2026-04-06 10:59:56,368 - h2.codec.framed_write - DEBUG - send frame=WindowUpdate { stream_id: StreamId(0), size_increment: 10420225 }
+2026-04-06 10:59:56,369 - h2.codec.framed_write - DEBUG - send frame=Headers { stream_id: StreamId(1), flags: (0x5: END_HEADERS | END_STREAM) }
+2026-04-06 10:59:56,369 - hyper_util.client.legacy.connect.http - DEBUG - connected to 185.15.59.224:443
+2026-04-06 10:59:56,369 - rustls.client.hs - DEBUG - No cached session for DnsName("en.wikipedia.org")
+2026-04-06 10:59:56,369 - rustls.client.hs - DEBUG - Not resuming any session
+2026-04-06 10:59:56,369 - rustls.client.hs - DEBUG - Browser emulation: Some(BrowserEmulator { browser_type: Chrome, version: BrowserVersion { major: 144, minor: 0, patch: 0 }, extension_order_seed: Some(36266), cipher_suites: Some([CipherSuite(0xa0a), TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, CipherSuite(0x9c), CipherSuite(0x9d), CipherSuite(0x2f), CipherSuite(0x35)]), signature_algorithms: Some([ECDSA_NISTP256_SHA256, RSA_PSS_SHA256, RSA_PKCS1_SHA256, ECDSA_NISTP384_SHA384, RSA_PSS_SHA384, RSA_PKCS1_SHA384, RSA_PSS_SHA512, RSA_PKCS1_SHA512]), named_groups: Some([GREASE, X25519MLKEM768, X25519, secp256r1, secp384r1]), os_type: None, include_status_request_v2: false })
+2026-04-06 10:59:56,369 - rustls.client.hs - DEBUG - Using extension_order_seed: 16286
+2026-04-06 10:59:56,369 - rustls.client.hs - DEBUG - Browser emulation: Some(BrowserEmulator { browser_type: Chrome, version: BrowserVersion { major: 144, minor: 0, patch: 0 }, extension_order_seed: Some(36266), cipher_suites: Some([CipherSuite(0xa0a), TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, CipherSuite(0x9c), CipherSuite(0x9d), CipherSuite(0x2f), CipherSuite(0x35)]), signature_algorithms: Some([ECDSA_NISTP256_SHA256, RSA_PSS_SHA256, RSA_PKCS1_SHA256, ECDSA_NISTP384_SHA384, RSA_PSS_SHA384, RSA_PKCS1_SHA384, RSA_PSS_SHA512, RSA_PKCS1_SHA512]), named_groups: Some([GREASE, X25519MLKEM768, X25519, secp256r1, secp384r1]), os_type: None, include_status_request_v2: false })
+2026-04-06 10:59:56,369 - rustls.client.hs - DEBUG - Cipher suites count: 16
+2026-04-06 10:59:56,369 - rustls.client.hs - DEBUG -   [0] CipherSuite(0xdada)
+2026-04-06 10:59:56,369 - rustls.client.hs - DEBUG -   [1] TLS13_AES_128_GCM_SHA256
+2026-04-06 10:59:56,369 - rustls.client.hs - DEBUG -   [2] TLS13_AES_256_GCM_SHA384
+2026-04-06 10:59:56,369 - rustls.client.hs - DEBUG -   [3] TLS13_CHACHA20_POLY1305_SHA256
+2026-04-06 10:59:56,369 - rustls.client.hs - DEBUG -   [4] TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+2026-04-06 10:59:56,369 - rustls.client.hs - DEBUG -   [5] TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+2026-04-06 10:59:56,369 - rustls.client.hs - DEBUG -   [6] TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+2026-04-06 10:59:56,369 - rustls.client.hs - DEBUG -   [7] TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+2026-04-06 10:59:56,369 - rustls.client.hs - DEBUG -   [8] TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+2026-04-06 10:59:56,369 - rustls.client.hs - DEBUG -   [9] TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+2026-04-06 10:59:56,369 - rustls.client.hs - DEBUG -   [10] TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
+2026-04-06 10:59:56,369 - rustls.client.hs - DEBUG -   [11] TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA
+2026-04-06 10:59:56,369 - rustls.client.hs - DEBUG -   [12] CipherSuite(0x9c)
+2026-04-06 10:59:56,369 - rustls.client.hs - DEBUG -   [13] CipherSuite(0x9d)
+2026-04-06 10:59:56,369 - rustls.client.hs - DEBUG -   [14] CipherSuite(0x2f)
+2026-04-06 10:59:56,369 - rustls.client.hs - DEBUG -   [15] CipherSuite(0x35)
+2026-04-06 10:59:56,369 - rustls.client.hs - DEBUG - Final cipher suites for ClientHello: [CipherSuite(0xdada), TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, CipherSuite(0x9c), CipherSuite(0x9d), CipherSuite(0x2f), CipherSuite(0x35)]
+2026-04-06 10:59:56,401 - h2.codec.framed_read - DEBUG - received frame=Settings { flags: (0x0), max_concurrent_streams: 100, initial_window_size: 65536, max_frame_size: 16777215 }
+2026-04-06 10:59:56,401 - h2.codec.framed_write - DEBUG - send frame=Settings { flags: (0x1: ACK) }
+2026-04-06 10:59:56,401 - h2.frame.settings - DEBUG - encoding SETTINGS; len=0, order=SettingsOrder { ids: [HeaderTableSize, EnablePush, MaxConcurrentStreams, InitialWindowSize, MaxFrameSize, MaxHeaderListSize, EnableConnectProtocol, NoRfc7540Priorities] }, header_table_size=None, enable_push=None, initial_window_size=None, max_frame_size=None, max_header_list_size=None
+2026-04-06 10:59:56,401 - h2.codec.framed_read - DEBUG - received frame=WindowUpdate { stream_id: StreamId(0), size_increment: 2147418112 }
+2026-04-06 10:59:56,402 - h2.codec.framed_read - DEBUG - received frame=Settings { flags: (0x1: ACK) }
+2026-04-06 10:59:56,402 - h2.proto.settings - DEBUG - received settings ACK; applying Settings { flags: (0x0), enable_push: 0, max_concurrent_streams: 100, initial_window_size: 2097152, no_rfc7540_priorities: 1 }
+2026-04-06 10:59:56,481 - rustls.client.hs - DEBUG - Using ciphersuite TLS13_AES_128_GCM_SHA256
+2026-04-06 10:59:56,482 - rustls.client.tls13 - DEBUG - Not resuming
+2026-04-06 10:59:56,482 - rustls.client.tls13 - DEBUG - TLS1.3 encrypted extensions: ServerExtensions { server_name_ack: (), selected_protocol: SingleProtocolName(ProtocolName(6832)), unknown_extensions: {}, .. }
+2026-04-06 10:59:56,482 - rustls.client.hs - DEBUG - ALPN protocol is Some(b"h2")
+2026-04-06 10:59:56,483 - h2.client - DEBUG - binding client connection
+2026-04-06 10:59:56,483 - h2.client - DEBUG - client connection bound
+2026-04-06 10:59:56,483 - h2.client - DEBUG - handshake2: settings header_table_size=Some(65536), enable_push=Some(false), initial_window_size=Some(6291456), max_frame_size=None, max_header_list_size=Some(262144)
+2026-04-06 10:59:56,483 - h2.client - DEBUG - handshake2: sending initial settings frame
+2026-04-06 10:59:56,483 - h2.codec.framed_write - DEBUG - send frame=Settings { flags: (0x0), header_table_size: 65536, enable_push: 0, initial_window_size: 6291456, max_header_list_size: 262144 }
+2026-04-06 10:59:56,483 - h2.frame.settings - DEBUG - encoding SETTINGS; len=24, order=SettingsOrder { ids: [HeaderTableSize, EnablePush, InitialWindowSize, MaxHeaderListSize] }, header_table_size=Some(65536), enable_push=Some(0), initial_window_size=Some(6291456), max_frame_size=None, max_header_list_size=Some(262144)
+2026-04-06 10:59:56,483 - h2.frame.settings - DEBUG - encoding setting; val=HeaderTableSize(65536)
+2026-04-06 10:59:56,483 - h2.frame.settings - DEBUG - encoding setting; val=EnablePush(0)
+2026-04-06 10:59:56,483 - h2.frame.settings - DEBUG - encoding setting; val=InitialWindowSize(6291456)
+2026-04-06 10:59:56,483 - h2.frame.settings - DEBUG - encoding setting; val=MaxHeaderListSize(262144)
+2026-04-06 10:59:56,483 - h2.proto.connection - DEBUG - Connection; peer=Client
+2026-04-06 10:59:56,483 - hyper_util.client.legacy.pool - DEBUG - pooling idle connection for ("https", en.wikipedia.org)
+2026-04-06 10:59:56,483 - h2.codec.framed_write - DEBUG - send frame=WindowUpdate { stream_id: StreamId(0), size_increment: 15663105 }
+2026-04-06 10:59:56,483 - h2.codec.framed_write - DEBUG - send frame=Headers { stream_id: StreamId(1), flags: (0x25: END_HEADERS | END_STREAM | PRIORITY), stream_dep: StreamDependency { dependency_id: StreamId(0), weight: 255, is_exclusive: true } }
+2026-04-06 10:59:56,607 - h2.codec.framed_read - DEBUG - received frame=Settings { flags: (0x0), max_concurrent_streams: 100, enable_connect_protocol: 1 }
+2026-04-06 10:59:56,607 - h2.codec.framed_write - DEBUG - send frame=Settings { flags: (0x1: ACK) }
+2026-04-06 10:59:56,607 - h2.frame.settings - DEBUG - encoding SETTINGS; len=0, order=SettingsOrder { ids: [HeaderTableSize, EnablePush, MaxConcurrentStreams, InitialWindowSize, MaxFrameSize, MaxHeaderListSize, EnableConnectProtocol, NoRfc7540Priorities] }, header_table_size=None, enable_push=None, initial_window_size=None, max_frame_size=None, max_header_list_size=None
+2026-04-06 10:59:56,607 - h2.codec.framed_read - DEBUG - received frame=Settings { flags: (0x1: ACK) }
+2026-04-06 10:59:56,608 - h2.proto.settings - DEBUG - received settings ACK; applying Settings { flags: (0x0), header_table_size: 65536, enable_push: 0, initial_window_size: 6291456, max_header_list_size: 262144 }
+2026-04-06 10:59:56,768 - h2.hpack.decoder - DEBUG - Decoder changed max table size from=0 to=0
+2026-04-06 10:59:56,769 - h2.codec.framed_read - DEBUG - received frame=Headers { stream_id: StreamId(1), flags: (0x4: END_HEADERS) }
+2026-04-06 10:59:56,769 - h2.codec.framed_read - DEBUG - received frame=Data { stream_id: StreamId(1), flags: (0x1: END_STREAM) }
+2026-04-06 10:59:56,769 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'WMF-Last-Access'
+2026-04-06 10:59:56,769 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'WMF-Last-Access-Global'
+2026-04-06 10:59:56,769 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'GeoIP'
+2026-04-06 10:59:56,769 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'NetworkProbeLimit'
+2026-04-06 10:59:56,769 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'WMF-Uniq'
+2026-04-06 10:59:56,770 - primp - INFO - response: https://en.wikipedia.org/w/api.php?action=opensearch&profile=fuzzy&limit=1&search=what%27s%205%2B5 200
+2026-04-06 10:59:56,773 - hyper_util.client.legacy.pool - DEBUG - reuse idle connection for ("https", en.wikipedia.org)
+2026-04-06 10:59:56,773 - h2.codec.framed_write - DEBUG - send frame=Headers { stream_id: StreamId(3), flags: (0x25: END_HEADERS | END_STREAM | PRIORITY), stream_dep: StreamDependency { dependency_id: StreamId(0), weight: 255, is_exclusive: true } }
+2026-04-06 10:59:56,795 - h2.codec.framed_read - DEBUG - received frame=Headers { stream_id: StreamId(1), flags: (0x4: END_HEADERS) }
+2026-04-06 10:59:56,795 - h2.codec.framed_read - DEBUG - received frame=Data { stream_id: StreamId(1) }
+2026-04-06 10:59:56,796 - h2.codec.framed_read - DEBUG - received frame=Data { stream_id: StreamId(1), flags: (0x1: END_STREAM) }
+2026-04-06 10:59:56,796 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'grokipedia-affinity'
+2026-04-06 10:59:56,796 - cookie_store.cookie_store - DEBUG - inserting secure cookie '__cf_bm'
+2026-04-06 10:59:56,796 - primp - INFO - response: https://grokipedia.com/api/typeahead?query=what%27s+5%2B5&limit=1 200
+2026-04-06 10:59:57,038 - h2.codec.framed_read - DEBUG - received frame=Headers { stream_id: StreamId(3), flags: (0x4: END_HEADERS) }
+2026-04-06 10:59:57,038 - h2.codec.framed_read - DEBUG - received frame=Data { stream_id: StreamId(3), flags: (0x1: END_STREAM) }
+2026-04-06 10:59:57,038 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'WMF-Uniq'
+2026-04-06 10:59:57,038 - primp - INFO - response: https://en.wikipedia.org/w/api.php?action=query&format=json&prop=extracts&titles=WhatsApp&explaintext=0&exintro=0&redirects=1 200
+2026-04-06 10:59:57,039 - reqwest.connect - DEBUG - starting new connection: https://search.yahoo.com/
+2026-04-06 10:59:57,054 - hyper_util.client.legacy.connect.http - DEBUG - connecting to 212.82.100.137:443
+2026-04-06 10:59:57,228 - hyper_util.client.legacy.connect.http - DEBUG - connected to 212.82.100.137:443
+2026-04-06 10:59:57,229 - rustls.client.hs - DEBUG - No cached session for DnsName("search.yahoo.com")
+2026-04-06 10:59:57,229 - rustls.client.hs - DEBUG - Not resuming any session
+2026-04-06 10:59:57,229 - rustls.client.hs - DEBUG - Browser emulation: Some(BrowserEmulator { browser_type: Safari, version: BrowserVersion { major: 26, minor: 3, patch: 0 }, extension_order_seed: Some(39548), cipher_suites: Some([TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, CipherSuite(0x9d), CipherSuite(0x9c), CipherSuite(0x35), CipherSuite(0x2f), CipherSuite(0xc008), CipherSuite(0xc012), CipherSuite(0xa)]), signature_algorithms: Some([ECDSA_NISTP256_SHA256, RSA_PSS_SHA256, RSA_PKCS1_SHA256, ECDSA_NISTP384_SHA384, RSA_PSS_SHA384, RSA_PSS_SHA384, RSA_PKCS1_SHA384, RSA_PSS_SHA512, RSA_PKCS1_SHA512, RSA_PKCS1_SHA1]), named_groups: Some([X25519MLKEM768, X25519, secp256r1, secp384r1]), os_type: Some(MacOS), include_status_request_v2: true })
+2026-04-06 10:59:57,229 - rustls.client.hs - DEBUG - Using extension_order_seed: 45814
+2026-04-06 10:59:57,229 - rustls.client.hs - DEBUG - Browser emulation: Some(BrowserEmulator { browser_type: Safari, version: BrowserVersion { major: 26, minor: 3, patch: 0 }, extension_order_seed: Some(39548), cipher_suites: Some([TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, CipherSuite(0x9d), CipherSuite(0x9c), CipherSuite(0x35), CipherSuite(0x2f), CipherSuite(0xc008), CipherSuite(0xc012), CipherSuite(0xa)]), signature_algorithms: Some([ECDSA_NISTP256_SHA256, RSA_PSS_SHA256, RSA_PKCS1_SHA256, ECDSA_NISTP384_SHA384, RSA_PSS_SHA384, RSA_PSS_SHA384, RSA_PKCS1_SHA384, RSA_PSS_SHA512, RSA_PKCS1_SHA512, RSA_PKCS1_SHA1]), named_groups: Some([X25519MLKEM768, X25519, secp256r1, secp384r1]), os_type: Some(MacOS), include_status_request_v2: true })
+2026-04-06 10:59:57,229 - rustls.client.hs - DEBUG - Cipher suites count: 20
+2026-04-06 10:59:57,229 - rustls.client.hs - DEBUG -   [0] TLS13_AES_128_GCM_SHA256
+2026-04-06 10:59:57,229 - rustls.client.hs - DEBUG -   [1] TLS13_AES_256_GCM_SHA384
+2026-04-06 10:59:57,229 - rustls.client.hs - DEBUG -   [2] TLS13_CHACHA20_POLY1305_SHA256
+2026-04-06 10:59:57,229 - rustls.client.hs - DEBUG -   [3] TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+2026-04-06 10:59:57,229 - rustls.client.hs - DEBUG -   [4] TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+2026-04-06 10:59:57,230 - rustls.client.hs - DEBUG -   [5] TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+2026-04-06 10:59:57,230 - rustls.client.hs - DEBUG -   [6] TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+2026-04-06 10:59:57,230 - rustls.client.hs - DEBUG -   [7] TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+2026-04-06 10:59:57,230 - rustls.client.hs - DEBUG -   [8] TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+2026-04-06 10:59:57,230 - rustls.client.hs - DEBUG -   [9] TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA
+2026-04-06 10:59:57,230 - rustls.client.hs - DEBUG -   [10] TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA
+2026-04-06 10:59:57,230 - rustls.client.hs - DEBUG -   [11] TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA
+2026-04-06 10:59:57,230 - rustls.client.hs - DEBUG -   [12] TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
+2026-04-06 10:59:57,230 - rustls.client.hs - DEBUG -   [13] CipherSuite(0x9d)
+2026-04-06 10:59:57,230 - rustls.client.hs - DEBUG -   [14] CipherSuite(0x9c)
+2026-04-06 10:59:57,230 - rustls.client.hs - DEBUG -   [15] CipherSuite(0x35)
+2026-04-06 10:59:57,230 - rustls.client.hs - DEBUG -   [16] CipherSuite(0x2f)
+2026-04-06 10:59:57,230 - rustls.client.hs - DEBUG -   [17] CipherSuite(0xc008)
+2026-04-06 10:59:57,230 - rustls.client.hs - DEBUG -   [18] CipherSuite(0xc012)
+2026-04-06 10:59:57,230 - rustls.client.hs - DEBUG -   [19] CipherSuite(0xa)
+2026-04-06 10:59:57,230 - rustls.client.hs - DEBUG - Final cipher suites for ClientHello: [TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, CipherSuite(0x9d), CipherSuite(0x9c), CipherSuite(0x35), CipherSuite(0x2f), CipherSuite(0xc008), CipherSuite(0xc012), CipherSuite(0xa)]
+2026-04-06 10:59:57,388 - rustls.client.hs - DEBUG - Using ciphersuite TLS13_AES_128_GCM_SHA256
+2026-04-06 10:59:57,388 - rustls.client.tls13 - DEBUG - Not resuming
+2026-04-06 10:59:57,388 - rustls.client.tls13 - DEBUG - TLS1.3 encrypted extensions: ServerExtensions { server_name_ack: (), selected_protocol: SingleProtocolName(ProtocolName(6832)), unknown_extensions: {}, .. }
+2026-04-06 10:59:57,388 - rustls.client.hs - DEBUG - ALPN protocol is Some(b"h2")
+2026-04-06 10:59:57,389 - h2.client - DEBUG - binding client connection
+2026-04-06 10:59:57,389 - h2.client - DEBUG - client connection bound
+2026-04-06 10:59:57,389 - h2.client - DEBUG - handshake2: settings header_table_size=None, enable_push=Some(false), initial_window_size=Some(2097152), max_frame_size=None, max_header_list_size=None
+2026-04-06 10:59:57,389 - h2.client - DEBUG - handshake2: sending initial settings frame
+2026-04-06 10:59:57,389 - h2.codec.framed_write - DEBUG - send frame=Settings { flags: (0x0), enable_push: 0, max_concurrent_streams: 100, initial_window_size: 2097152, no_rfc7540_priorities: 1 }
+2026-04-06 10:59:57,389 - h2.frame.settings - DEBUG - encoding SETTINGS; len=24, order=SettingsOrder { ids: [EnablePush, MaxConcurrentStreams, InitialWindowSize, NoRfc7540Priorities] }, header_table_size=None, enable_push=Some(0), initial_window_size=Some(2097152), max_frame_size=None, max_header_list_size=None
+2026-04-06 10:59:57,389 - h2.frame.settings - DEBUG - encoding setting; val=EnablePush(0)
+2026-04-06 10:59:57,389 - h2.frame.settings - DEBUG - encoding setting; val=MaxConcurrentStreams(100)
+2026-04-06 10:59:57,389 - h2.frame.settings - DEBUG - encoding setting; val=InitialWindowSize(2097152)
+2026-04-06 10:59:57,389 - h2.frame.settings - DEBUG - encoding setting; val=NoRfc7540Priorities(1)
+2026-04-06 10:59:57,389 - h2.proto.connection - DEBUG - Connection; peer=Client
+2026-04-06 10:59:57,389 - hyper_util.client.legacy.pool - DEBUG - pooling idle connection for ("https", search.yahoo.com)
+2026-04-06 10:59:57,389 - h2.codec.framed_write - DEBUG - send frame=WindowUpdate { stream_id: StreamId(0), size_increment: 10420225 }
+2026-04-06 10:59:57,389 - h2.codec.framed_write - DEBUG - send frame=Headers { stream_id: StreamId(1), flags: (0x5: END_HEADERS | END_STREAM) }
+2026-04-06 10:59:57,550 - h2.codec.framed_read - DEBUG - received frame=Settings { flags: (0x0), max_concurrent_streams: 100, max_header_list_size: 131072 }
+2026-04-06 10:59:57,551 - h2.codec.framed_write - DEBUG - send frame=Settings { flags: (0x1: ACK) }
+2026-04-06 10:59:57,551 - h2.frame.settings - DEBUG - encoding SETTINGS; len=0, order=SettingsOrder { ids: [HeaderTableSize, EnablePush, MaxConcurrentStreams, InitialWindowSize, MaxFrameSize, MaxHeaderListSize, EnableConnectProtocol, NoRfc7540Priorities] }, header_table_size=None, enable_push=None, initial_window_size=None, max_frame_size=None, max_header_list_size=None
+2026-04-06 10:59:57,551 - h2.codec.framed_read - DEBUG - received frame=Settings { flags: (0x1: ACK) }
+2026-04-06 10:59:57,551 - h2.proto.settings - DEBUG - received settings ACK; applying Settings { flags: (0x0), enable_push: 0, max_concurrent_streams: 100, initial_window_size: 2097152, no_rfc7540_priorities: 1 }
+2026-04-06 10:59:57,704 - h2.codec.framed_read - DEBUG - received frame=Headers { stream_id: StreamId(1), flags: (0x4: END_HEADERS) }
+2026-04-06 10:59:57,704 - h2.codec.framed_read - DEBUG - received frame=Data { stream_id: StreamId(1) }
+2026-04-06 10:59:57,704 - h2.codec.framed_read - DEBUG - received frame=Data { stream_id: StreamId(1) }
+2026-04-06 10:59:57,705 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'lkl'
+2026-04-06 10:59:57,705 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'A1'
+2026-04-06 10:59:57,705 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'A3'
+2026-04-06 10:59:57,705 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'A1S'
+2026-04-06 10:59:57,705 - primp - INFO - response: https://search.yahoo.com/search;_ylt=E5BbHtsvAFhWbkg6fA0tLAzN;_ylu=75Xkw3FN-tyREM3Pd9QCpagOfyoyQ92Cvd0rDaoU-DbJlbM?p=what%27s+5%2B5 200
+2026-04-06 10:59:58,265 - h2.codec.framed_read - DEBUG - received frame=Data { stream_id: StreamId(1) }
+2026-04-06 10:59:58,265 - h2.codec.framed_read - DEBUG - received frame=Data { stream_id: StreamId(1), flags: (0x1: END_STREAM) }
+2026-04-06 10:59:58,273 - reqwest.connect - DEBUG - starting new connection: https://yandex.com/
+2026-04-06 10:59:58,275 - hyper_util.client.legacy.connect.http - DEBUG - connecting to 77.88.44.55:443
+2026-04-06 10:59:58,389 - hyper_util.client.legacy.connect.http - DEBUG - connected to 77.88.44.55:443
+2026-04-06 10:59:58,389 - rustls.client.hs - DEBUG - No cached session for DnsName("yandex.com")
+2026-04-06 10:59:58,389 - rustls.client.hs - DEBUG - Not resuming any session
+2026-04-06 10:59:58,389 - rustls.client.hs - DEBUG - Browser emulation: Some(BrowserEmulator { browser_type: Edge, version: BrowserVersion { major: 145, minor: 0, patch: 0 }, extension_order_seed: Some(36266), cipher_suites: Some([CipherSuite(0xa0a), TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, CipherSuite(0x9c), CipherSuite(0x9d), CipherSuite(0x2f), CipherSuite(0x35)]), signature_algorithms: Some([ECDSA_NISTP256_SHA256, RSA_PSS_SHA256, RSA_PKCS1_SHA256, ECDSA_NISTP384_SHA384, RSA_PSS_SHA384, RSA_PKCS1_SHA384, RSA_PSS_SHA512, RSA_PKCS1_SHA512]), named_groups: Some([GREASE, X25519MLKEM768, X25519, secp256r1, secp384r1]), os_type: None, include_status_request_v2: false })
+2026-04-06 10:59:58,389 - rustls.client.hs - DEBUG - Using extension_order_seed: 33975
+2026-04-06 10:59:58,389 - rustls.client.hs - DEBUG - Browser emulation: Some(BrowserEmulator { browser_type: Edge, version: BrowserVersion { major: 145, minor: 0, patch: 0 }, extension_order_seed: Some(36266), cipher_suites: Some([CipherSuite(0xa0a), TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, CipherSuite(0x9c), CipherSuite(0x9d), CipherSuite(0x2f), CipherSuite(0x35)]), signature_algorithms: Some([ECDSA_NISTP256_SHA256, RSA_PSS_SHA256, RSA_PKCS1_SHA256, ECDSA_NISTP384_SHA384, RSA_PSS_SHA384, RSA_PKCS1_SHA384, RSA_PSS_SHA512, RSA_PKCS1_SHA512]), named_groups: Some([GREASE, X25519MLKEM768, X25519, secp256r1, secp384r1]), os_type: None, include_status_request_v2: false })
+2026-04-06 10:59:58,390 - rustls.client.hs - DEBUG - Cipher suites count: 16
+2026-04-06 10:59:58,390 - rustls.client.hs - DEBUG -   [0] CipherSuite(0xdada)
+2026-04-06 10:59:58,390 - rustls.client.hs - DEBUG -   [1] TLS13_AES_128_GCM_SHA256
+2026-04-06 10:59:58,390 - rustls.client.hs - DEBUG -   [2] TLS13_AES_256_GCM_SHA384
+2026-04-06 10:59:58,390 - rustls.client.hs - DEBUG -   [3] TLS13_CHACHA20_POLY1305_SHA256
+2026-04-06 10:59:58,390 - rustls.client.hs - DEBUG -   [4] TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+2026-04-06 10:59:58,390 - rustls.client.hs - DEBUG -   [5] TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+2026-04-06 10:59:58,390 - rustls.client.hs - DEBUG -   [6] TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+2026-04-06 10:59:58,390 - rustls.client.hs - DEBUG -   [7] TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+2026-04-06 10:59:58,390 - rustls.client.hs - DEBUG -   [8] TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+2026-04-06 10:59:58,390 - rustls.client.hs - DEBUG -   [9] TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+2026-04-06 10:59:58,390 - rustls.client.hs - DEBUG -   [10] TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
+2026-04-06 10:59:58,390 - rustls.client.hs - DEBUG -   [11] TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA
+2026-04-06 10:59:58,390 - rustls.client.hs - DEBUG -   [12] CipherSuite(0x9c)
+2026-04-06 10:59:58,390 - rustls.client.hs - DEBUG -   [13] CipherSuite(0x9d)
+2026-04-06 10:59:58,390 - rustls.client.hs - DEBUG -   [14] CipherSuite(0x2f)
+2026-04-06 10:59:58,390 - rustls.client.hs - DEBUG -   [15] CipherSuite(0x35)
+2026-04-06 10:59:58,390 - rustls.client.hs - DEBUG - Final cipher suites for ClientHello: [CipherSuite(0xdada), TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, CipherSuite(0x9c), CipherSuite(0x9d), CipherSuite(0x2f), CipherSuite(0x35)]
+2026-04-06 10:59:58,503 - rustls.client.hs - DEBUG - Using ciphersuite TLS13_AES_128_GCM_SHA256
+2026-04-06 10:59:58,504 - rustls.client.tls13 - DEBUG - Not resuming
+2026-04-06 10:59:58,504 - rustls.client.tls13 - DEBUG - TLS1.3 encrypted extensions: ServerExtensions { selected_protocol: SingleProtocolName(ProtocolName(6832)), unknown_extensions: {}, .. }
+2026-04-06 10:59:58,504 - rustls.client.hs - DEBUG - ALPN protocol is Some(b"h2")
+2026-04-06 10:59:58,505 - h2.client - DEBUG - binding client connection
+2026-04-06 10:59:58,505 - h2.client - DEBUG - client connection bound
+2026-04-06 10:59:58,505 - h2.client - DEBUG - handshake2: settings header_table_size=Some(65536), enable_push=Some(false), initial_window_size=Some(6291456), max_frame_size=None, max_header_list_size=Some(262144)
+2026-04-06 10:59:58,505 - h2.client - DEBUG - handshake2: sending initial settings frame
+2026-04-06 10:59:58,505 - h2.codec.framed_write - DEBUG - send frame=Settings { flags: (0x0), header_table_size: 65536, enable_push: 0, initial_window_size: 6291456, max_header_list_size: 262144 }
+2026-04-06 10:59:58,505 - h2.frame.settings - DEBUG - encoding SETTINGS; len=24, order=SettingsOrder { ids: [HeaderTableSize, EnablePush, InitialWindowSize, MaxHeaderListSize] }, header_table_size=Some(65536), enable_push=Some(0), initial_window_size=Some(6291456), max_frame_size=None, max_header_list_size=Some(262144)
+2026-04-06 10:59:58,505 - h2.frame.settings - DEBUG - encoding setting; val=HeaderTableSize(65536)
+2026-04-06 10:59:58,505 - h2.frame.settings - DEBUG - encoding setting; val=EnablePush(0)
+2026-04-06 10:59:58,505 - h2.frame.settings - DEBUG - encoding setting; val=InitialWindowSize(6291456)
+2026-04-06 10:59:58,505 - h2.frame.settings - DEBUG - encoding setting; val=MaxHeaderListSize(262144)
+2026-04-06 10:59:58,505 - h2.proto.connection - DEBUG - Connection; peer=Client
+2026-04-06 10:59:58,505 - hyper_util.client.legacy.pool - DEBUG - pooling idle connection for ("https", yandex.com)
+2026-04-06 10:59:58,505 - h2.codec.framed_write - DEBUG - send frame=WindowUpdate { stream_id: StreamId(0), size_increment: 15663105 }
+2026-04-06 10:59:58,506 - h2.codec.framed_write - DEBUG - send frame=Headers { stream_id: StreamId(1), flags: (0x25: END_HEADERS | END_STREAM | PRIORITY), stream_dep: StreamDependency { dependency_id: StreamId(0), weight: 255, is_exclusive: true } }
+2026-04-06 10:59:58,621 - h2.codec.framed_read - DEBUG - received frame=Settings { flags: (0x0), header_table_size: 16384, max_concurrent_streams: 128, initial_window_size: 262144, max_frame_size: 16384, max_header_list_size: 524288 }
+2026-04-06 10:59:58,621 - h2.codec.framed_write - DEBUG - send frame=Settings { flags: (0x1: ACK) }
+2026-04-06 10:59:58,621 - h2.frame.settings - DEBUG - encoding SETTINGS; len=0, order=SettingsOrder { ids: [HeaderTableSize, EnablePush, MaxConcurrentStreams, InitialWindowSize, MaxFrameSize, MaxHeaderListSize, EnableConnectProtocol, NoRfc7540Priorities] }, header_table_size=None, enable_push=None, initial_window_size=None, max_frame_size=None, max_header_list_size=None
+2026-04-06 10:59:58,621 - h2.codec.framed_read - DEBUG - received frame=WindowUpdate { stream_id: StreamId(0), size_increment: 196609 }
+2026-04-06 10:59:58,621 - h2.codec.framed_read - DEBUG - received frame=Settings { flags: (0x1: ACK) }
+2026-04-06 10:59:58,621 - h2.proto.settings - DEBUG - received settings ACK; applying Settings { flags: (0x0), header_table_size: 65536, enable_push: 0, initial_window_size: 6291456, max_header_list_size: 262144 }
+2026-04-06 10:59:59,074 - h2.hpack.decoder - DEBUG - Decoder changed max table size from=0 to=65536
+2026-04-06 10:59:59,074 - h2.codec.framed_read - DEBUG - received frame=Headers { stream_id: StreamId(1), flags: (0x4: END_HEADERS) }
+2026-04-06 10:59:59,074 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'is_gdpr'
+2026-04-06 10:59:59,075 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'is_gdpr_b'
+2026-04-06 10:59:59,075 - cookie_store.cookie_store - DEBUG - inserting secure cookie '_yasc'
+2026-04-06 10:59:59,075 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'pi'
+2026-04-06 10:59:59,075 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'i'
+2026-04-06 10:59:59,075 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'yandexuid'
+2026-04-06 10:59:59,075 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'yashr'
+2026-04-06 10:59:59,075 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'bh'
+2026-04-06 10:59:59,075 - primp - INFO - response: https://yandex.com/search/site/?text=what%27s+5%2B5&web=1&searchid=1160759 200
+2026-04-06 10:59:59,075 - h2.codec.framed_read - DEBUG - received frame=Data { stream_id: StreamId(1) }
+2026-04-06 10:59:59,076 - h2.codec.framed_read - DEBUG - received frame=Data { stream_id: StreamId(1) }
+2026-04-06 10:59:59,076 - h2.codec.framed_read - DEBUG - received frame=Data { stream_id: StreamId(1), flags: (0x1: END_STREAM) }
+2026-04-06 10:59:59,082 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-04-06 10:59:59,082 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-06 10:59:59,082 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-04-06 10:59:59,082 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-06 10:59:59,082 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-04-06 10:59:59,822 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Mon, 06 Apr 2026 06:59:59 GMT'), (b'Content-Length', b'316')])
+2026-04-06 10:59:59,822 - httpx - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-04-06 10:59:59,822 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-04-06 10:59:59,822 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-06 10:59:59,822 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-06 10:59:59,822 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-06 10:59:59,823 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-04-06 10:59:59,823 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-06 10:59:59,823 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-04-06 10:59:59,823 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-06 10:59:59,823 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-04-06 11:00:00,063 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Mon, 06 Apr 2026 07:00:00 GMT'), (b'Content-Length', b'322')])
+2026-04-06 11:00:00,064 - httpx - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-04-06 11:00:00,064 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-04-06 11:00:00,064 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-06 11:00:00,064 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-06 11:00:00,064 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-06 11:00:00,064 - brain.consolidator - DEBUG - STM snippet: "5 plus 5 equals 10."
+2026-04-06 11:00:00,064 - filelock - DEBUG - Attempting to acquire lock 4435249920 on brain/working_memory.txt.lock
+2026-04-06 11:00:00,064 - filelock - DEBUG - Lock 4435249920 acquired on brain/working_memory.txt.lock
+2026-04-06 11:00:00,065 - filelock - DEBUG - Attempting to release lock 4435249920 on brain/working_memory.txt.lock
+2026-04-06 11:00:00,065 - filelock - DEBUG - Lock 4435249920 released on brain/working_memory.txt.lock
+2026-04-06 11:00:00,065 - brain.stm - DEBUG - Appended: "5 plus 5 equals 10."
+2026-04-06 11:00:00,065 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-04-06 11:00:00,066 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-06 11:00:00,066 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-04-06 11:00:00,066 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-06 11:00:00,066 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-04-06 11:00:00,074 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Mon, 06 Apr 2026 07:00:00 GMT'), (b'Transfer-Encoding', b'chunked')])
+2026-04-06 11:00:00,074 - httpx - INFO - HTTP Request: POST http://127.0.0.1:11434/api/embeddings "HTTP/1.1 200 OK"
+2026-04-06 11:00:00,074 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-04-06 11:00:00,074 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-06 11:00:00,074 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-06 11:00:00,074 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-06 11:00:00,075 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-04-06 11:00:00,075 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-06 11:00:00,075 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-04-06 11:00:00,075 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-06 11:00:00,075 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-04-06 11:00:00,206 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Mon, 06 Apr 2026 07:00:00 GMT'), (b'Content-Length', b'317')])
+2026-04-06 11:00:00,207 - httpx - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-04-06 11:00:00,207 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-04-06 11:00:00,207 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-06 11:00:00,207 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-06 11:00:00,207 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-06 11:00:00,207 - brain.consolidator - DEBUG - Topic shift (sim=0.40): 'Mathematics Addition'
+2026-04-06 11:00:00,207 - brain.memory_controller - DEBUG - Consolidating STM to tree
+2026-04-06 11:00:00,207 - filelock - DEBUG - Attempting to acquire lock 4435249920 on brain/working_memory.txt.lock
+2026-04-06 11:00:00,208 - filelock - DEBUG - Lock 4435249920 acquired on brain/working_memory.txt.lock
+2026-04-06 11:00:00,208 - filelock - DEBUG - Attempting to release lock 4435249920 on brain/working_memory.txt.lock
+2026-04-06 11:00:00,208 - filelock - DEBUG - Lock 4435249920 released on brain/working_memory.txt.lock
+2026-04-06 11:00:00,208 - brain.consolidator - DEBUG - Consolidating STM to tree (branch: de015cb5-a861-41b4-b6f3-b2da62eb0f36)
+2026-04-06 11:00:00,208 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-04-06 11:00:00,208 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-06 11:00:00,208 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-04-06 11:00:00,208 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-06 11:00:00,208 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-04-06 11:00:00,377 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Mon, 06 Apr 2026 07:00:00 GMT'), (b'Content-Length', b'323')])
+2026-04-06 11:00:00,378 - httpx - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-04-06 11:00:00,378 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-04-06 11:00:00,378 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-06 11:00:00,378 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-06 11:00:00,378 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-06 11:00:00,378 - brain.consolidator - DEBUG - Distilled 1 lines
+2026-04-06 11:00:00,379 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-04-06 11:00:00,379 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-06 11:00:00,379 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-04-06 11:00:00,380 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-06 11:00:00,380 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-04-06 11:00:00,387 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Mon, 06 Apr 2026 07:00:00 GMT'), (b'Transfer-Encoding', b'chunked')])
+2026-04-06 11:00:00,388 - httpx - INFO - HTTP Request: POST http://127.0.0.1:11434/api/embeddings "HTTP/1.1 200 OK"
+2026-04-06 11:00:00,388 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-04-06 11:00:00,388 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-06 11:00:00,388 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-06 11:00:00,388 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-06 11:00:00,389 - brain.memory_controller - ERROR - Error in _process_turn: 'LtmTree' object has no attribute '_branch_embedding_text'
+2026-04-06 11:00:05,895 - filelock - DEBUG - Attempting to acquire lock 4432247216 on brain/ltm_tree.json.lock
+2026-04-06 11:00:05,895 - filelock - DEBUG - Lock 4432247216 acquired on brain/ltm_tree.json.lock
+2026-04-06 11:00:05,900 - filelock - DEBUG - Attempting to release lock 4432247216 on brain/ltm_tree.json.lock
+2026-04-06 11:00:05,900 - filelock - DEBUG - Lock 4432247216 released on brain/ltm_tree.json.lock
+2026-04-06 11:00:08,549 - filelock - DEBUG - Attempting to acquire lock 4465940128 on brain/ltm_tree.json.lock
+2026-04-06 11:00:08,549 - filelock - DEBUG - Lock 4465940128 acquired on brain/ltm_tree.json.lock
+2026-04-06 11:00:08,550 - filelock - DEBUG - Attempting to release lock 4465940128 on brain/ltm_tree.json.lock
+2026-04-06 11:00:08,550 - filelock - DEBUG - Lock 4465940128 released on brain/ltm_tree.json.lock
+2026-04-06 11:00:09,699 - filelock - DEBUG - Attempting to acquire lock 4465653904 on brain/ltm_tree.json.lock
+2026-04-06 11:00:09,699 - filelock - DEBUG - Lock 4465653904 acquired on brain/ltm_tree.json.lock
+2026-04-06 11:00:09,702 - filelock - DEBUG - Attempting to release lock 4465653904 on brain/ltm_tree.json.lock
+2026-04-06 11:00:09,702 - filelock - DEBUG - Lock 4465653904 released on brain/ltm_tree.json.lock
+2026-04-06 11:09:25,022 - filelock - DEBUG - Attempting to acquire lock 4428453536 on brain/ltm_tree.json.lock
+2026-04-06 11:09:25,022 - filelock - DEBUG - Lock 4428453536 acquired on brain/ltm_tree.json.lock
+2026-04-06 11:09:25,022 - filelock - DEBUG - Attempting to release lock 4428453536 on brain/ltm_tree.json.lock
+2026-04-06 11:09:25,022 - filelock - DEBUG - Lock 4428453536 released on brain/ltm_tree.json.lock
+2026-04-06 11:09:27,880 - filelock - DEBUG - Attempting to acquire lock 4428150928 on brain/working_memory.txt.lock
+2026-04-06 11:09:27,880 - filelock - DEBUG - Lock 4428150928 acquired on brain/working_memory.txt.lock
+2026-04-06 11:09:27,881 - filelock - DEBUG - Attempting to release lock 4428150928 on brain/working_memory.txt.lock
+2026-04-06 11:09:27,881 - filelock - DEBUG - Lock 4428150928 released on brain/working_memory.txt.lock
+2026-04-06 11:09:27,882 - httpcore.connection - DEBUG - connect_tcp.started host='127.0.0.1' port=11434 local_address=None timeout=None socket_options=None
+2026-04-06 11:09:27,884 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x107f4e900>
+2026-04-06 11:09:27,884 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-04-06 11:09:27,884 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-06 11:09:27,884 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-04-06 11:09:27,885 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-06 11:09:27,885 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-04-06 11:09:28,374 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Mon, 06 Apr 2026 07:09:28 GMT'), (b'Transfer-Encoding', b'chunked')])
+2026-04-06 11:09:28,375 - httpx - INFO - HTTP Request: POST http://127.0.0.1:11434/api/embeddings "HTTP/1.1 200 OK"
+2026-04-06 11:09:28,375 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-04-06 11:09:28,376 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-06 11:09:28,376 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-06 11:09:28,376 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-06 11:09:28,378 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-04-06 11:09:28,378 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-06 11:09:28,378 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-04-06 11:09:28,378 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-06 11:09:28,378 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-04-06 11:09:29,475 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Mon, 06 Apr 2026 07:09:29 GMT'), (b'Content-Length', b'426')])
+2026-04-06 11:09:29,475 - httpx - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-04-06 11:09:29,475 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-04-06 11:09:29,475 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-06 11:09:29,476 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-06 11:09:29,476 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-06 11:09:29,476 - brain.planner - DEBUG - Raw plan:
+Search: Hi there
+Tool: bash
+ THINK: Hello! I'm ready to assist with any questions you may have. Please ask your question.
+2026-04-06 11:09:29,477 - brain.planner - DEBUG - Parsed steps: [('SEARCH', 'Hi there'), ('TOOL', 'bash'), ('THINK', '')]
+2026-04-06 11:09:29,601 - rustls.webpki.anchors - DEBUG - add_parsable_certificates processed 159 valid and 0 invalid certs
+2026-04-06 11:09:29,602 - reqwest.connect - DEBUG - starting new connection: https://en.wikipedia.org/
+2026-04-06 11:09:29,602 - reqwest.connect - DEBUG - starting new connection: https://grokipedia.com/
+2026-04-06 11:09:29,623 - hyper_util.client.legacy.connect.http - DEBUG - connecting to 185.15.59.224:443
+2026-04-06 11:09:29,692 - hyper_util.client.legacy.connect.http - DEBUG - connecting to 104.18.19.2:443
+2026-04-06 11:09:29,729 - hyper_util.client.legacy.connect.http - DEBUG - connected to 185.15.59.224:443
+2026-04-06 11:09:29,729 - rustls.client.hs - DEBUG - No cached session for DnsName("en.wikipedia.org")
+2026-04-06 11:09:29,729 - rustls.client.hs - DEBUG - Not resuming any session
+2026-04-06 11:09:29,756 - rustls.client.hs - DEBUG - Browser emulation: Some(BrowserEmulator { browser_type: Opera, version: BrowserVersion { major: 128, minor: 0, patch: 0 }, extension_order_seed: Some(36266), cipher_suites: Some([CipherSuite(0xa0a), TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, CipherSuite(0x9c), CipherSuite(0x9d), CipherSuite(0x2f), CipherSuite(0x35)]), signature_algorithms: Some([ECDSA_NISTP256_SHA256, RSA_PSS_SHA256, RSA_PKCS1_SHA256, ECDSA_NISTP384_SHA384, RSA_PSS_SHA384, RSA_PKCS1_SHA384, RSA_PSS_SHA512, RSA_PKCS1_SHA512]), named_groups: Some([GREASE, X25519MLKEM768, X25519, secp256r1, secp384r1]), os_type: None, include_status_request_v2: false })
+2026-04-06 11:09:29,756 - rustls.client.hs - DEBUG - Using extension_order_seed: 29800
+2026-04-06 11:09:29,756 - rustls.client.hs - DEBUG - Browser emulation: Some(BrowserEmulator { browser_type: Opera, version: BrowserVersion { major: 128, minor: 0, patch: 0 }, extension_order_seed: Some(36266), cipher_suites: Some([CipherSuite(0xa0a), TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, CipherSuite(0x9c), CipherSuite(0x9d), CipherSuite(0x2f), CipherSuite(0x35)]), signature_algorithms: Some([ECDSA_NISTP256_SHA256, RSA_PSS_SHA256, RSA_PKCS1_SHA256, ECDSA_NISTP384_SHA384, RSA_PSS_SHA384, RSA_PKCS1_SHA384, RSA_PSS_SHA512, RSA_PKCS1_SHA512]), named_groups: Some([GREASE, X25519MLKEM768, X25519, secp256r1, secp384r1]), os_type: None, include_status_request_v2: false })
+2026-04-06 11:09:29,756 - rustls.client.hs - DEBUG - Cipher suites count: 16
+2026-04-06 11:09:29,756 - rustls.client.hs - DEBUG -   [0] CipherSuite(0xcaca)
+2026-04-06 11:09:29,756 - rustls.client.hs - DEBUG -   [1] TLS13_AES_128_GCM_SHA256
+2026-04-06 11:09:29,756 - rustls.client.hs - DEBUG -   [2] TLS13_AES_256_GCM_SHA384
+2026-04-06 11:09:29,756 - rustls.client.hs - DEBUG -   [3] TLS13_CHACHA20_POLY1305_SHA256
+2026-04-06 11:09:29,756 - rustls.client.hs - DEBUG -   [4] TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+2026-04-06 11:09:29,756 - rustls.client.hs - DEBUG -   [5] TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+2026-04-06 11:09:29,756 - rustls.client.hs - DEBUG -   [6] TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+2026-04-06 11:09:29,756 - rustls.client.hs - DEBUG -   [7] TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+2026-04-06 11:09:29,756 - rustls.client.hs - DEBUG -   [8] TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+2026-04-06 11:09:29,756 - rustls.client.hs - DEBUG -   [9] TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+2026-04-06 11:09:29,756 - rustls.client.hs - DEBUG -   [10] TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
+2026-04-06 11:09:29,756 - rustls.client.hs - DEBUG -   [11] TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA
+2026-04-06 11:09:29,756 - rustls.client.hs - DEBUG -   [12] CipherSuite(0x9c)
+2026-04-06 11:09:29,756 - rustls.client.hs - DEBUG -   [13] CipherSuite(0x9d)
+2026-04-06 11:09:29,756 - rustls.client.hs - DEBUG -   [14] CipherSuite(0x2f)
+2026-04-06 11:09:29,756 - rustls.client.hs - DEBUG -   [15] CipherSuite(0x35)
+2026-04-06 11:09:29,756 - rustls.client.hs - DEBUG - Final cipher suites for ClientHello: [CipherSuite(0xcaca), TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, CipherSuite(0x9c), CipherSuite(0x9d), CipherSuite(0x2f), CipherSuite(0x35)]
+2026-04-06 11:09:29,757 - hyper_util.client.legacy.connect.http - DEBUG - connected to 104.18.19.2:443
+2026-04-06 11:09:29,757 - rustls.client.hs - DEBUG - No cached session for DnsName("grokipedia.com")
+2026-04-06 11:09:29,757 - rustls.client.hs - DEBUG - Not resuming any session
+2026-04-06 11:09:29,757 - rustls.client.hs - DEBUG - Browser emulation: Some(BrowserEmulator { browser_type: Chrome, version: BrowserVersion { major: 146, minor: 0, patch: 0 }, extension_order_seed: Some(36266), cipher_suites: Some([CipherSuite(0xa0a), TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, CipherSuite(0x9c), CipherSuite(0x9d), CipherSuite(0x2f), CipherSuite(0x35)]), signature_algorithms: Some([ECDSA_NISTP256_SHA256, RSA_PSS_SHA256, RSA_PKCS1_SHA256, ECDSA_NISTP384_SHA384, RSA_PSS_SHA384, RSA_PKCS1_SHA384, RSA_PSS_SHA512, RSA_PKCS1_SHA512]), named_groups: Some([GREASE, X25519MLKEM768, X25519, secp256r1, secp384r1]), os_type: None, include_status_request_v2: false })
+2026-04-06 11:09:29,757 - rustls.client.hs - DEBUG - Using extension_order_seed: 29790
+2026-04-06 11:09:29,757 - rustls.client.hs - DEBUG - Browser emulation: Some(BrowserEmulator { browser_type: Chrome, version: BrowserVersion { major: 146, minor: 0, patch: 0 }, extension_order_seed: Some(36266), cipher_suites: Some([CipherSuite(0xa0a), TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, CipherSuite(0x9c), CipherSuite(0x9d), CipherSuite(0x2f), CipherSuite(0x35)]), signature_algorithms: Some([ECDSA_NISTP256_SHA256, RSA_PSS_SHA256, RSA_PKCS1_SHA256, ECDSA_NISTP384_SHA384, RSA_PSS_SHA384, RSA_PKCS1_SHA384, RSA_PSS_SHA512, RSA_PKCS1_SHA512]), named_groups: Some([GREASE, X25519MLKEM768, X25519, secp256r1, secp384r1]), os_type: None, include_status_request_v2: false })
+2026-04-06 11:09:29,757 - rustls.client.hs - DEBUG - Cipher suites count: 16
+2026-04-06 11:09:29,757 - rustls.client.hs - DEBUG -   [0] CipherSuite(0x6a6a)
+2026-04-06 11:09:29,757 - rustls.client.hs - DEBUG -   [1] TLS13_AES_128_GCM_SHA256
+2026-04-06 11:09:29,757 - rustls.client.hs - DEBUG -   [2] TLS13_AES_256_GCM_SHA384
+2026-04-06 11:09:29,757 - rustls.client.hs - DEBUG -   [3] TLS13_CHACHA20_POLY1305_SHA256
+2026-04-06 11:09:29,757 - rustls.client.hs - DEBUG -   [4] TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+2026-04-06 11:09:29,757 - rustls.client.hs - DEBUG -   [5] TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+2026-04-06 11:09:29,757 - rustls.client.hs - DEBUG -   [6] TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+2026-04-06 11:09:29,757 - rustls.client.hs - DEBUG -   [7] TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+2026-04-06 11:09:29,757 - rustls.client.hs - DEBUG -   [8] TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+2026-04-06 11:09:29,757 - rustls.client.hs - DEBUG -   [9] TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+2026-04-06 11:09:29,757 - rustls.client.hs - DEBUG -   [10] TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
+2026-04-06 11:09:29,757 - rustls.client.hs - DEBUG -   [11] TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA
+2026-04-06 11:09:29,757 - rustls.client.hs - DEBUG -   [12] CipherSuite(0x9c)
+2026-04-06 11:09:29,757 - rustls.client.hs - DEBUG -   [13] CipherSuite(0x9d)
+2026-04-06 11:09:29,757 - rustls.client.hs - DEBUG -   [14] CipherSuite(0x2f)
+2026-04-06 11:09:29,757 - rustls.client.hs - DEBUG -   [15] CipherSuite(0x35)
+2026-04-06 11:09:29,757 - rustls.client.hs - DEBUG - Final cipher suites for ClientHello: [CipherSuite(0x6a6a), TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, CipherSuite(0x9c), CipherSuite(0x9d), CipherSuite(0x2f), CipherSuite(0x35)]
+2026-04-06 11:09:29,820 - rustls.client.hs - DEBUG - Using ciphersuite TLS13_AES_128_GCM_SHA256
+2026-04-06 11:09:29,821 - rustls.client.tls13 - DEBUG - Not resuming
+2026-04-06 11:09:29,821 - rustls.client.tls13 - DEBUG - TLS1.3 encrypted extensions: ServerExtensions { server_name_ack: (), selected_protocol: SingleProtocolName(ProtocolName(6832)), encrypted_client_hello_ack: ServerEncryptedClientHello { retry_configs: [V18(EchConfigContents { key_config: HpkeKeyConfig { config_id: 204, kem_id: DHKEM_X25519_HKDF_SHA256, public_key: 59809e83b38bd54d22e08aa463b0f95b94913e088bdcab04923119f62235400e, symmetric_cipher_suites: [HpkeSymmetricCipherSuite { kdf_id: HKDF_SHA256, aead_id: AES_128_GCM }] }, maximum_name_length: 0, public_name: DnsName("cloudflare-ech.com"), extensions: [] })] }, unknown_extensions: {}, .. }
+2026-04-06 11:09:29,821 - rustls.client.hs - DEBUG - ALPN protocol is Some(b"h2")
+2026-04-06 11:09:29,821 - h2.client - DEBUG - binding client connection
+2026-04-06 11:09:29,821 - h2.client - DEBUG - client connection bound
+2026-04-06 11:09:29,821 - h2.client - DEBUG - handshake2: settings header_table_size=Some(65536), enable_push=Some(false), initial_window_size=Some(6291456), max_frame_size=None, max_header_list_size=Some(262144)
+2026-04-06 11:09:29,821 - h2.client - DEBUG - handshake2: sending initial settings frame
+2026-04-06 11:09:29,821 - h2.codec.framed_write - DEBUG - send frame=Settings { flags: (0x0), header_table_size: 65536, enable_push: 0, initial_window_size: 6291456, max_header_list_size: 262144 }
+2026-04-06 11:09:29,821 - h2.frame.settings - DEBUG - encoding SETTINGS; len=24, order=SettingsOrder { ids: [HeaderTableSize, EnablePush, InitialWindowSize, MaxHeaderListSize] }, header_table_size=Some(65536), enable_push=Some(0), initial_window_size=Some(6291456), max_frame_size=None, max_header_list_size=Some(262144)
+2026-04-06 11:09:29,821 - h2.frame.settings - DEBUG - encoding setting; val=HeaderTableSize(65536)
+2026-04-06 11:09:29,821 - h2.frame.settings - DEBUG - encoding setting; val=EnablePush(0)
+2026-04-06 11:09:29,821 - h2.frame.settings - DEBUG - encoding setting; val=InitialWindowSize(6291456)
+2026-04-06 11:09:29,821 - h2.frame.settings - DEBUG - encoding setting; val=MaxHeaderListSize(262144)
+2026-04-06 11:09:29,821 - h2.proto.connection - DEBUG - Connection; peer=Client
+2026-04-06 11:09:29,821 - hyper_util.client.legacy.pool - DEBUG - pooling idle connection for ("https", grokipedia.com)
+2026-04-06 11:09:29,821 - h2.codec.framed_write - DEBUG - send frame=WindowUpdate { stream_id: StreamId(0), size_increment: 15663105 }
+2026-04-06 11:09:29,822 - h2.codec.framed_write - DEBUG - send frame=Headers { stream_id: StreamId(1), flags: (0x25: END_HEADERS | END_STREAM | PRIORITY), stream_dep: StreamDependency { dependency_id: StreamId(0), weight: 255, is_exclusive: true } }
+2026-04-06 11:09:29,853 - h2.codec.framed_read - DEBUG - received frame=Settings { flags: (0x0), max_concurrent_streams: 100, initial_window_size: 65536, max_frame_size: 16777215 }
+2026-04-06 11:09:29,853 - h2.codec.framed_write - DEBUG - send frame=Settings { flags: (0x1: ACK) }
+2026-04-06 11:09:29,853 - h2.frame.settings - DEBUG - encoding SETTINGS; len=0, order=SettingsOrder { ids: [HeaderTableSize, EnablePush, MaxConcurrentStreams, InitialWindowSize, MaxFrameSize, MaxHeaderListSize, EnableConnectProtocol, NoRfc7540Priorities] }, header_table_size=None, enable_push=None, initial_window_size=None, max_frame_size=None, max_header_list_size=None
+2026-04-06 11:09:29,853 - h2.codec.framed_read - DEBUG - received frame=WindowUpdate { stream_id: StreamId(0), size_increment: 2147418112 }
+2026-04-06 11:09:29,853 - h2.codec.framed_read - DEBUG - received frame=Settings { flags: (0x1: ACK) }
+2026-04-06 11:09:29,853 - h2.proto.settings - DEBUG - received settings ACK; applying Settings { flags: (0x0), header_table_size: 65536, enable_push: 0, initial_window_size: 6291456, max_header_list_size: 262144 }
+2026-04-06 11:09:29,863 - rustls.client.hs - DEBUG - Using ciphersuite TLS13_AES_128_GCM_SHA256
+2026-04-06 11:09:29,863 - rustls.client.tls13 - DEBUG - Not resuming
+2026-04-06 11:09:29,863 - rustls.client.tls13 - DEBUG - TLS1.3 encrypted extensions: ServerExtensions { server_name_ack: (), selected_protocol: SingleProtocolName(ProtocolName(6832)), unknown_extensions: {}, .. }
+2026-04-06 11:09:29,863 - rustls.client.hs - DEBUG - ALPN protocol is Some(b"h2")
+2026-04-06 11:09:29,865 - h2.client - DEBUG - binding client connection
+2026-04-06 11:09:29,865 - h2.client - DEBUG - client connection bound
+2026-04-06 11:09:29,865 - h2.client - DEBUG - handshake2: settings header_table_size=Some(65536), enable_push=Some(false), initial_window_size=Some(6291456), max_frame_size=None, max_header_list_size=Some(262144)
+2026-04-06 11:09:29,865 - h2.client - DEBUG - handshake2: sending initial settings frame
+2026-04-06 11:09:29,865 - h2.codec.framed_write - DEBUG - send frame=Settings { flags: (0x0), header_table_size: 65536, enable_push: 0, initial_window_size: 6291456, max_header_list_size: 262144 }
+2026-04-06 11:09:29,866 - h2.frame.settings - DEBUG - encoding SETTINGS; len=24, order=SettingsOrder { ids: [HeaderTableSize, EnablePush, InitialWindowSize, MaxHeaderListSize] }, header_table_size=Some(65536), enable_push=Some(0), initial_window_size=Some(6291456), max_frame_size=None, max_header_list_size=Some(262144)
+2026-04-06 11:09:29,866 - h2.frame.settings - DEBUG - encoding setting; val=HeaderTableSize(65536)
+2026-04-06 11:09:29,866 - h2.frame.settings - DEBUG - encoding setting; val=EnablePush(0)
+2026-04-06 11:09:29,866 - h2.frame.settings - DEBUG - encoding setting; val=InitialWindowSize(6291456)
+2026-04-06 11:09:29,866 - h2.frame.settings - DEBUG - encoding setting; val=MaxHeaderListSize(262144)
+2026-04-06 11:09:29,866 - h2.proto.connection - DEBUG - Connection; peer=Client
+2026-04-06 11:09:29,866 - hyper_util.client.legacy.pool - DEBUG - pooling idle connection for ("https", en.wikipedia.org)
+2026-04-06 11:09:29,866 - h2.codec.framed_write - DEBUG - send frame=WindowUpdate { stream_id: StreamId(0), size_increment: 15663105 }
+2026-04-06 11:09:29,866 - h2.codec.framed_write - DEBUG - send frame=Headers { stream_id: StreamId(1), flags: (0x25: END_HEADERS | END_STREAM | PRIORITY), stream_dep: StreamDependency { dependency_id: StreamId(0), weight: 255, is_exclusive: true } }
+2026-04-06 11:09:29,956 - h2.codec.framed_read - DEBUG - received frame=Settings { flags: (0x0), max_concurrent_streams: 100, enable_connect_protocol: 1 }
+2026-04-06 11:09:29,957 - h2.codec.framed_write - DEBUG - send frame=Settings { flags: (0x1: ACK) }
+2026-04-06 11:09:29,957 - h2.frame.settings - DEBUG - encoding SETTINGS; len=0, order=SettingsOrder { ids: [HeaderTableSize, EnablePush, MaxConcurrentStreams, InitialWindowSize, MaxFrameSize, MaxHeaderListSize, EnableConnectProtocol, NoRfc7540Priorities] }, header_table_size=None, enable_push=None, initial_window_size=None, max_frame_size=None, max_header_list_size=None
+2026-04-06 11:09:29,957 - h2.codec.framed_read - DEBUG - received frame=Settings { flags: (0x1: ACK) }
+2026-04-06 11:09:29,957 - h2.proto.settings - DEBUG - received settings ACK; applying Settings { flags: (0x0), header_table_size: 65536, enable_push: 0, initial_window_size: 6291456, max_header_list_size: 262144 }
+2026-04-06 11:09:30,124 - h2.hpack.decoder - DEBUG - Decoder changed max table size from=0 to=0
+2026-04-06 11:09:30,124 - h2.codec.framed_read - DEBUG - received frame=Headers { stream_id: StreamId(1), flags: (0x4: END_HEADERS) }
+2026-04-06 11:09:30,124 - h2.codec.framed_read - DEBUG - received frame=Data { stream_id: StreamId(1), flags: (0x1: END_STREAM) }
+2026-04-06 11:09:30,124 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'WMF-Last-Access'
+2026-04-06 11:09:30,125 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'WMF-Last-Access-Global'
+2026-04-06 11:09:30,125 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'GeoIP'
+2026-04-06 11:09:30,125 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'NetworkProbeLimit'
+2026-04-06 11:09:30,125 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'WMF-Uniq'
+2026-04-06 11:09:30,125 - primp - INFO - response: https://en.wikipedia.org/w/api.php?action=opensearch&profile=fuzzy&limit=1&search=Hi%20there 200
+2026-04-06 11:09:30,125 - hyper_util.client.legacy.pool - DEBUG - reuse idle connection for ("https", en.wikipedia.org)
+2026-04-06 11:09:30,125 - h2.codec.framed_write - DEBUG - send frame=Headers { stream_id: StreamId(3), flags: (0x25: END_HEADERS | END_STREAM | PRIORITY), stream_dep: StreamDependency { dependency_id: StreamId(0), weight: 255, is_exclusive: true } }
+2026-04-06 11:09:30,234 - h2.hpack.decoder - DEBUG - Decoder changed max table size from=0 to=4096
+2026-04-06 11:09:30,234 - h2.codec.framed_read - DEBUG - received frame=Headers { stream_id: StreamId(1), flags: (0x4: END_HEADERS) }
+2026-04-06 11:09:30,234 - h2.codec.framed_read - DEBUG - received frame=Data { stream_id: StreamId(1) }
+2026-04-06 11:09:30,234 - h2.codec.framed_read - DEBUG - received frame=Data { stream_id: StreamId(1), flags: (0x1: END_STREAM) }
+2026-04-06 11:09:30,234 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'grokipedia-affinity'
+2026-04-06 11:09:30,234 - cookie_store.cookie_store - DEBUG - inserting secure cookie '__cf_bm'
+2026-04-06 11:09:30,234 - primp - INFO - response: https://grokipedia.com/api/typeahead?query=Hi+there&limit=1 200
+2026-04-06 11:09:30,318 - h2.codec.framed_read - DEBUG - received frame=Headers { stream_id: StreamId(3), flags: (0x4: END_HEADERS) }
+2026-04-06 11:09:30,319 - h2.codec.framed_read - DEBUG - received frame=Data { stream_id: StreamId(3), flags: (0x1: END_STREAM) }
+2026-04-06 11:09:30,319 - cookie_store.cookie_store - DEBUG - inserting secure cookie 'WMF-Uniq'
+2026-04-06 11:09:30,319 - primp - INFO - response: https://en.wikipedia.org/w/api.php?action=query&format=json&prop=extracts&titles=Hi%20there&explaintext=0&exintro=0&redirects=1 200
+2026-04-06 11:09:30,319 - cookie_store.cookie_store - DEBUG - inserting Set-Cookie 'Cookie { cookie_string: Some("arc=us"), name: Indexed(0, 3), value: Indexed(4, 6), expires: None, max_age: None, domain: None, path: None, secure: None, http_only: None, same_site: None, partitioned: None }'
+2026-04-06 11:09:30,319 - cookie_store.cookie_store - DEBUG - inserting Set-Cookie 'Cookie { cookie_string: Some("lb=en"), name: Indexed(0, 2), value: Indexed(3, 5), expires: None, max_age: None, domain: None, path: None, secure: None, http_only: None, same_site: None, partitioned: None }'
+2026-04-06 11:09:30,319 - reqwest.connect - DEBUG - starting new connection: https://www.mojeek.com/
+2026-04-06 11:09:30,321 - hyper_util.client.legacy.connect.http - DEBUG - connecting to 5.102.173.68:443
+2026-04-06 11:09:30,402 - hyper_util.client.legacy.connect.http - DEBUG - connected to 5.102.173.68:443
+2026-04-06 11:09:30,403 - rustls.client.hs - DEBUG - No cached session for DnsName("www.mojeek.com")
+2026-04-06 11:09:30,403 - rustls.client.hs - DEBUG - Not resuming any session
+2026-04-06 11:09:30,403 - rustls.client.hs - DEBUG - Browser emulation: Some(BrowserEmulator { browser_type: Safari, version: BrowserVersion { major: 18, minor: 5, patch: 0 }, extension_order_seed: Some(39548), cipher_suites: Some([TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, CipherSuite(0x9d), CipherSuite(0x9c), CipherSuite(0x35), CipherSuite(0x2f), CipherSuite(0xc008), CipherSuite(0xc012), CipherSuite(0xa)]), signature_algorithms: Some([ECDSA_NISTP256_SHA256, RSA_PSS_SHA256, RSA_PKCS1_SHA256, ECDSA_NISTP384_SHA384, RSA_PSS_SHA384, RSA_PSS_SHA384, RSA_PKCS1_SHA384, RSA_PSS_SHA512, RSA_PKCS1_SHA512, RSA_PKCS1_SHA1]), named_groups: Some([X25519MLKEM768, X25519, secp256r1, secp384r1]), os_type: Some(MacOS), include_status_request_v2: true })
+2026-04-06 11:09:30,403 - rustls.client.hs - DEBUG - Using extension_order_seed: 54603
+2026-04-06 11:09:30,404 - rustls.client.hs - DEBUG - Browser emulation: Some(BrowserEmulator { browser_type: Safari, version: BrowserVersion { major: 18, minor: 5, patch: 0 }, extension_order_seed: Some(39548), cipher_suites: Some([TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, CipherSuite(0x9d), CipherSuite(0x9c), CipherSuite(0x35), CipherSuite(0x2f), CipherSuite(0xc008), CipherSuite(0xc012), CipherSuite(0xa)]), signature_algorithms: Some([ECDSA_NISTP256_SHA256, RSA_PSS_SHA256, RSA_PKCS1_SHA256, ECDSA_NISTP384_SHA384, RSA_PSS_SHA384, RSA_PSS_SHA384, RSA_PKCS1_SHA384, RSA_PSS_SHA512, RSA_PKCS1_SHA512, RSA_PKCS1_SHA1]), named_groups: Some([X25519MLKEM768, X25519, secp256r1, secp384r1]), os_type: Some(MacOS), include_status_request_v2: true })
+2026-04-06 11:09:30,404 - rustls.client.hs - DEBUG - Cipher suites count: 20
+2026-04-06 11:09:30,404 - rustls.client.hs - DEBUG -   [0] TLS13_AES_128_GCM_SHA256
+2026-04-06 11:09:30,404 - rustls.client.hs - DEBUG -   [1] TLS13_AES_256_GCM_SHA384
+2026-04-06 11:09:30,404 - rustls.client.hs - DEBUG -   [2] TLS13_CHACHA20_POLY1305_SHA256
+2026-04-06 11:09:30,404 - rustls.client.hs - DEBUG -   [3] TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+2026-04-06 11:09:30,404 - rustls.client.hs - DEBUG -   [4] TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+2026-04-06 11:09:30,404 - rustls.client.hs - DEBUG -   [5] TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+2026-04-06 11:09:30,404 - rustls.client.hs - DEBUG -   [6] TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+2026-04-06 11:09:30,404 - rustls.client.hs - DEBUG -   [7] TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+2026-04-06 11:09:30,404 - rustls.client.hs - DEBUG -   [8] TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+2026-04-06 11:09:30,404 - rustls.client.hs - DEBUG -   [9] TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA
+2026-04-06 11:09:30,405 - rustls.client.hs - DEBUG -   [10] TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA
+2026-04-06 11:09:30,405 - rustls.client.hs - DEBUG -   [11] TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA
+2026-04-06 11:09:30,405 - rustls.client.hs - DEBUG -   [12] TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
+2026-04-06 11:09:30,405 - rustls.client.hs - DEBUG -   [13] CipherSuite(0x9d)
+2026-04-06 11:09:30,405 - rustls.client.hs - DEBUG -   [14] CipherSuite(0x9c)
+2026-04-06 11:09:30,405 - rustls.client.hs - DEBUG -   [15] CipherSuite(0x35)
+2026-04-06 11:09:30,405 - rustls.client.hs - DEBUG -   [16] CipherSuite(0x2f)
+2026-04-06 11:09:30,405 - rustls.client.hs - DEBUG -   [17] CipherSuite(0xc008)
+2026-04-06 11:09:30,405 - rustls.client.hs - DEBUG -   [18] CipherSuite(0xc012)
+2026-04-06 11:09:30,405 - rustls.client.hs - DEBUG -   [19] CipherSuite(0xa)
+2026-04-06 11:09:30,405 - rustls.client.hs - DEBUG - Final cipher suites for ClientHello: [TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, CipherSuite(0x9d), CipherSuite(0x9c), CipherSuite(0x35), CipherSuite(0x2f), CipherSuite(0xc008), CipherSuite(0xc012), CipherSuite(0xa)]
+2026-04-06 11:09:30,489 - rustls.client.hs - DEBUG - Using ciphersuite TLS13_AES_256_GCM_SHA384
+2026-04-06 11:09:30,490 - rustls.client.tls13 - DEBUG - Not resuming
+2026-04-06 11:09:30,490 - rustls.client.tls13 - DEBUG - TLS1.3 encrypted extensions: ServerExtensions { server_name_ack: (), selected_protocol: SingleProtocolName(ProtocolName(687474702f312e31)), unknown_extensions: {}, .. }
+2026-04-06 11:09:30,490 - rustls.client.hs - DEBUG - ALPN protocol is Some(b"http/1.1")
+2026-04-06 11:09:31,689 - primp - INFO - response: https://www.mojeek.com/search?q=Hi+there 200
+2026-04-06 11:09:31,769 - hyper_util.client.legacy.pool - DEBUG - pooling idle connection for ("https", www.mojeek.com)
+2026-04-06 11:09:31,773 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-04-06 11:09:31,773 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-06 11:09:31,773 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-04-06 11:09:31,774 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-06 11:09:31,774 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-04-06 11:09:32,327 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Mon, 06 Apr 2026 07:09:32 GMT'), (b'Content-Length', b'337')])
+2026-04-06 11:09:32,328 - httpx - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-04-06 11:09:32,328 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-04-06 11:09:32,328 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-06 11:09:32,328 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-06 11:09:32,328 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-06 11:09:32,329 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-04-06 11:09:32,330 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-06 11:09:32,330 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-04-06 11:09:32,330 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-06 11:09:32,330 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-04-06 11:09:32,547 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Mon, 06 Apr 2026 07:09:32 GMT'), (b'Content-Length', b'335')])
+2026-04-06 11:09:32,548 - httpx - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-04-06 11:09:32,548 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-04-06 11:09:32,548 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-06 11:09:32,548 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-06 11:09:32,548 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-06 11:09:32,548 - brain.consolidator - DEBUG - STM snippet: Hi there! How can I assist you today?
+2026-04-06 11:09:32,549 - filelock - DEBUG - Attempting to acquire lock 4429142992 on brain/working_memory.txt.lock
+2026-04-06 11:09:32,549 - filelock - DEBUG - Lock 4429142992 acquired on brain/working_memory.txt.lock
+2026-04-06 11:09:32,549 - filelock - DEBUG - Attempting to release lock 4429142992 on brain/working_memory.txt.lock
+2026-04-06 11:09:32,550 - filelock - DEBUG - Lock 4429142992 released on brain/working_memory.txt.lock
+2026-04-06 11:09:32,550 - brain.stm - DEBUG - Appended: Hi there! How can I assist you today?
+2026-04-06 11:09:32,550 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-04-06 11:09:32,551 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-06 11:09:32,551 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-04-06 11:09:32,551 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-06 11:09:32,551 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-04-06 11:09:32,561 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Mon, 06 Apr 2026 07:09:32 GMT'), (b'Transfer-Encoding', b'chunked')])
+2026-04-06 11:09:32,561 - httpx - INFO - HTTP Request: POST http://127.0.0.1:11434/api/embeddings "HTTP/1.1 200 OK"
+2026-04-06 11:09:32,561 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-04-06 11:09:32,561 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-06 11:09:32,561 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-06 11:09:32,561 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-06 11:09:32,562 - brain.memory_controller - DEBUG - Initial branch: hiya
+2026-04-06 11:09:36,951 - filelock - DEBUG - Attempting to acquire lock 4303986176 on brain/ltm_tree.json.lock
+2026-04-06 11:09:36,951 - filelock - DEBUG - Lock 4303986176 acquired on brain/ltm_tree.json.lock
+2026-04-06 11:09:36,954 - filelock - DEBUG - Attempting to release lock 4303986176 on brain/ltm_tree.json.lock
+2026-04-06 11:09:36,954 - filelock - DEBUG - Lock 4303986176 released on brain/ltm_tree.json.lock
+2026-04-06 11:09:38,344 - filelock - DEBUG - Attempting to acquire lock 4494546592 on brain/ltm_tree.json.lock
+2026-04-06 11:09:38,344 - filelock - DEBUG - Lock 4494546592 acquired on brain/ltm_tree.json.lock
+2026-04-06 11:09:38,344 - filelock - DEBUG - Attempting to release lock 4494546592 on brain/ltm_tree.json.lock
+2026-04-06 11:09:38,344 - filelock - DEBUG - Lock 4494546592 released on brain/ltm_tree.json.lock
+2026-04-06 11:09:39,373 - filelock - DEBUG - Attempting to acquire lock 4494243984 on brain/ltm_tree.json.lock
+2026-04-06 11:09:39,374 - filelock - DEBUG - Lock 4494243984 acquired on brain/ltm_tree.json.lock
+2026-04-06 11:09:39,377 - filelock - DEBUG - Attempting to release lock 4494243984 on brain/ltm_tree.json.lock
+2026-04-06 11:09:39,377 - filelock - DEBUG - Lock 4494243984 released on brain/ltm_tree.json.lock
+2026-04-06 11:09:40,431 - filelock - DEBUG - Attempting to acquire lock 4503377568 on brain/ltm_tree.json.lock
+2026-04-06 11:09:40,431 - filelock - DEBUG - Lock 4503377568 acquired on brain/ltm_tree.json.lock
+2026-04-06 11:09:40,432 - filelock - DEBUG - Attempting to release lock 4503377568 on brain/ltm_tree.json.lock
+2026-04-06 11:09:40,432 - filelock - DEBUG - Lock 4503377568 released on brain/ltm_tree.json.lock
+2026-04-06 11:09:43,516 - filelock - DEBUG - Attempting to acquire lock 4503091344 on brain/working_memory.txt.lock
+2026-04-06 11:09:43,516 - filelock - DEBUG - Lock 4503091344 acquired on brain/working_memory.txt.lock
+2026-04-06 11:09:43,516 - filelock - DEBUG - Attempting to release lock 4503091344 on brain/working_memory.txt.lock
+2026-04-06 11:09:43,517 - filelock - DEBUG - Lock 4503091344 released on brain/working_memory.txt.lock
+2026-04-06 11:09:43,518 - httpcore.connection - DEBUG - connect_tcp.started host='127.0.0.1' port=11434 local_address=None timeout=None socket_options=None
+2026-04-06 11:09:43,519 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x10c6c2900>
+2026-04-06 11:09:43,519 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-04-06 11:09:43,519 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-06 11:09:43,519 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-04-06 11:09:43,519 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-06 11:09:43,519 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-04-06 11:09:43,546 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Mon, 06 Apr 2026 07:09:43 GMT'), (b'Transfer-Encoding', b'chunked')])
+2026-04-06 11:09:43,546 - httpx - INFO - HTTP Request: POST http://127.0.0.1:11434/api/embeddings "HTTP/1.1 200 OK"
+2026-04-06 11:09:43,547 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-04-06 11:09:43,547 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-06 11:09:43,547 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-06 11:09:43,547 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-06 11:09:43,549 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-04-06 11:09:43,550 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-06 11:09:43,550 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-04-06 11:09:43,550 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-06 11:09:43,550 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-04-06 11:09:44,401 - httpcore.http11 - DEBUG - receive_response_headers.failed exception=KeyboardInterrupt()
+2026-04-06 11:09:44,401 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-06 11:09:44,401 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-06 11:09:44,410 - filelock - DEBUG - Attempting to acquire lock 4504096272 on brain/ltm_tree.json.lock
+2026-04-06 11:09:44,410 - filelock - DEBUG - Lock 4504096272 acquired on brain/ltm_tree.json.lock
+2026-04-06 11:09:44,413 - filelock - DEBUG - Attempting to release lock 4504096272 on brain/ltm_tree.json.lock
+2026-04-06 11:09:44,413 - filelock - DEBUG - Lock 4504096272 released on brain/ltm_tree.json.lock

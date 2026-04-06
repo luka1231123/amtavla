@@ -1,4 +1,5 @@
 import atexit
+import logging
 import re
 import threading
 
@@ -11,6 +12,7 @@ from brain.consolidator import (
     _clean_topic_name,
 )
 
+logger = logging.getLogger("brain.memory_controller")
 SAVE_INTERVAL = 5
 GREETING_PATTERNS = re.compile(
     r"^(hi|hello|hey|hey there|hi there|hello there|greetings|sup|yo|howdy|what'?s up)",
@@ -27,9 +29,10 @@ class MemoryController:
         self.turn_count = 0
         self._cached_ltm_context = ""
         self._turns_since_save = 0
+        self._lock = threading.Lock()
 
         active = self.tree.get_most_active_branch()
-        if active and len(active["content"]) > 0:
+        if active and len(active.get("content", [])) > 0:
             self.current_branch_id = active["id"]
 
         atexit.register(self._save_on_exit)
@@ -64,30 +67,31 @@ class MemoryController:
 
     def _process_turn(self, user_input, response):
         try:
-            self.turn_count += 1
+            with self._lock:
+                self.turn_count += 1
             snippet = summarize_for_stm(user_input, response)
 
             if not snippet or not snippet.strip():
-                print("   [DEBUG-BRAIN] -> Empty snippet, skipping turn")
+                logger.debug("Empty snippet, skipping turn")
                 return
 
-            append_stm(snippet, stm_file=self._stm_file)
+            append_stm(user_input, response, stm_file=self._stm_file)
 
             current_branch = self._get_current_branch()
 
             if self.turn_count == 1:
                 if self._is_greeting(user_input) and len(snippet) < 15:
-                    print("   [DEBUG-BRAIN] -> Greeting turn, skipping branch creation")
+                    logger.debug("Greeting turn, skipping branch creation")
                     return
                 if snippet.lower() == user_input.lower().strip():
-                    print("   [DEBUG-BRAIN] -> Snippet echoes input, skipping branch")
+                    logger.debug("Snippet echoes input, skipping branch")
                     return
 
                 topic = _clean_topic_name(user_input[:40], "Conversation")
                 new_branch = self.tree.add_branch(topic, [snippet])
                 if new_branch:
                     self.current_branch_id = new_branch["id"]
-                    print(f"   [DEBUG-BRAIN] -> Initial branch: {new_branch['topic']}")
+                    logger.debug("Initial branch: %s", new_branch["topic"])
                     self._cached_ltm_context = self.tree.retrieve_context(user_input)
                 return
 
@@ -99,31 +103,33 @@ class MemoryController:
                     new_branch = self.tree.add_branch(clean_topic, [snippet])
                     if new_branch:
                         self.current_branch_id = new_branch["id"]
-                        print(f"   [DEBUG-BRAIN] -> New branch: {new_branch['topic']}")
+                        logger.debug("New branch: %s", new_branch["topic"])
                         self._cached_ltm_context = self.tree.retrieve_context(
                             user_input
                         )
                 else:
                     self._cached_ltm_context = ""
             else:
-                pass
+                self._cached_ltm_context = self.tree.retrieve_context(user_input)
 
-            self._turns_since_save += 1
-            if self._turns_since_save >= SAVE_INTERVAL:
-                self.tree.save()
-                self._turns_since_save = 0
+            with self._lock:
+                self._turns_since_save += 1
+                if self._turns_since_save >= SAVE_INTERVAL:
+                    self.tree.save()
+                    self._turns_since_save = 0
         except Exception as e:
-            print(f"   [DEBUG-BRAIN] -> Error in _process_turn: {e}")
+            logger.error("Error in _process_turn: %s", e)
 
     def _consolidate_and_reset(self):
-        print(f"   [DEBUG-BRAIN] -> Consolidating STM to tree")
+        logger.debug("Consolidating STM to tree")
         stm = read_stm(stm_file=self._stm_file)
         if stm.strip():
             consolidate_to_tree(stm, self.tree, self.current_branch_id)
             self.tree.save()
         clear_stm(stm_file=self._stm_file)
         self.current_branch_id = None
-        self._turns_since_save = 0
+        with self._lock:
+            self._turns_since_save = 0
 
     def get_debug_info(self, mode="status"):
         if mode == "status":

@@ -1,10 +1,4 @@
-def tool_weather(user_prompt, memory):
-    combined_query = (user_prompt + " " + memory).lower()
-    if "tokyo" in combined_query:
-        return "Tokyo: Sunny, 22C."
-    elif "london" in combined_query:
-        return "London: Raining, 14C."
-    return "Location unknown."
+from datetime import datetime
 
 
 def tool_bash_simulator(user_prompt, memory):
@@ -14,7 +8,7 @@ def tool_bash_simulator(user_prompt, memory):
     if any(kw in user_lower for kw in ["python", "version"]):
         return "Python 3.12.3"
     if any(kw in user_lower for kw in ["date", "time", "today", "now"]):
-        return "2026-04-05 14:32:00 UTC"
+        return datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
     if any(kw in user_lower for kw in ["whoami", "user", "name"]):
         return "luka"
     if any(kw in user_lower for kw in ["pwd", "where", "path", "cwd"]):

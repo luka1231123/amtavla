@@ -2,3 +2,4 @@ filelock
 ollama
 ddgs
 numpy
+flask

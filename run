@@ -1,0 +1,18 @@
+#!/bin/bash
+
+cleanup() {
+    echo "Cleaning up..."
+    kill $PHONE_PID 2>/dev/null
+    pkill -f "llama-server" 2>/dev/null
+}
+
+trap cleanup EXIT
+
+# Start phone UI server in background
+echo "Starting phone UI server on port 8081..."
+python server/phone_server.py &
+PHONE_PID=$!
+
+# Start main CLI
+echo "Starting amtavla CLI..."
+python main.py

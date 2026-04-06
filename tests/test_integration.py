@@ -7,12 +7,26 @@ Run: python3 tests/test_integration.py
 """
 
 import json
+import logging
 import os
 import sys
 import tempfile
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+LOG_DIR = os.path.join(os.path.dirname(__file__), "..", "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(os.path.join(LOG_DIR, "integration_test.log")),
+        logging.StreamHandler(),
+    ],
+)
+logger = logging.getLogger("test.integration")
 
 from brain.stm import read_stm, append_stm, clear_stm, STM_FILE, MAX_LINES
 from brain.ltm_tree import (

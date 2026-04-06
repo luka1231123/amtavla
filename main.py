@@ -1,23 +1,65 @@
+import os
 import sys
+import time
+import threading
+import select
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.insert(0, ".")
 
-from brain.planner import generate_plan
+from brain.planner import generate_plan, get_thinking
 from brain.memory_controller import MemoryController
 from generator import generate_response
-from tools import tool_weather, tool_bash_simulator
+from tools import tool_bash_simulator
 from tools.websearch import tool_websearch
 
 MEMORY = MemoryController()
-CONVERSATION_HISTORY = deque(maxlen=5)
 
 GREETING_RESPONSES = {
     "hi": "Hey! How can I help?",
     "hello": "Hello! What can I do for you?",
     "hey": "Hey there! What's up?",
 }
+
+command_queue = []
+stop_command_poller = False
+
+
+def _poll_commands():
+    import urllib.request
+    import json
+    global command_queue, stop_command_poller
+    while not stop_command_poller:
+        try:
+            req = urllib.request.Request("http://127.0.0.1:8081/command")
+            with urllib.request.urlopen(req, timeout=2) as response:
+                data = response.read()
+                resp = json.loads(data)
+                if resp.get("command"):
+                    command_queue.append(resp["command"])
+                    urllib.request.urlopen(
+                        urllib.request.Request("http://127.0.0.1:8081/command/ack"),
+                        timeout=2
+                    )
+        except Exception:
+            pass
+        time.sleep(0.5)
+
+
+def _send_response_to_ui(response: str):
+    try:
+        import urllib.request
+        import json
+        data = json.dumps({"text": response}).encode("utf-8")
+        req = urllib.request.Request(
+            "http://127.0.0.1:8081/response",
+            data=data,
+            headers={"Content-Type": "application/json"}
+        )
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass
 
 
 def execute_plan_step(
@@ -27,9 +69,7 @@ def execute_plan_step(
         result = tool_websearch(detail)
         return action, detail, result
     elif action == "TOOL":
-        if detail == "weather":
-            result = tool_weather(user_input, memory)
-        elif detail == "bash":
+        if detail == "bash":
             result = tool_bash_simulator(user_input, memory)
         else:
             result = f"Unknown tool: {detail}"
@@ -40,11 +80,33 @@ def execute_plan_step(
 
 
 def run():
+    global stop_command_poller
+    
+    poller_thread = threading.Thread(target=_poll_commands, daemon=True)
+    poller_thread.start()
+    
     print("amtavla - CLI assistant (type 'exit' to quit, '/brain <mode>' for debug)\n")
+    print("Or use phone UI at http://127.0.0.1:8081\n")
 
     while True:
         try:
-            user_input = input("> ").strip()
+            user_input = None
+            
+            # Check for phone commands first
+            if command_queue:
+                user_input = command_queue.pop(0)
+                print(f"[PHONE] {user_input}")
+            # Check for stdin input (non-blocking)
+            elif sys.platform != 'win32' and select.select([sys.stdin], [], [], 0)[0]:
+                user_input = sys.stdin.readline()
+                if user_input:
+                    user_input = user_input.strip()
+            else:
+                time.sleep(0.1)
+                continue
+                
+            if not user_input:
+                continue
         except (EOFError, KeyboardInterrupt):
             print("\nExiting.")
             break
@@ -82,7 +144,7 @@ def run():
                     + (context.get("ltm_context", "") or "")
                 )
 
-                plan = generate_plan(user_input, context_text)
+                plan, thinking = generate_plan(user_input, context_text)
 
                 plan_results = []
                 with ThreadPoolExecutor(max_workers=5) as executor:
@@ -107,13 +169,16 @@ def run():
                     context,
                 )
                 print(f"{response}\n")
+                
+                _send_response_to_ui(response)
 
-                CONVERSATION_HISTORY.append((user_input, response))
                 MEMORY.process_turn_async(user_input, response)
 
             except Exception as e:
                 print(f"   [ERROR] {e}")
                 print("I'm having trouble right now. Please try again.\n")
+
+    stop_command_poller = True
 
 
 if __name__ == "__main__":

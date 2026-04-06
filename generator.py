@@ -1,6 +1,4 @@
-import ollama
-
-MODEL = "qwen2.5-coder:1.5b"
+import llama_client
 
 SYSTEM_PROMPT = """You are amtavla, a CLI assistant.
 
@@ -11,6 +9,8 @@ Cite sources from web search when using them."""
 
 
 def generate_response(user_prompt, plan, plan_results, context_blocks):
+    client = llama_client
+
     context_parts = []
 
     if plan:
@@ -45,5 +45,8 @@ def generate_response(user_prompt, plan, plan_results, context_blocks):
         {"role": "user", "content": user_prompt},
     ]
 
-    response = ollama.chat(model=MODEL, messages=messages)
-    return response["message"]["content"].strip()
+    try:
+        response = client.chat(messages)
+        return response["message"]["content"].strip()
+    except Exception as e:
+        return f"I apologize, but I encountered an error generating a response: {e}"

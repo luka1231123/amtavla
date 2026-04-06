@@ -6,12 +6,11 @@ from collections import deque
 from functools import lru_cache
 
 import numpy as np
-import ollama
+import llama_client
 from filelock import FileLock
 
 logger = logging.getLogger("brain.ltm_tree")
 
-EMBEDDING_MODEL = "nomic-embed-text"
 TREE_FILE = "brain/ltm_tree.json"
 MAX_DEPTH = 4
 RETRIEVAL_THRESHOLD = 0.3
@@ -28,16 +27,19 @@ def _safe_embed(text: str) -> list[float]:
 @lru_cache(maxsize=512)
 def _embed_cached(text: str) -> tuple[float, ...]:
     try:
-        resp = ollama.embeddings(model=EMBEDDING_MODEL, prompt=text)
-        return tuple(resp["embedding"])
+        resp = llama_client.embed(text)
+        emb = resp.get("embedding", [])
+        if emb:
+            return tuple(emb)
+        return tuple([0.0] * EMBEDDING_DIM)
     except Exception as e:
         logger.error(f"Embedding failed: {e}")
         return tuple([0.0] * EMBEDDING_DIM)
 
 
-def _safe_chat(messages: list[dict], model: str = "qwen2.5-coder:1.5b") -> str:
+def _safe_chat(messages: list[dict], model: str = None) -> str:
     try:
-        response = ollama.chat(model=model, messages=messages)
+        response = llama_client.chat(messages)
         return response["message"]["content"].strip()
     except Exception as e:
         logger.error(f"Chat failed: {e}")
@@ -54,8 +56,9 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
     return float(np.dot(arr_a, arr_b) / (norm_a * norm_b))
 
 
-def _branch_embedding_text(branch: dict) -> str:
-    return branch["topic"] + " " + " ".join(branch["content"])
+    def _branch_embedding_text(branch: dict) -> str:
+        content = branch.get("content") or []
+        return branch["topic"] + " " + " ".join(content)
 
 
 class LtmTree:
@@ -104,7 +107,8 @@ class LtmTree:
         while stack:
             node = stack.pop()
             result.append(node)
-            stack.extend(reversed(node["children"]))
+            children = node.get("children", [])
+            stack.extend(reversed(children))
         return result
 
     def _collect_subbranch_with_depths(
@@ -126,7 +130,7 @@ class LtmTree:
             node, depth = queue.popleft()
             if node["id"] == branch_id:
                 return depth
-            for child in node["children"]:
+            for child in node.get("children", []):
                 queue.append((child, depth + 1))
         return -1
 
@@ -134,7 +138,7 @@ class LtmTree:
         for node_id, node in self._index.items():
             if node_id == branch_id:
                 continue
-            for child in node["children"]:
+            for child in node.get("children", []):
                 if child["id"] == branch_id:
                     return node
         return None
@@ -143,7 +147,7 @@ class LtmTree:
         parent = self._parent_of(branch_id)
         if parent is None:
             return list(self.branches)
-        return list(parent["children"])
+        return list(parent.get("children", []))
 
     def find_best_branch(
         self,
@@ -212,7 +216,8 @@ class LtmTree:
         parent = self._find_branch(parent_id)
         if parent is None:
             return None
-        if self._depth_of(parent_id) >= MAX_DEPTH - 1:
+        parent_depth = self._depth_of(parent_id)
+        if parent_depth < 0 or parent_depth >= MAX_DEPTH - 1:
             return None
         parent["children"].append(branch)
         self._index[branch["id"]] = branch
@@ -225,7 +230,7 @@ class LtmTree:
         branch["content"].extend(content_items)
         if len(branch["content"]) > MAX_CONTENT_PER_BRANCH:
             branch["content"] = branch["content"][-MAX_CONTENT_PER_BRANCH:]
-        branch["embedding"] = list(_safe_embed(_branch_embedding_text(branch)))
+        branch["embedding"] = list(_safe_embed(self._branch_embedding_text(branch)))
         return True
 
     def update_branch_topic(self, branch_id: str, new_topic: str) -> bool:
@@ -233,7 +238,7 @@ class LtmTree:
         if branch is None:
             return False
         branch["topic"] = new_topic
-        branch["embedding"] = list(_safe_embed(_branch_embedding_text(branch)))
+        branch["embedding"] = list(_safe_embed(self._branch_embedding_text(branch)))
         return True
 
     def merge_branches(self, keep_id: str, merge_id: str) -> bool:
@@ -243,20 +248,21 @@ class LtmTree:
             return False
 
         keep["content"].extend(merge["content"])
-        for child in merge["children"]:
+        for child in merge.get("children", []):
             if child["id"] not in [c["id"] for c in keep["children"]]:
                 keep["children"].append(child)
+                self._index[child["id"]] = child
         keep["topic"] = _merge_topic_name(keep["topic"], merge["topic"])
-        keep["embedding"] = list(_safe_embed(_branch_embedding_text(keep)))
+        keep["embedding"] = list(_safe_embed(self._branch_embedding_text(keep)))
 
         self._remove_branch(merge_id)
         return True
 
     def _remove_branch(self, branch_id: str) -> bool:
         self._index.pop(branch_id, None)
-        for i, node in enumerate(self.branches):
+        for node in self.branches[:]:
             if node["id"] == branch_id:
-                self.branches.pop(i)
+                self.branches.remove(node)
                 return True
             if self._remove_from_children(node, branch_id):
                 return True
@@ -282,7 +288,7 @@ class LtmTree:
             visited.add(current_id)
 
             while True:
-                siblings = self._siblings_of(current_id)
+                siblings = list(self._siblings_of(current_id))
                 if len(siblings) < 2:
                     break
                 merged = False
@@ -305,18 +311,22 @@ class LtmTree:
                     break
 
             for sib in self._siblings_of(current_id):
-                if sib["children"] and sib["id"] not in visited:
+                if sib.get("children") and sib["id"] not in visited:
                     queue.append(sib["id"])
 
     def full_tree_merge(self):
         changed = True
         while changed:
             changed = False
-            nodes = self._collect_all_nodes()
-            for i in range(len(nodes)):
-                for j in range(i + 1, len(nodes)):
-                    a, b = nodes[i], nodes[j]
-                    if a["id"] not in self._index or b["id"] not in self._index:
+            current_nodes = self._collect_all_nodes()
+            current_ids = {n["id"] for n in current_nodes}
+            for a in current_nodes:
+                if a["id"] not in current_ids:
+                    continue
+                for b in current_nodes:
+                    if b["id"] not in current_ids:
+                        continue
+                    if a["id"] == b["id"]:
                         continue
                     if self._parent_of(b["id"]) is a or self._parent_of(a["id"]) is b:
                         continue

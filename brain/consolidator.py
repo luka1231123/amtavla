@@ -1,3 +1,4 @@
+import logging
 import re
 
 from brain.ltm_tree import (
@@ -8,10 +9,14 @@ from brain.ltm_tree import (
     MAX_DEPTH,
 )
 
+logger = logging.getLogger("brain.consolidator")
 MODEL = "qwen2.5-coder:1.5b"
 
 APPEND_THRESHOLD = 0.25
 SUBTOPIC_THRESHOLD = 0.15
+TOPIC_SHIFT_THRESHOLD_HIGH = 0.60
+TOPIC_SHIFT_THRESHOLD_LOW = 0.50
+TOPIC_SHIFT_KEYWORD_THRESHOLD = 0.48
 
 
 def _clean_topic_name(raw: str, fallback: str) -> str:
@@ -51,7 +56,7 @@ Assistant: {response}
 Output ONLY the summary line. No labels, no prefixes.
 """
     snippet = _safe_chat([{"role": "user", "content": prompt}], model=MODEL)
-    print(f"   [DEBUG-CONSOLIDATOR] -> STM snippet: {snippet}")
+    logger.debug("STM snippet: %s", snippet)
     return snippet
 
 
@@ -63,7 +68,7 @@ def detect_topic_shift(user_input, current_branch: dict | None):
     branch_embedding = current_branch["embedding"]
     sim = _cosine_similarity(input_embedding, branch_embedding)
 
-    if sim > 0.60:
+    if sim > TOPIC_SHIFT_THRESHOLD_HIGH:
         return False, current_branch["topic"]
 
     STOP_WORDS = {
@@ -180,13 +185,13 @@ def detect_topic_shift(user_input, current_branch: dict | None):
 
     input_words = set(w.strip(".,!?;:\"'()[]{}") for w in user_input.lower().split())
     input_words -= STOP_WORDS
-    branch_text = current_branch["topic"] + " " + " ".join(current_branch["content"])
+    branch_text = current_branch["topic"] + " " + " ".join(current_branch.get("content", []))
     branch_words = set(branch_text.lower().split())
     keyword_overlap = len(input_words & branch_words)
-    if keyword_overlap >= 1 and sim > 0.48:
+    if keyword_overlap >= 1 and sim > TOPIC_SHIFT_KEYWORD_THRESHOLD:
         return False, current_branch["topic"]
 
-    if sim < 0.50:
+    if sim < TOPIC_SHIFT_THRESHOLD_LOW:
         prompt = f"""
 Generate a concise topic name for this new subject.
 
@@ -196,7 +201,7 @@ Output ONLY the topic name, under 5 words. No quotes, no punctuation.
 """
         raw_topic = _safe_chat([{"role": "user", "content": prompt}], model=MODEL)
         new_topic = _clean_topic_name(raw_topic, user_input[:40])
-        print(f"   [DEBUG-CONSOLIDATOR] -> Topic shift (sim={sim:.2f}): '{new_topic}'")
+        logger.debug("Topic shift (sim=%.2f): '%s'", sim, new_topic)
         return True, new_topic
 
     prompt = f"""
@@ -235,15 +240,13 @@ Answer SAME or DIFFERENT. If DIFFERENT, also give a one-line topic name.
                 model=MODEL,
             )
         new_topic = _clean_topic_name(raw_topic, user_input[:40])
-        print(f"   [DEBUG-CONSOLIDATOR] -> Topic shift (sim={sim:.2f}): '{new_topic}'")
+        logger.debug("Topic shift (sim=%.2f): '%s'", sim, new_topic)
         return True, new_topic
     return False, current_branch["topic"]
 
 
 def consolidate_to_tree(stm_lines: str, tree: LtmTree, current_branch_id: str | None):
-    print(
-        f"   [DEBUG-CONSOLIDATOR] -> Consolidating STM to tree (branch: {current_branch_id})"
-    )
+    logger.debug("Consolidating STM to tree (branch: %s)", current_branch_id)
 
     prompt = f"""
 Review these short-term memory lines and distill them into concise content statements for long-term storage.
@@ -259,11 +262,11 @@ Return nothing if nothing is worth keeping.
     content = _safe_chat([{"role": "user", "content": prompt}], model=MODEL)
 
     if not content:
-        print("   [DEBUG-CONSOLIDATOR] -> Nothing worth consolidating")
+        logger.debug("Nothing worth consolidating")
         return
 
     distilled = [l.strip() for l in content.splitlines() if l.strip()]
-    print(f"   [DEBUG-CONSOLIDATOR] -> Distilled {len(distilled)} lines")
+    logger.debug("Distilled %d lines", len(distilled))
 
     distilled_text = " ".join(distilled)
     distilled_embedding = _safe_embed(distilled_text)
@@ -275,9 +278,7 @@ Return nothing if nothing is worth keeping.
 
         if sim >= APPEND_THRESHOLD:
             tree.append_to_branch(best_match["id"], distilled)
-            print(
-                f"   [DEBUG-CONSOLIDATOR] -> Appended to '{best_match['topic']}' (sim={sim:.2f})"
-            )
+            logger.debug("Appended to '%s' (sim=%.2f)", best_match["topic"], sim)
             tree.check_and_merge_siblings(best_match["id"])
             tree.full_tree_merge()
             return
@@ -312,34 +313,24 @@ Output ONLY the topic name, under 5 words.
                         new_topic, distilled, parent_id=best_match["id"]
                     )
                     if new_branch:
-                        print(
-                            f"   [DEBUG-CONSOLIDATOR] -> Created subbranch '{new_topic}' under '{best_match['topic']}'"
-                        )
+                        logger.debug("Created subbranch '%s' under '%s'", new_topic, best_match["topic"])
                         tree.check_and_merge_siblings(new_branch["id"])
                         tree.full_tree_merge()
                     else:
                         tree.append_to_branch(best_match["id"], distilled)
-                        print(
-                            f"   [DEBUG-CONSOLIDATOR] -> Max depth, appended to '{best_match['topic']}'"
-                        )
+                        logger.debug("Max depth, appended to '%s'", best_match["topic"])
                 else:
                     tree.append_to_branch(best_match["id"], distilled)
-                    print(
-                        f"   [DEBUG-CONSOLIDATOR] -> Max depth, appended to '{best_match['topic']}'"
-                    )
+                    logger.debug("Max depth, appended to '%s'", best_match["topic"])
             else:
                 tree.append_to_branch(best_match["id"], distilled)
-                print(
-                    f"   [DEBUG-CONSOLIDATOR] -> Appended to '{best_match['topic']}' (sim={sim:.2f})"
-                )
+                logger.debug("Appended to '%s' (sim=%.2f)", best_match["topic"], sim)
                 tree.check_and_merge_siblings(best_match["id"])
                 tree.full_tree_merge()
             return
 
         tree.append_to_branch(best_match["id"], distilled)
-        print(
-            f"   [DEBUG-CONSOLIDATOR] -> Weak match, appended to '{best_match['topic']}' (sim={sim:.2f})"
-        )
+        logger.debug("Weak match, appended to '%s' (sim=%.2f)", best_match["topic"], sim)
         tree.check_and_merge_siblings(best_match["id"])
         tree.full_tree_merge()
         return
@@ -354,6 +345,6 @@ Output ONLY the topic name, under 5 words.
 
     new_branch = tree.add_branch(new_topic, distilled)
     if new_branch:
-        print(f"   [DEBUG-CONSOLIDATOR] -> Created new root branch '{new_topic}'")
+        logger.debug("Created new root branch '%s'", new_topic)
         tree.check_and_merge_siblings(new_branch["id"])
         tree.full_tree_merge()

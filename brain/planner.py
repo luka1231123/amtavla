@@ -1,92 +1,116 @@
+import json
 import re
 
 from brain.ltm_tree import _safe_chat
 
-MODEL = "qwen2.5-coder:1.5b"
+LLAMA_CLIENT = None
 
-PLANNER_PROMPT = """You are a planning assistant. Create a short todo list to answer the user's question.
+def _get_client():
+    global LLAMA_CLIENT
+    if LLAMA_CLIENT is None:
+        import llama_client
+        LLAMA_CLIENT = llama_client
+    return LLAMA_CLIENT
 
-Available tools:
-- weather: for weather questions (Tokyo, London)
-- bash: for listing files, python version, date, user, disk space, pwd
+PLANNER_PROMPT = """You are a planning assistant. Create a todo list to answer the user's question.
 
 Rules:
 - Max 5 steps total
-- Use EXACTLY these formats, one per line:
-  SEARCH: short query
-  TOOL: weather
-  TOOL: bash
-  THINK
-
-- SEARCH: write a short search query (max 8 words)
-- TOOL: use weather or bash only if relevant
-- THINK: always include for reasoning
 - Always include at least 1 SEARCH step
+- Output ONLY valid JSON, no other text
+
+JSON format:
+{{
+  "steps": [
+    {{"action": "SEARCH", "detail": "short query"}},
+    {{"action": "TOOL", "detail": "bash"}},
+    {{"action": "THINK", "detail": ""}}
+  ],
+  "thinking": "your reasoning about how to approach this question"
+}}
+
+Context from memory:
+{context}
 
 Examples:
 User: What is Python?
-SEARCH: Python programming language overview
-TOOL: bash
-THINK
-
-User: Weather in Tokyo?
-SEARCH: current weather Tokyo
-TOOL: weather
-THINK
+{{"steps": [{{"action": "SEARCH", "detail": "Python programming language"}}, {{"action": "THINK", "detail": ""}}], "thinking": "Need to search for basic info about Python"}}
 
 User: How do decorators work?
-SEARCH: Python decorators tutorial
-THINK
+{{"steps": [{{"action": "SEARCH", "detail": "Python decorators tutorial"}}, {{"action": "THINK", "detail": ""}}], "thinking": "Search for Python decorator concepts"}}
 
 User: {user_input}
-TODO:
-"""
+Output only JSON:"""
 
 
-def generate_plan(user_input: str, context: str) -> list[tuple[str, str]]:
-    prompt = PLANNER_PROMPT.format(user_input=user_input)
-    raw = _safe_chat([{"role": "user", "content": prompt}], model=MODEL)
-    print(f"   [DEBUG-PLANNER] -> Raw plan:\n{raw}")
+def _parse_plan(raw: str) -> list[tuple[str, str]]:
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        start = raw.find("{")
+        end = raw.rfind("}") + 1
+        if start >= 0 and end > start:
+            try:
+                data = json.loads(raw[start:end])
+            except json.JSONDecodeError:
+                return []
+        else:
+            return []
 
     steps = []
-    for line in raw.splitlines():
-        line = line.strip()
-        line = re.sub(r"^[\d\.\-\*\#]+\s*", "", line)
-        line = line.strip()
-        if not line:
-            continue
-        upper = line.upper()
+    for step in data.get("steps", []):
+        action = step.get("action", "").upper()
+        detail = step.get("detail", "")
+        if action in ("SEARCH", "TOOL", "THINK"):
+            steps.append((action, detail))
 
-        if upper.startswith("SEARCH"):
-            query = line.split(":", 1)[1].strip() if ":" in line else line[6:].strip()
-            query = query.strip('"').strip("'").strip("`").strip("*")
-            query = query[:60].strip()
-            if query:
-                steps.append(("SEARCH", query))
-        elif upper.startswith("TOOL"):
-            tool_part = (
-                line.split(":", 1)[1].strip() if ":" in line else line[4:].strip()
-            )
-            tool_lower = tool_part.lower()
-            if "weather" in tool_lower:
-                steps.append(("TOOL", "weather"))
-            elif "bash" in tool_lower:
-                steps.append(("TOOL", "bash"))
-        elif upper.startswith("THINK"):
-            steps.append(("THINK", ""))
-
-    seen = set()
     deduped = []
+    seen = set()
     for step in steps:
         if step not in seen:
             seen.add(step)
             deduped.append(step)
-    steps = deduped[:5]
 
-    if not steps:
-        steps = [("SEARCH", user_input[:60]), ("THINK", "")]
-    elif not any(s[0] == "SEARCH" for s in steps):
-        steps.insert(0, ("SEARCH", user_input[:60]))
+    deduped = deduped[:5]
 
-    print(f"   [DEBUG-PLANNER] -> Parsed steps: {steps}")
-    return steps
+    if not deduped:
+        deduped = [("SEARCH", ""), ("THINK", "")]
+    elif not any(s[0] == "SEARCH" for s in deduped):
+        deduped.insert(0, ("SEARCH", ""))
+
+    return deduped
+
+
+def generate_plan(user_input: str, context: str) -> tuple[list[tuple[str, str]], str]:
+    client = _get_client()
+    context_part = context[:500] if context else "No prior context."
+    prompt = PLANNER_PROMPT.format(user_input=user_input, context=context_part)
+
+    thinking = ""
+    try:
+        response = client.chat([{"role": "user", "content": prompt}])
+        raw = response.get("message", {}).get("content", "")
+        thinking = get_thinking(raw)
+    except Exception:
+        raw = ""
+
+    if not raw:
+        return [("SEARCH", user_input[:60]), ("THINK", "")], thinking
+
+    return _parse_plan(raw), thinking
+
+
+def get_thinking(raw: str) -> str:
+    try:
+        data = json.loads(raw)
+        return data.get("thinking", "")
+    except json.JSONDecodeError:
+        start = raw.find("{")
+        end = raw.rfind("}") + 1
+        if start >= 0 and end > start:
+            try:
+                data = json.loads(raw[start:end])
+                return data.get("thinking", "")
+            except json.JSONDecodeError:
+                pass
+    return ""

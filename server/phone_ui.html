@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>amtavla</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        .transcription-area {
+            flex: 0 0 30%;
+            padding: 16px;
+            overflow-y: auto;
+            border-bottom: 1px solid #333;
+        }
+        .text-content {
+            white-space: pre-wrap;
+            font-size: 18px;
+            line-height: 1.5;
+        }
+        .response-area {
+            flex: 0 0 50%;
+            padding: 16px;
+            overflow-y: auto;
+            background: #222;
+            border-bottom: 1px solid #333;
+        }
+        .response-content {
+            white-space: pre-wrap;
+            font-size: 16px;
+            line-height: 1.5;
+            color: #4fc3f7;
+        }
+        .dictation-area {
+            flex: 0 0 20%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        #dictateBtn {
+            width: 100%;
+            height: 80%;
+            font-size: 24px;
+            font-weight: 600;
+            background: #2d5a2d;
+            color: #fff;
+            border: none;
+            border-radius: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        #dictateBtn:active {
+            background: #1e3d1e;
+        }
+        #dictateBtn.listening {
+            background: #8b2a2a;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .status {
+            font-size: 14px;
+            color: #888;
+            text-align: center;
+            padding: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="transcription-area">
+            <div id="textContent" class="text-content"></div>
+        </div>
+        <div class="response-area">
+            <div id="responseContent" class="response-content"></div>
+        </div>
+        <div class="dictation-area">
+            <button id="dictateBtn">Hold to Talk</button>
+        </div>
+    </div>
+    <div id="status" class="status"></div>
+
+    <script>
+        const textContent = document.getElementById('textContent');
+        const responseContent = document.getElementById('responseContent');
+        const dictateBtn = document.getElementById('dictateBtn');
+        const status = document.getElementById('status');
+        let recognition = null;
+        let isListening = false;
+        let isProcessing = false;
+
+        if ('webkitSpeechRecognition' in window) {
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+
+            recognition.onresult = (event) => {
+                let finalTranscript = '';
+                let interimTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+                if (finalTranscript) {
+                    textContent.textContent = finalTranscript;
+                }
+            };
+
+            recognition.onerror = (event) => {
+                status.textContent = 'Error: ' + event.error;
+                isListening = false;
+                dictateBtn.classList.remove('listening');
+            };
+
+            recognition.onend = () => {
+                isListening = false;
+                dictateBtn.classList.remove('listening');
+                const finalText = textContent.textContent.trim();
+                if (finalText) {
+                    fetch('http://127.0.0.1:8081/command', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({text: finalText})
+                    });
+                }
+                if (!isProcessing) {
+                    status.textContent = '';
+                }
+            };
+        } else {
+            status.textContent = 'Speech recognition not supported';
+            dictateBtn.disabled = true;
+        }
+
+        const clearContent = () => {
+            textContent.textContent = '';
+            responseContent.textContent = '';
+        };
+
+        const startListening = () => {
+            if (recognition && !isListening) {
+                clearContent();
+                recognition.start();
+                isListening = true;
+                dictateBtn.classList.add('listening');
+                status.textContent = 'Listening...';
+            }
+        };
+
+        const stopListening = () => {
+            if (recognition && isListening) {
+                recognition.stop();
+                isListening = false;
+                dictateBtn.classList.remove('listening');
+                status.textContent = 'Processing...';
+                isProcessing = true;
+            }
+        };
+
+        dictateBtn.addEventListener('mousedown', startListening);
+        dictateBtn.addEventListener('mouseup', stopListening);
+        dictateBtn.addEventListener('mouseleave', stopListening);
+        dictateBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startListening(); });
+        dictateBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopListening(); });
+
+        let lastResponse = '';
+        setInterval(async () => {
+            try {
+                const resp = await fetch('http://127.0.0.1:8081/response');
+                const data = await resp.json();
+                if (data.response && data.response !== lastResponse) {
+                    responseContent.textContent = data.response;
+                    lastResponse = data.response;
+                    isProcessing = false;
+                    status.textContent = '';
+                    await fetch('http://127.0.0.1:8081/response/ack', { method: 'POST' });
+                }
+            } catch (e) {
+                // ignore connection errors
+            }
+        }, 1500);
+    </script>
+</body>
+</html>
