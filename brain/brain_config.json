@@ -1,0 +1,191 @@
+{
+  "routing": {
+    "default_pathway": "planner_full",
+    "max_plan_steps": 4,
+    "max_search_chars": 2200,
+    "intent_model_enabled": true,
+    "intent_model": "default",
+    "intent_model_threshold": 1,
+    "intent_embedding_enabled": true,
+    "intent_low_confidence_fallback": "planner_full"
+  },
+  "research": {
+    "deep_crawl_max_results": 8,
+    "deep_crawl_max_jobs_per_idle": 1
+  },
+  "idle_memory": {
+    "enabled": true,
+    "idle_seconds": 4.0,
+    "poll_seconds": 0.5
+  },
+  "memory": {
+    "db_dir": "brain/db",
+    "episodic_ttl_seconds": 604800,
+    "episodic_recall_extension_seconds": 172800,
+    "episodic_strength_alpha": 0.25,
+    "episodic_strength_decay": 0.02,
+    "proactive_turn_gap": 8,
+    "proactive_seconds_gap": 600,
+    "proactive_max_asks": 2,
+    "proactive_snooze_seconds": 900
+  },
+  "salience": {
+    "max_facts_per_turn": 3,
+    "min_score": 3,
+    "max_fact_length": 140,
+    "ignore_regex": [
+      "^(hi|hello|hey|yo|sup|wazzup|thanks|thank you|ok|okay|cool|nice|great)[!. ]*$"
+    ]
+  },
+  "intents": [
+    {
+      "name": "brain_dump",
+      "priority": 120,
+      "pathway": "brain_dump_reply",
+      "min_score": 1,
+      "keywords": [
+        "tell me what's in your brain",
+        "show all memory",
+        "brain dump",
+        "brain memory",
+        "brain status"
+      ],
+      "regex": [
+        "^(tell me what's in your brain|show all memory|brain dump|brain status|brain memory.*)$"
+      ]
+    },
+    {
+      "name": "smalltalk",
+      "priority": 100,
+      "pathway": "direct_reply",
+      "min_score": 2,
+      "keywords": [
+        "hi",
+        "hello",
+        "hey",
+        "wazzup",
+        "sup",
+        "yo",
+        "howdy",
+        "bro",
+        "man",
+        "thanks",
+        "thank you",
+        "how are you",
+        "what's up"
+      ],
+      "regex": [
+        "^(hi|hello|hey|yo|wazzup|sup|howdy|what'?s up|thanks|thank you)[!. ]*$"
+      ]
+    },
+    {
+      "name": "remember",
+      "priority": 95,
+      "pathway": "remember_reply",
+      "min_score": 1,
+      "keywords": [
+        "remember this",
+        "remember that",
+        "don't forget",
+        "save this",
+        "keep this in mind",
+        "memorize"
+      ],
+      "regex": []
+    },
+    {
+      "name": "memory_recall",
+      "priority": 92,
+      "pathway": "memory_recall_reply",
+      "min_score": 1,
+      "keywords": [
+        "where is my car",
+        "where did i park",
+        "what did i say",
+        "remind me",
+        "where is it parked",
+        "my memory"
+      ],
+      "regex": [
+        "\\b(where (is|did) (my|the) (car|keys|wallet)|where did i park|what did i say|remind me where)\\b"
+      ]
+    },
+    {
+      "name": "creative_helper",
+      "priority": 90,
+      "pathway": "creative_reply",
+      "min_score": 1,
+      "keywords": [
+        "brainstorm",
+        "creative",
+        "story",
+        "poem",
+        "idea",
+        "lyrics",
+        "name ideas",
+        "tagline"
+      ],
+      "regex": []
+    },
+    {
+      "name": "tool_command",
+      "priority": 80,
+      "pathway": "tool_then_reply",
+      "min_score": 1,
+      "keywords": [
+        "ls",
+        "list files",
+        "show files",
+        "directory",
+        "pwd",
+        "python version",
+        "pip version",
+        "disk space",
+        "whoami",
+        "cwd"
+      ],
+      "regex": [
+        "\\b(ls|pwd|whoami|df)\\b"
+      ]
+    },
+    {
+      "name": "web_factual",
+      "priority": 70,
+      "pathway": "search_then_reply",
+      "min_score": 1,
+      "keywords": [
+        "weather",
+        "news",
+        "latest",
+        "price",
+        "order",
+        "buy",
+        "pizza",
+        "restaurants",
+        "near me",
+        "delivery"
+      ],
+      "regex": [
+        "\\b(weather|forecast|order|buy|near me|nearby)\\b"
+      ]
+    },
+    {
+      "name": "research_deep_crawl",
+      "priority": 85,
+      "pathway": "research_deep_crawl",
+      "min_score": 1,
+      "keywords": [
+        "deep research",
+        "deep dive",
+        "research thoroughly",
+        "comprehensive research",
+        "crawl sources",
+        "survey literature",
+        "investigate thoroughly"
+      ],
+      "regex": [
+        "\\b(deep(ly)? research|deep dive|comprehensive research|crawl( the)? web|survey literature|investigate thoroughly)\\b"
+      ]
+    }
+  ]
+}

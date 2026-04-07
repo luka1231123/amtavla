@@ -5,18 +5,23 @@ from brain.ltm_tree import _safe_chat
 
 LLAMA_CLIENT = None
 
+
 def _get_client():
     global LLAMA_CLIENT
     if LLAMA_CLIENT is None:
         import llama_client
+
         LLAMA_CLIENT = llama_client
     return LLAMA_CLIENT
 
-PLANNER_PROMPT = """You are a planning assistant. Create a todo list to answer the user's question.
+
+PLANNER_PROMPT = """You are a planning assistant. Create a short execution plan for the user's question.
 
 Rules:
 - Max 5 steps total
-- Always include at least 1 SEARCH step
+- Include SEARCH only when external web knowledge is needed
+- Use TOOL only when user asks for system-like command output
+- Omit THINK unless it adds clear value
 - Output ONLY valid JSON, no other text
 
 JSON format:
@@ -74,9 +79,7 @@ def _parse_plan(raw: str) -> list[tuple[str, str]]:
     deduped = deduped[:5]
 
     if not deduped:
-        deduped = [("SEARCH", ""), ("THINK", "")]
-    elif not any(s[0] == "SEARCH" for s in deduped):
-        deduped.insert(0, ("SEARCH", ""))
+        deduped = [("THINK", "")]
 
     return deduped
 
@@ -95,7 +98,7 @@ def generate_plan(user_input: str, context: str) -> tuple[list[tuple[str, str]],
         raw = ""
 
     if not raw:
-        return [("SEARCH", user_input[:60]), ("THINK", "")], thinking
+        return [("THINK", "")], thinking
 
     return _parse_plan(raw), thinking
 

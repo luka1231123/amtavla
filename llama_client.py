@@ -67,6 +67,8 @@ def _ensure_server_running():
             LLAMA_SERVER_BIN,
             "-m",
             model_path,
+            "-ngl",
+            "99",
             "--host",
             LLAMA_SERVER_HOST,
             "--port",
@@ -116,13 +118,13 @@ def _stop_server():
             _server_process = None
 
 
-def _call_llama(messages: list[dict]) -> dict:
+def _call_llama(messages: list[dict], model: str | None = None) -> dict:
     _ensure_server_running()
 
     url = f"http://{LLAMA_SERVER_HOST}:{LLAMA_SERVER_PORT}/v1/chat/completions"
 
     payload = {
-        "model": "default",
+        "model": model or "default",
         "messages": messages,
         "max_tokens": 512,
         "temperature": 0.7,
@@ -141,20 +143,22 @@ def _call_llama(messages: list[dict]) -> dict:
         raise RuntimeError(f"llama-server call failed: {e}")
 
 
-def _make_cache_key(messages: list[dict]) -> str:
-    cache_str = json.dumps(messages, sort_keys=True)
+def _make_cache_key(messages: list[dict], model: str | None = None) -> str:
+    cache_str = json.dumps(
+        {"model": model or "default", "messages": messages}, sort_keys=True
+    )
     return hashlib.sha256(cache_str.encode()).hexdigest()[:32]
 
 
 def chat(messages: list[dict], model: str = None) -> dict:
-    key = _make_cache_key(messages)
+    key = _make_cache_key(messages, model=model)
 
     with _cache_lock:
         if key in _response_cache:
             return _response_cache[key]
 
     try:
-        result = _call_llama(messages)
+        result = _call_llama(messages, model=model)
         content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
         if not content:
             content = result.get("message", {}).get("content", "")

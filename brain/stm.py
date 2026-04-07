@@ -19,6 +19,9 @@ def read_stm(stm_file: str | None = None) -> str:
             entries = data.get("entries", [])
             lines = []
             for e in entries:
+                if e.get("kind") == "fact":
+                    lines.append(f"Fact: {e.get('fact', '')}")
+                    continue
                 lines.append(f"User: {e.get('user', '')}")
                 lines.append(f"Bot: {e.get('response', '')}")
             return "\n".join(lines)
@@ -47,11 +50,13 @@ def append_stm(user: str, response: str, stm_file: str | None = None):
                 data = {"entries": []}
 
         entries = data.get("entries", [])
-        entries.append({
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "user": user,
-            "response": response,
-        })
+        entries.append(
+            {
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "user": user,
+                "response": response,
+            }
+        )
 
         if len(entries) > MAX_ENTRIES:
             entries = entries[-MAX_ENTRIES:]
@@ -68,3 +73,32 @@ def clear_stm(stm_file: str | None = None):
     with lock:
         if os.path.exists(path):
             os.remove(path)
+
+
+def append_stm_fact(fact: str, stm_file: str | None = None):
+    path = stm_file or STM_FILE
+    lock = FileLock(f"{path}.lock")
+    with lock:
+        data = {"entries": []}
+        if os.path.exists(path):
+            try:
+                with open(path, "r") as f:
+                    data = json.load(f)
+            except (json.JSONDecodeError, IOError):
+                data = {"entries": []}
+
+        entries = data.get("entries", [])
+        entries.append(
+            {
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "kind": "fact",
+                "fact": fact,
+            }
+        )
+
+        if len(entries) > MAX_ENTRIES:
+            entries = entries[-MAX_ENTRIES:]
+
+        data["entries"] = entries
+        with open(path, "w") as f:
+            json.dump(data, f, indent=2)

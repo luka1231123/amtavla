@@ -25,15 +25,35 @@ def generate_response(user_prompt, plan, plan_results, context_blocks):
                     label += f" ({detail})"
                 context_parts.append(f"--- {label} ---\n{result}")
 
-    if context_blocks.get("working_memory"):
+    if context_blocks.get("semantic_facts"):
+        lines = [
+            f"- {item.get('statement', '')}"
+            for item in context_blocks["semantic_facts"]
+        ]
+        context_parts.append("--- Semantic Memory ---\n" + "\n".join(lines))
+
+    if context_blocks.get("episodic_context"):
+        lines = [
+            f"- User: {item.get('user_input', '')} | Bot: {item.get('response', '')}"
+            for item in context_blocks["episodic_context"]
+        ]
+        context_parts.append("--- Episodic Recall ---\n" + "\n".join(lines))
+
+    if context_blocks.get("combined_context"):
         context_parts.append(
-            "--- Short-Term Memory ---\n" + context_blocks["working_memory"]
+            "--- Recall Engine Context ---\n" + context_blocks["combined_context"]
         )
 
     if context_blocks.get("ltm_context"):
-        context_parts.append(
-            "--- Long-Term Memory ---\n" + context_blocks["ltm_context"]
-        )
+        ltm = context_blocks["ltm_context"]
+        if isinstance(ltm, list):
+            lines = [f"- {item.get('thesis', '')}" for item in ltm]
+            context_parts.append("--- Long-Term Insights ---\n" + "\n".join(lines))
+        else:
+            context_parts.append("--- Long-Term Insights ---\n" + str(ltm))
+
+    if context_blocks.get("web_context"):
+        context_parts.append("--- Web Grounding ---\n" + context_blocks["web_context"])
 
     context_str = "\n\n".join(context_parts)
     system_message = SYSTEM_PROMPT

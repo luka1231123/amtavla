@@ -6,11 +6,14 @@ from flask import Flask, send_file, jsonify, make_response, request
 app = Flask(__name__)
 
 UI_FILE = os.path.join(os.path.dirname(__file__), "phone_ui.html")
+MAX_DEBUG_EVENTS = 500
 command_store = None
 response_store = None
 command_updated_at = None
 response_updated_at = None
 server_started_at = time.time()
+debug_events = []
+debug_event_counter = 0
 
 
 def _iso_utc(ts):
@@ -38,7 +41,24 @@ def _debug_state():
         "command_age_seconds": _age_seconds(command_updated_at),
         "response_age_seconds": _age_seconds(response_updated_at),
         "uptime_seconds": round(time.time() - server_started_at, 2),
+        "debug_event_count": len(debug_events),
     }
+
+
+def _append_debug_event(event_type: str, payload: dict):
+    global debug_event_counter
+    debug_event_counter += 1
+    event = {
+        "id": debug_event_counter,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "type": event_type,
+        "payload": payload,
+    }
+    debug_events.append(event)
+    if len(debug_events) > MAX_DEBUG_EVENTS:
+        overflow = len(debug_events) - MAX_DEBUG_EVENTS
+        del debug_events[:overflow]
+    return event
 
 
 @app.route("/")
@@ -103,6 +123,56 @@ def debug_state():
     return jsonify(_debug_state())
 
 
+@app.route("/debug/event", methods=["POST"])
+def push_debug_event():
+    data = request.get_json(silent=True) or {}
+    event_type = data.get("type", "event")
+    payload = data.get("payload", {})
+    if not isinstance(payload, dict):
+        payload = {"value": payload}
+    event = _append_debug_event(str(event_type), payload)
+    return jsonify({"status": "ok", "event_id": event["id"]})
+
+
+@app.route("/debug/events", methods=["GET"])
+def get_debug_events():
+    limit_arg = request.args.get("limit")
+    since_arg = request.args.get("since")
+
+    limit = 200
+    if limit_arg is not None:
+        try:
+            limit = max(1, min(MAX_DEBUG_EVENTS, int(limit_arg)))
+        except ValueError:
+            limit = 200
+
+    since_id = 0
+    if since_arg is not None:
+        try:
+            since_id = max(0, int(since_arg))
+        except ValueError:
+            since_id = 0
+
+    filtered = [e for e in debug_events if e["id"] > since_id]
+    out = filtered[-limit:]
+    return jsonify(
+        {
+            "events": out,
+            "count": len(out),
+            "total": len(debug_events),
+            "latest_id": out[-1]["id"] if out else since_id,
+        }
+    )
+
+
+@app.route("/debug/events/clear", methods=["POST"])
+def clear_debug_events():
+    global debug_event_counter
+    debug_events.clear()
+    debug_event_counter = 0
+    return jsonify({"status": "ok"})
+
+
 @app.route("/debug")
 def debug_view():
     html = """<!DOCTYPE html>
@@ -132,10 +202,54 @@ def debug_view():
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 12px;
         }
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        button {
+            border: none;
+            background: #1565c0;
+            color: #fff;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .log {
+            max-height: 45vh;
+            overflow-y: auto;
+            border: 1px solid #3a3a3a;
+            border-radius: 8px;
+            background: #111;
+            padding: 8px;
+        }
+        .event {
+            border-bottom: 1px solid #2a2a2a;
+            padding: 10px;
+        }
+        .event:last-child {
+            border-bottom: none;
+        }
+        .event-meta {
+            color: #8cc7ff;
+            font-size: 12px;
+            margin-bottom: 6px;
+        }
+        .event pre {
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-size: 12px;
+            line-height: 1.35;
+            color: #d6d6d6;
+        }
     </style>
 </head>
 <body>
     <h1>amtavla Debug</h1>
+    <div class="toolbar">
+        <button id="clearEvents">Clear Brain Log</button>
+    </div>
     <div class="card">
         <div class="label">Overall Health</div>
         <div class="value" id="health"></div>
@@ -169,6 +283,14 @@ def debug_view():
             <div class="label">Last Response Update</div>
             <div class="value" id="responseUpdated"></div>
         </div>
+        <div class="card">
+            <div class="label">Brain Event Count</div>
+            <div class="value" id="eventCount"></div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="label">Brain Events (prompt/context/plan/search/answer)</div>
+        <div id="eventLog" class="log"></div>
     </div>
     <div class="card">
         <div class="label">Status</div>
@@ -176,6 +298,7 @@ def debug_view():
     </div>
     <script>
         const STALE_SECONDS = 30;
+        let latestEventId = 0;
 
         function setValue(id, value, emptyText='(empty)') {
             const el = document.getElementById(id);
@@ -195,6 +318,12 @@ def debug_view():
             setValue('uptime', data.uptime_seconds, 'n/a');
             setValue('commandUpdated', data.command_updated_at, 'n/a');
             setValue('responseUpdated', data.response_updated_at, 'n/a');
+            setValue('eventCount', data.debug_event_count, '0');
+
+            const eventsResp = await fetch('/debug/events?limit=200');
+            const eventsData = await eventsResp.json();
+            latestEventId = eventsData.latest_id || latestEventId;
+            renderEvents(eventsData.events || []);
 
             const commandStale = data.pending.command && data.command_age_seconds !== null && data.command_age_seconds > STALE_SECONDS;
             const responseStale = data.pending.response && data.response_age_seconds !== null && data.response_age_seconds > STALE_SECONDS;
@@ -210,6 +339,34 @@ def debug_view():
             document.getElementById('status').textContent = 'Last update: ' + new Date().toLocaleTimeString();
         }
 
+        function renderEvents(events) {
+            const log = document.getElementById('eventLog');
+            if (!events.length) {
+                log.innerHTML = '<div class="event"><div class="value empty">No events yet.</div></div>';
+                return;
+            }
+
+            log.innerHTML = events.map((event) => {
+                const payload = event.payload || {};
+                const summary = payload.summary || '(no summary)';
+                const details = JSON.stringify(payload.data || payload, null, 2);
+                return `
+                    <div class="event">
+                        <div class="event-meta">#${event.id} | ${event.timestamp} | ${event.type}</div>
+                        <div class="value" style="margin-bottom:8px; font-size:13px; color:#9fe3a7;">${escapeHtml(summary)}</div>
+                        <pre>${escapeHtml(details)}</pre>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function escapeHtml(text) {
+            return text
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;');
+        }
+
         async function loop() {
             try {
                 await poll();
@@ -220,6 +377,16 @@ def debug_view():
                 document.getElementById('status').textContent = 'Error: ' + e.message;
             }
         }
+
+        document.getElementById('clearEvents').addEventListener('click', async () => {
+            try {
+                await fetch('/debug/events/clear', { method: 'POST' });
+                latestEventId = 0;
+                await loop();
+            } catch (e) {
+                document.getElementById('status').textContent = 'Clear failed: ' + e.message;
+            }
+        });
 
         loop();
         setInterval(loop, 1000);
