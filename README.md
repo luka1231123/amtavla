@@ -10,7 +10,7 @@ amtavla treats the assistant as a cooperative cognitive layer, not just a chat b
 
 - **Fast intent routing** for immediate response pathway selection
 - **Semantic memory prefetch** for known facts/preferences/constraints
-- **Recall engine** combining episodic memory, semantic memory, insight memory, and curated web grounding
+- **Recall engine** combining episodic memory, semantic memory, insight memory, and live web grounding
 - **Todo/plan generation** from recalled context
 - **Execution + response** in the foreground
 - **Post-turn episodic write** so every completed turn is traceable
@@ -22,7 +22,7 @@ Each turn runs in this order:
 
 1. Intent detection (`brain/intent_router.py`)
 2. Semantic fact extraction and prefetch (`brain/memory/service.py`)
-3. Context recall (episodic + semantic + insights + curated web)
+3. Context recall (episodic + semantic + insights + live web)
 4. Todo/plan creation (`main.py` + planner)
 5. Tool/search execution
 6. Response generation (`generator.py`)
@@ -47,6 +47,8 @@ Memory is SQLite-backed in `brain/db/`:
 - `insight_ltm.db`
   - high-value synthesized discoveries only
   - supports proactive human confirmation states
+- `jobs.db`
+  - internal synthesis/maintenance bookkeeping
 - `ltm_vectors.db`
   - vector index for long-term insight retrieval
   - KNN recall via `sqlite-vec` (with scan fallback if extension is unavailable)
@@ -68,7 +70,7 @@ Foreground commands:
 - `/brain [status|ltm|full]` - memory debug summary
 - `/ask` - force one proactive insight ask
 - `/idle` - force idle cycle now (synthesis + decay)
-- `/delete` - clear all memory databases (episodic, semantic, insight)
+- `/delete` - clear all memory databases (episodic, semantic, insight, jobs, vectors)
 
 Natural-language modes:
 
@@ -111,6 +113,8 @@ python server/phone_server.py
 python main.py
 ```
 
+Open the phone UI at `http://127.0.0.1:8081` and debug dashboard at `http://127.0.0.1:8081/debug`.
+
 ## Raw Trace Run
 
 Run the full raw terminal trace script:
@@ -133,6 +137,16 @@ Artifacts are written to:
 - Web search uses direct web lookup via `ddgs`.
 - `logs/amtavla.log` captures runtime behavior.
 - Memory ingestion now filters assistant meta-prompts to reduce semantic pollution.
+
+## Tests
+
+Run focused tests for the new JSON/vector/LTM components:
+
+```bash
+python3 -m pytest tests/test_json_utils.py tests/test_vector_store.py tests/test_memory_ltm_knn.py
+```
+
+`pytest` is not pinned in `requirements.txt`; install it separately if needed.
 
 ## What Is Still In Progress
 
