@@ -5,8 +5,11 @@ import sqlite3
 import time
 from collections import Counter
 
+import llama_client
 from brain.config import load_brain_config
-from tools.websearch import deep_crawl_websearch, tool_websearch
+from brain.memory.ltm_repository import LtmRepository
+from brain.memory.vector_store import SQLiteVecStore
+from tools.websearch import tool_websearch
 
 
 NOISE_PATTERNS = [
@@ -25,6 +28,58 @@ MEMORY_LIKE_PATTERNS = [
     ),
     re.compile(r"\bremember (that|this)\b", re.IGNORECASE),
 ]
+
+ASSISTANT_MEMORY_CONFIRM_PATTERNS = [
+    re.compile(r"\bnoted\b", re.IGNORECASE),
+    re.compile(r"\bremember(ed|ing)?\b", re.IGNORECASE),
+    re.compile(r"\bgot it\b", re.IGNORECASE),
+    re.compile(r"\byour\b.*\b(parked|deadline|preference|prefer)\b", re.IGNORECASE),
+]
+
+POLLUTED_FACT_PATTERNS = [
+    re.compile(r"\*\*"),
+    re.compile(r"`[^`]+`"),
+    re.compile(r"\{[^}]*\}"),
+    re.compile(r"^here('|’)s", re.IGNORECASE),
+    re.compile(r"^for example", re.IGNORECASE),
+    re.compile(r"^quick memory check", re.IGNORECASE),
+    re.compile(r"compact memory notes that need to be rewritten", re.IGNORECASE),
+    re.compile(r"how can i assist you today", re.IGNORECASE),
+]
+
+QUESTION_START_WORDS = {
+    "what",
+    "who",
+    "when",
+    "where",
+    "why",
+    "how",
+    "can",
+    "could",
+    "would",
+    "should",
+    "do",
+    "does",
+    "did",
+    "is",
+    "are",
+}
+
+IMPERATIVE_VERBS = {
+    "make",
+    "list",
+    "show",
+    "tell",
+    "give",
+    "ask",
+    "set",
+    "create",
+    "explain",
+}
+
+FIRST_PERSON_MARKERS = {"i", "me", "my", "mine", "we", "our", "us"}
+
+UNCERTAIN_LEADS = {"if", "maybe", "might", "perhaps", "possibly"}
 
 
 def _now_ts() -> float:
@@ -64,6 +119,88 @@ def _is_memory_like_text(text: str) -> bool:
     return any(pattern.search(value) for pattern in MEMORY_LIKE_PATTERNS)
 
 
+def _is_polluted_statement(text: str) -> bool:
+    value = (text or "").strip()
+    if not value:
+        return True
+    for pattern in POLLUTED_FACT_PATTERNS:
+        if pattern.search(value):
+            return True
+    if len(value) < 8:
+        return True
+    return False
+
+
+def _normalize_fact_text(text: str) -> str:
+    value = re.sub(r"\s+", " ", (text or "").strip())
+    value = value.strip(" -;:,.\n")
+    return value
+
+
+def _strip_memory_directive(text: str) -> str:
+    value = _normalize_fact_text(text)
+    lowered = value.lower()
+    prefixes = (
+        "remember this:",
+        "remember this",
+        "remember that:",
+        "remember that",
+        "don't forget:",
+        "dont forget:",
+        "don't forget",
+        "dont forget",
+    )
+    for prefix in prefixes:
+        if lowered.startswith(prefix):
+            return _normalize_fact_text(value[len(prefix) :])
+    return value
+
+
+def _infer_speech_act(text: str) -> str:
+    value = _normalize_fact_text(text)
+    lowered = value.lower()
+    tokens = re.findall(r"[a-z0-9']+", lowered)
+    if not tokens:
+        return "other"
+
+    first = tokens[0]
+    if "?" in value:
+        return "question"
+    if first in QUESTION_START_WORDS and len(tokens) >= 3:
+        return "question"
+    if first in {"thanks", "thank", "hi", "hello", "hey", "yo"}:
+        return "social"
+    if first in IMPERATIVE_VERBS:
+        return "command"
+    if len(tokens) > 1 and tokens[0] == "please" and tokens[1] in IMPERATIVE_VERBS:
+        return "command"
+    if any(token in IMPERATIVE_VERBS for token in tokens[:3]) and not (
+        "i" in tokens[:2] or "we" in tokens[:2]
+    ):
+        return "command"
+    return "assertion"
+
+
+def _should_store_user_fact(text: str) -> bool:
+    value = _strip_memory_directive(text)
+    if not value:
+        return False
+    if _infer_speech_act(value) != "assertion":
+        return False
+    tokens = re.findall(r"[a-z0-9']+", value.lower())
+    if len(tokens) < 4 or len(tokens) > 28:
+        return False
+    if tokens and tokens[0] in UNCERTAIN_LEADS:
+        return False
+    if value.startswith("/"):
+        return False
+    if _is_noise_text(value) or _is_polluted_statement(value):
+        return False
+    if not any(token in FIRST_PERSON_MARKERS for token in tokens):
+        return False
+    return True
+
+
 class MemoryService:
     def __init__(self, db_dir: str = "brain/db"):
         self._config = load_brain_config()
@@ -92,21 +229,40 @@ class MemoryService:
         self._proactive_snooze_seconds = float(
             memory_cfg.get("proactive_snooze_seconds", 900)
         )
+        self._embedding_dim = int(memory_cfg.get("embedding_dim", 768))
+        vector_db_path = memory_cfg.get(
+            "vector_db_path", os.path.join(self._db_dir, "ltm_vectors.db")
+        )
+        self._vector_top_k = int(memory_cfg.get("vector_top_k", 5))
 
         self._turn_counter = 0
         self._last_proactive_turn = -99999
         self._last_proactive_ts = 0.0
         self._active_asked_insight_id = None
+        self._last_route_intent = ""
+        self._last_route_pathway = ""
 
-        research_cfg = self._config.get("research", {})
-        self._deep_crawl_max_results = int(
-            research_cfg.get("deep_crawl_max_results", 8)
+        self._ltm_store = SQLiteVecStore(
+            db_path=vector_db_path,
+            embedding_dim=self._embedding_dim,
         )
-        self._deep_crawl_max_jobs_per_idle = int(
-            research_cfg.get("deep_crawl_max_jobs_per_idle", 1)
-        )
+        self._ltm_repo = LtmRepository(self._ltm_store, self._embed_text)
 
         self._init_schema()
+        self.cleanup_polluted_memory()
+
+    def _embed_text(self, text: str) -> list[float]:
+        try:
+            response = llama_client.embed(text)
+            embedding = response.get("embedding", [])
+            if isinstance(embedding, list) and embedding:
+                vec = [float(x) for x in embedding]
+                if len(vec) >= self._embedding_dim:
+                    return vec[: self._embedding_dim]
+                return vec + [0.0] * (self._embedding_dim - len(vec))
+        except Exception:
+            pass
+        return [0.0] * self._embedding_dim
 
     def _connect(self, db_path: str) -> sqlite3.Connection:
         conn = sqlite3.connect(db_path, timeout=30)
@@ -256,139 +412,6 @@ class MemoryService:
             for score, row in ranked[:limit]
         ]
 
-    def enqueue_research_job(self, query: str, source: str = "cli") -> int:
-        payload = {"query": query, "source": source}
-        with self._connect(self._jobs_db) as conn:
-            row = conn.execute(
-                """
-                INSERT INTO jobs(kind, payload_json, status, attempts, created_at)
-                VALUES(?, ?, 'queued', 0, ?)
-                RETURNING id
-                """,
-                ("research_deep_crawl", json.dumps(payload), _now_ts()),
-            ).fetchone()
-            return int(row["id"])
-
-    def _run_research_jobs(self, max_jobs: int | None = None) -> dict:
-        limit = max_jobs if max_jobs is not None else self._deep_crawl_max_jobs_per_idle
-        processed = 0
-        completed = 0
-        failed = 0
-        with self._connect(self._jobs_db) as conn:
-            rows = conn.execute(
-                """
-                SELECT id, payload_json, attempts
-                FROM jobs
-                WHERE kind = 'research_deep_crawl' AND status = 'queued'
-                ORDER BY created_at ASC
-                LIMIT ?
-                """,
-                (limit,),
-            ).fetchall()
-
-            for row in rows:
-                processed += 1
-                job_id = int(row["id"])
-                attempts = int(row["attempts"] or 0) + 1
-                conn.execute(
-                    "UPDATE jobs SET status = 'running', attempts = ? WHERE id = ?",
-                    (attempts, job_id),
-                )
-                payload = _json_load(row["payload_json"], {})
-                query = payload.get("query", "")
-                try:
-                    result = deep_crawl_websearch(
-                        query,
-                        max_results=self._deep_crawl_max_results,
-                    )
-                    payload["result"] = result
-                    payload["completed_at"] = _now_ts()
-                    conn.execute(
-                        """
-                        UPDATE jobs
-                        SET status = 'completed', payload_json = ?, finished_at = ?, error_text = NULL
-                        WHERE id = ?
-                        """,
-                        (json.dumps(payload), _now_ts(), job_id),
-                    )
-                    completed += 1
-                except Exception as exc:
-                    conn.execute(
-                        """
-                        UPDATE jobs
-                        SET status = 'failed', finished_at = ?, error_text = ?
-                        WHERE id = ?
-                        """,
-                        (_now_ts(), str(exc), job_id),
-                    )
-                    failed += 1
-        return {
-            "research_jobs_processed": processed,
-            "research_jobs_completed": completed,
-            "research_jobs_failed": failed,
-        }
-
-    def latest_research_result(self) -> dict | None:
-        with self._connect(self._jobs_db) as conn:
-            row = conn.execute(
-                """
-                SELECT id, payload_json, finished_at
-                FROM jobs
-                WHERE kind = 'research_deep_crawl' AND status = 'completed'
-                ORDER BY finished_at DESC
-                LIMIT 1
-                """
-            ).fetchone()
-        if row is None:
-            return None
-        payload = _json_load(row["payload_json"], {})
-        return {
-            "job_id": int(row["id"]),
-            "query": payload.get("query", ""),
-            "result": payload.get("result", ""),
-            "finished_at": row["finished_at"],
-        }
-
-    def research_status(self, limit: int = 10) -> dict:
-        with self._connect(self._jobs_db) as conn:
-            rows = conn.execute(
-                """
-                SELECT id, status, attempts, created_at, finished_at, error_text, payload_json
-                FROM jobs
-                WHERE kind = 'research_deep_crawl'
-                ORDER BY created_at DESC
-                LIMIT ?
-                """,
-                (limit,),
-            ).fetchall()
-
-            count_rows = conn.execute(
-                """
-                SELECT status, COUNT(*) AS c
-                FROM jobs
-                WHERE kind = 'research_deep_crawl'
-                GROUP BY status
-                """
-            ).fetchall()
-
-        counts = {row["status"]: int(row["c"]) for row in count_rows}
-        items = []
-        for row in rows:
-            payload = _json_load(row["payload_json"], {})
-            items.append(
-                {
-                    "job_id": int(row["id"]),
-                    "status": row["status"],
-                    "attempts": int(row["attempts"] or 0),
-                    "query": payload.get("query", ""),
-                    "created_at": row["created_at"],
-                    "finished_at": row["finished_at"],
-                    "error": row["error_text"] or "",
-                }
-            )
-
-        return {"counts": counts, "jobs": items}
-
     def _normalize_thesis(self, text: str) -> str:
         cleaned = re.sub(r"\s+", " ", text or "").strip()
         cleaned = re.sub(r"([;:,])\1+", r"\1", cleaned)
@@ -400,6 +423,8 @@ class MemoryService:
     def _quality_score(self, text: str) -> float:
         normalized = self._normalize_thesis(text)
         if not normalized:
+            return 0.0
+        if _is_polluted_statement(normalized):
             return 0.0
         if _is_memory_like_text(normalized):
             return 0.0
@@ -417,12 +442,23 @@ class MemoryService:
         )
         return max(0.0, min(1.0, 0.35 + unique_ratio - repeated_penalty))
 
+    def _should_keep_fact_origin(self, origin: str, text: str) -> bool:
+        if origin == "user":
+            return True
+        if origin != "assistant":
+            return False
+        return any(p.search(text or "") for p in ASSISTANT_MEMORY_CONFIRM_PATTERNS)
+
     def _build_candidate_thesis(self, facts: list[sqlite3.Row]) -> str:
         statements = [
             self._normalize_thesis(x["statement"]) for x in facts if x["statement"]
         ]
         statements = [
-            s for s in statements if len(s.split()) >= 5 and not _is_memory_like_text(s)
+            s
+            for s in statements
+            if len(s.split()) >= 5
+            and not _is_memory_like_text(s)
+            and not _is_polluted_statement(s)
         ]
         if not statements:
             return ""
@@ -457,8 +493,23 @@ class MemoryService:
     def _build_proactive_prompt(self, thesis: str) -> str:
         return f'Quick memory check: should I keep this insight — "{self._normalize_thesis(thesis)}"?'
 
-    def _maybe_get_proactive_prompt(self, force: bool = False) -> dict:
+    def _maybe_get_proactive_prompt(
+        self,
+        force: bool = False,
+        current_intent: str = "",
+        current_pathway: str = "",
+        query: str = "",
+    ) -> dict:
         now = _now_ts()
+        intent = (current_intent or "").strip().lower()
+        pathway = (current_pathway or "").strip().lower()
+        query_tokens = _tokenize(query)
+        if not force and (
+            intent in {"smalltalk", "greeting"}
+            or pathway in {"direct_reply", "brain_dump_reply"}
+            or len(query_tokens) <= 2
+        ):
+            return {"prompt": "", "insight_id": None}
         if not force:
             if (
                 self._turn_counter - self._last_proactive_turn
@@ -525,10 +576,34 @@ class MemoryService:
                 "UPDATE insights SET feedback_state = ?, status = ?, snoozed_until = ? WHERE id = ?",
                 (new_state, new_status, snoozed_until, self._active_asked_insight_id),
             )
+        self._sync_insight_vector(self._active_asked_insight_id)
         self._active_asked_insight_id = None
 
+    def _sync_insight_vector(self, insight_id: int):
+        with self._connect(self._insight_db) as conn:
+            row = conn.execute(
+                "SELECT id, thesis, rationale, confidence, novelty_score, status FROM insights WHERE id = ?",
+                (insight_id,),
+            ).fetchone()
+        if row is None:
+            return
+        self._ltm_repo.upsert_insight_node(
+            insight_id=int(row["id"]),
+            thesis=row["thesis"],
+            rationale=row["rationale"] or "",
+            confidence=float(row["confidence"] or 0.0),
+            novelty_score=float(row["novelty_score"] or 0.0),
+            status=row["status"] or "candidate",
+        )
+
     def recall_context(
-        self, query: str, include_web: bool = True, top_k: int = 5
+        self,
+        query: str,
+        include_web: bool = True,
+        top_k: int = 5,
+        current_intent: str = "",
+        current_pathway: str = "",
+        search_cache: dict | None = None,
     ) -> dict:
         now = _now_ts()
         q_tokens = _tokenize(query)
@@ -587,27 +662,79 @@ class MemoryService:
                     }
                 )
 
-        with self._connect(self._insight_db) as conn:
-            insight_rows = conn.execute(
-                "SELECT id, thesis, rationale, confidence, novelty_score FROM insights WHERE status = 'promoted' ORDER BY created_at DESC LIMIT ?",
-                (top_k,),
-            ).fetchall()
+        insights = []
+        vector_k = max(top_k, self._vector_top_k)
+        if (query or "").strip():
+            hits = self._ltm_repo.search_insights(
+                query=query, top_k=vector_k, status="promoted"
+            )
+            insight_ids = [
+                int(hit.get("metadata", {}).get("insight_id", -1))
+                for hit in hits
+                if int(hit.get("metadata", {}).get("insight_id", -1)) > 0
+            ]
 
-        insights = [
-            {
-                "id": row["id"],
-                "thesis": row["thesis"],
-                "rationale": row["rationale"],
-                "confidence": row["confidence"],
-                "novelty_score": row["novelty_score"],
-            }
-            for row in insight_rows
-        ]
+            insight_map = {}
+            if insight_ids:
+                placeholders = ",".join("?" for _ in insight_ids)
+                with self._connect(self._insight_db) as conn:
+                    rows = conn.execute(
+                        f"SELECT id, thesis, rationale, confidence, novelty_score FROM insights WHERE status = 'promoted' AND id IN ({placeholders})",
+                        insight_ids,
+                    ).fetchall()
+                insight_map = {int(row["id"]): row for row in rows}
 
-        web_result = tool_websearch(query) if include_web else ""
-        proactive = self._maybe_get_proactive_prompt(force=False)
+            for hit in hits:
+                metadata = hit.get("metadata", {})
+                insight_id = int(metadata.get("insight_id", -1))
+                row = insight_map.get(insight_id)
+                if row is None:
+                    continue
+                insights.append(
+                    {
+                        "id": row["id"],
+                        "thesis": row["thesis"],
+                        "rationale": row["rationale"],
+                        "confidence": row["confidence"],
+                        "novelty_score": row["novelty_score"],
+                        "score": round(float(hit.get("score", 0.0)), 4),
+                    }
+                )
+                if len(insights) >= top_k:
+                    break
 
-        semantic_text = "\n".join(f"- {x['statement']}" for x in semantic)
+        if not insights:
+            with self._connect(self._insight_db) as conn:
+                insight_rows = conn.execute(
+                    "SELECT id, thesis, rationale, confidence, novelty_score FROM insights WHERE status = 'promoted' ORDER BY created_at DESC LIMIT ?",
+                    (top_k,),
+                ).fetchall()
+
+            insights = [
+                {
+                    "id": row["id"],
+                    "thesis": row["thesis"],
+                    "rationale": row["rationale"],
+                    "confidence": row["confidence"],
+                    "novelty_score": row["novelty_score"],
+                }
+                for row in insight_rows
+            ]
+
+        web_result = (
+            tool_websearch(query, cache=search_cache)
+            if include_web and (query or "").strip()
+            else ""
+        )
+        proactive = self._maybe_get_proactive_prompt(
+            force=False,
+            current_intent=current_intent,
+            current_pathway=current_pathway,
+            query=query,
+        )
+
+        semantic_lines = [x["statement"] for x in semantic]
+        semantic_text = "\n".join(f"- {line}" for line in semantic_lines if line)
         episodic_text = "\n".join(
             f"- User: {x['user_input']} | Bot: {x['response']}" for x in episodic
         )
@@ -639,6 +766,8 @@ class MemoryService:
         self._handle_feedback_if_any(user_input)
 
         intent = (trace.get("intent") or "").strip().lower()
+        self._last_route_intent = intent
+        self._last_route_pathway = (trace.get("pathway") or "").strip().lower()
         if intent in {"brain_dump", "debug", "debug_ask", "debug_idle"}:
             return
         if _is_noise_text(user_input):
@@ -668,16 +797,17 @@ class MemoryService:
 
     def _extract_fact_candidates(self, user_input: str, response: str) -> list[str]:
         lines = []
-        for raw in [user_input, response]:
-            for part in re.split(r"[\n\.!?]", raw or ""):
-                text = part.strip()
-                if len(text.split()) < 4:
-                    continue
-                if _is_noise_text(text):
-                    continue
-                if len(text) > 220:
-                    text = text[:220].strip() + "..."
-                lines.append(text)
+        del response
+        for part in re.split(r"[\n\.!?]", user_input or ""):
+            text = _strip_memory_directive(part)
+            if not _should_store_user_fact(text):
+                continue
+            normalized = _normalize_fact_text(text)
+            if len(normalized.split()) < 3:
+                continue
+            if len(normalized) > 220:
+                normalized = normalized[:220].strip() + "..."
+            lines.append(normalized)
         out = []
         for text, _ in Counter(lines).most_common():
             out.append(text)
@@ -695,7 +825,7 @@ class MemoryService:
                 key = " ".join(sorted(_tokenize(statement)))
                 if not key:
                     continue
-                if _is_noise_text(statement):
+                if _is_noise_text(statement) or _is_polluted_statement(statement):
                     continue
                 row = conn.execute(
                     "SELECT id, confidence, provenance_json FROM facts WHERE canonical_key = ?",
@@ -727,24 +857,27 @@ class MemoryService:
                     )
 
     def run_idle_jobs(self):
-        research = self._run_research_jobs()
         created, promoted = self._run_synthesis_job()
         decayed, deleted = self._apply_episodic_decay()
-        out = {
+        return {
             "insight_candidates_created": created,
             "insights_promoted": promoted,
             "episodic_decayed": decayed,
             "episodic_deleted": deleted,
         }
-        out.update(research)
-        return out
 
     def _run_synthesis_job(self):
         with self._connect(self._semantic_db) as conn:
             facts = conn.execute(
                 "SELECT id, statement, confidence FROM facts ORDER BY last_seen DESC LIMIT 40"
             ).fetchall()
-        if len(facts) < 3:
+        facts = [
+            row
+            for row in facts
+            if not _is_polluted_statement(row["statement"])
+            and len(_tokenize(row["statement"])) >= 4
+        ]
+        if len(facts) < 4:
             return 0, 0
 
         cluster = facts[:6]
@@ -752,7 +885,7 @@ class MemoryService:
         if not thesis:
             return 0, 0
         quality_score = self._quality_score(thesis)
-        if quality_score < 0.45:
+        if quality_score < 0.6:
             return 0, 0
 
         evidence_query = " ".join(row["statement"] for row in cluster[:2])[:140]
@@ -760,11 +893,11 @@ class MemoryService:
         has_web = bool(web_evidence and "failed" not in web_evidence.lower())
         avg_conf = sum(float(row["confidence"]) for row in cluster) / len(cluster)
         novelty_score = min(1.0, 0.45 + 0.05 * len(cluster))
-        confidence = min(0.99, avg_conf + (0.1 if has_web else 0.0))
+        confidence = min(0.99, avg_conf + (0.08 if has_web else 0.0))
 
         status = (
             "promoted"
-            if has_web and confidence >= 0.72 and novelty_score >= 0.65
+            if has_web and confidence >= 0.78 and novelty_score >= 0.7
             else "candidate"
         )
         feedback_state = "pending" if status == "candidate" else "approved"
@@ -775,7 +908,7 @@ class MemoryService:
             ).fetchone()
             if existing is not None:
                 return 0, 0
-            conn.execute(
+            cursor = conn.execute(
                 """
                 INSERT INTO insights(thesis, rationale, evidence_json, novelty_score, confidence, status, feedback_state, ask_count, quality_score, created_at)
                 VALUES(?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
@@ -797,6 +930,16 @@ class MemoryService:
                     _now_ts(),
                 ),
             )
+            insight_id = int(cursor.lastrowid)
+
+        self._ltm_repo.upsert_insight_node(
+            insight_id=insight_id,
+            thesis=thesis,
+            rationale="Synthesized from reinforced semantic facts with web grounding.",
+            confidence=confidence,
+            novelty_score=novelty_score,
+            status=status,
+        )
         return 1, 1 if status == "promoted" else 0
 
     def _apply_episodic_decay(self):
@@ -844,6 +987,37 @@ class MemoryService:
             "semantic_count": semantic_count,
             "insight_count": insight_count,
             "pending_feedback_count": pending_count,
+        }
+
+    def cleanup_polluted_memory(self) -> dict:
+        deleted_facts = 0
+        deleted_insights = 0
+        with self._connect(self._semantic_db) as conn:
+            rows = conn.execute("SELECT id, statement FROM facts").fetchall()
+            bad_ids = [
+                row["id"] for row in rows if _is_polluted_statement(row["statement"])
+            ]
+            if bad_ids:
+                placeholders = ",".join("?" for _ in bad_ids)
+                conn.execute(f"DELETE FROM facts WHERE id IN ({placeholders})", bad_ids)
+                deleted_facts = len(bad_ids)
+
+        with self._connect(self._insight_db) as conn:
+            rows = conn.execute(
+                "SELECT id, thesis FROM insights WHERE status = 'candidate'"
+            ).fetchall()
+            bad_ids = [
+                row["id"] for row in rows if _is_polluted_statement(row["thesis"])
+            ]
+            if bad_ids:
+                placeholders = ",".join("?" for _ in bad_ids)
+                conn.execute(
+                    f"DELETE FROM insights WHERE id IN ({placeholders})", bad_ids
+                )
+                deleted_insights = len(bad_ids)
+        return {
+            "deleted_semantic_facts": deleted_facts,
+            "deleted_candidate_insights": deleted_insights,
         }
 
     def get_brain_dump(self, mode: str = "full", limit: int = 50) -> str:
@@ -917,6 +1091,7 @@ class MemoryService:
             conn.execute("DELETE FROM insights")
         with self._connect(self._jobs_db) as conn:
             conn.execute("DELETE FROM jobs")
+        self._ltm_repo.clear()
         self._active_asked_insight_id = None
         self._turn_counter = 0
         self._last_proactive_turn = -99999

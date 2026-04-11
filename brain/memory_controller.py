@@ -21,11 +21,17 @@ class MemoryController:
         self._idle_enabled = bool(idle_cfg.get("enabled", True))
         self._idle_seconds = float(idle_cfg.get("idle_seconds", 4.0))
         self._idle_poll_seconds = float(idle_cfg.get("poll_seconds", 0.5))
+        self._idle_min_interval_seconds = float(
+            idle_cfg.get("min_interval_seconds", 5.0)
+        )
 
         self._last_activity_ts = time.time()
+        self._last_idle_run_ts = 0.0
         self._turn_queue: queue.Queue[tuple[str, str, dict] | None] = queue.Queue()
         self._stop_event = threading.Event()
         self._debug_hook = None
+        self._foreground_lock = threading.Lock()
+        self._foreground_active = 0
 
         self._worker_thread = threading.Thread(target=self._worker_loop, daemon=True)
         self._worker_thread.start()
@@ -47,6 +53,17 @@ class MemoryController:
 
     def note_user_activity(self):
         self._last_activity_ts = time.time()
+
+    def begin_foreground_turn(self):
+        self.note_user_activity()
+        with self._foreground_lock:
+            self._foreground_active += 1
+
+    def end_foreground_turn(self):
+        with self._foreground_lock:
+            if self._foreground_active > 0:
+                self._foreground_active -= 1
+        self.note_user_activity()
 
     def _shutdown_on_exit(self):
         self.wait_for_idle(timeout=2.0)
@@ -88,11 +105,18 @@ class MemoryController:
     def _run_idle_memory_maintenance(self):
         if self._turn_queue.unfinished_tasks > 0:
             return
+        with self._foreground_lock:
+            if self._foreground_active > 0:
+                return
         idle_for = time.time() - self._last_activity_ts
         if idle_for < self._idle_seconds:
             return
+        now = time.time()
+        if (now - self._last_idle_run_ts) < self._idle_min_interval_seconds:
+            return
 
         metrics = self.memory.run_idle_jobs()
+        self._last_idle_run_ts = now
         logger.debug("Idle memory maintenance metrics: %s", metrics)
 
     def run_idle_now(self) -> dict:
@@ -107,15 +131,6 @@ class MemoryController:
     def get_brain_dump(self, mode: str = "full", limit: int = 50) -> str:
         return self.memory.get_brain_dump(mode=mode, limit=limit)
 
-    def queue_research_job(self, query: str, source: str = "cli") -> int:
-        return self.memory.enqueue_research_job(query=query, source=source)
-
-    def latest_research_result(self) -> dict | None:
-        return self.memory.latest_research_result()
-
-    def research_status(self, limit: int = 10) -> dict:
-        return self.memory.research_status(limit=limit)
-
     def clear_all_memory(self):
         self.memory.clear_all_memory()
 
@@ -127,8 +142,21 @@ class MemoryController:
             time.sleep(0.01)
         return self._turn_queue.unfinished_tasks == 0
 
-    def get_context_for_prompt(self, user_input, include_web: bool = True):
-        recall = self.memory.recall_context(user_input, include_web=include_web)
+    def get_context_for_prompt(
+        self,
+        user_input,
+        include_web: bool = True,
+        intent: str = "",
+        pathway: str = "",
+        search_cache: dict | None = None,
+    ):
+        recall = self.memory.recall_context(
+            user_input,
+            include_web=include_web,
+            current_intent=intent,
+            current_pathway=pathway,
+            search_cache=search_cache,
+        )
         return {
             "semantic_facts": recall["semantic"],
             "episodic_context": recall["episodic"],

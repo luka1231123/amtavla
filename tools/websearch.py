@@ -1,245 +1,121 @@
-import json
 import re
-import time
-import urllib.parse
-import urllib.request
-from urllib.error import HTTPError
 
 from ddgs import DDGS
 
-MAX_RESULTS = 3
-MAX_BODY_WORDS = 200
-RATE_LIMIT_COOLDOWN_SECONDS = 60
-_RATE_LIMIT_UNTIL = {"wikipedia": 0.0, "wikidata": 0.0}
+from brain.config import load_brain_config
 
-
-STOPWORDS = {
-    "what",
-    "who",
-    "when",
-    "where",
-    "why",
-    "how",
-    "is",
-    "are",
+STOP_TOKENS = {
     "the",
     "a",
     "an",
-    "of",
-    "to",
+    "and",
+    "or",
     "for",
+    "to",
+    "of",
     "in",
     "on",
-    "about",
+    "at",
     "with",
-    "and",
-    "tell",
+    "from",
+    "about",
     "me",
-    "please",
-    "explain",
-    "show",
+    "my",
+    "our",
+    "you",
 }
 
 
-def _fetch_json(url: str) -> dict:
-    req = urllib.request.Request(url, headers={"User-Agent": "amtavla/1.0"})
-    with urllib.request.urlopen(req, timeout=12) as response:
-        return json.loads(response.read().decode("utf-8", errors="replace"))
+def normalize_search_query(query: str) -> str:
+    tokens = re.findall(r"[a-z0-9]+", (query or "").lower())
+    return " ".join(tokens)
 
 
-def _simplify_query(query: str) -> str:
-    tokens = re.findall(r"[a-zA-Z0-9']+", query or "")
-    filtered = [t for t in tokens if t.lower() not in STOPWORDS]
-    if filtered and filtered[0].lower() in {"listen", "ok", "okay", "hey", "yo"}:
-        filtered = filtered[1:]
-    if not filtered:
-        return query.strip()
-    return " ".join(filtered[:6])
+def _format_results(rows: list[dict], max_chars: int) -> str:
+    blocks = []
+    for idx, row in enumerate(rows, 1):
+        title = (row.get("title") or "").strip()
+        if not title:
+            continue
+        url = (row.get("url") or "").strip()
+        snippet = (row.get("snippet") or "").strip()
+        lines = [f"[{idx}] {title}"]
+        if url:
+            lines.append(url)
+        if snippet:
+            lines.append(snippet[:420])
+        blocks.append("\n".join(lines))
+    text = "\n\n".join(blocks)
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars] + "... [truncated]"
 
 
-def _entity_query(query: str) -> str:
-    tokens = re.findall(r"[a-zA-Z0-9']+", query or "")
+def _search_rows(query: str, top_k: int) -> list[dict]:
+    rows = []
+    with DDGS() as ddgs:
+        for item in ddgs.text(query, max_results=max(1, top_k)):
+            rows.append(
+                {
+                    "title": item.get("title", ""),
+                    "url": item.get("href", ""),
+                    "snippet": item.get("body", ""),
+                }
+            )
+    return rows
+
+
+def _avg_overlap_score(query: str, rows: list[dict]) -> float:
+    query_tokens = set(re.findall(r"[a-z0-9]+", query.lower()))
+    if not query_tokens or not rows:
+        return 0.0
+    scores = []
+    for row in rows[:2]:
+        hay = f"{row.get('title', '')} {row.get('snippet', '')}".lower()
+        hit = sum(1 for token in query_tokens if token in hay)
+        scores.append(hit / max(1, len(query_tokens)))
+    return sum(scores) / len(scores) if scores else 0.0
+
+
+def _rewrite_query(query: str) -> str:
+    tokens = [
+        t for t in re.findall(r"[a-z0-9]+", query.lower()) if t not in STOP_TOKENS
+    ]
     if not tokens:
+        return query.strip()
+    return " ".join(tokens[:8])
+
+
+def tool_websearch(query: str, cache: dict | None = None) -> str:
+    text = (query or "").strip()
+    if not text:
         return ""
-    caps = [t for t in tokens if t and t[0].isupper() and t.lower() not in STOPWORDS]
-    if len(caps) >= 2:
-        return " ".join(caps[:2])
-    plain = [t for t in tokens if t.lower() not in STOPWORDS]
-    return " ".join((plain or tokens)[:2])
 
+    cfg = load_brain_config().get("search", {})
+    if not bool(cfg.get("enabled", True)):
+        return ""
+    top_k = int(cfg.get("top_k", 3))
+    max_chars = int(cfg.get("max_chars", 2200))
+    min_overlap = float(cfg.get("min_overlap_score", 0.2))
 
-def _wiki_result(query: str) -> list[dict]:
-    q = urllib.parse.quote(query)
-    search_url = f"https://en.wikipedia.org/w/api.php?action=opensearch&search={q}&limit=1&namespace=0&format=json"
-    data = _fetch_json(search_url)
-    titles = data[1] if isinstance(data, list) and len(data) > 1 else []
-    if not titles:
-        return []
-    title = titles[0]
-    summary_url = (
-        "https://en.wikipedia.org/api/rest_v1/page/summary/" + urllib.parse.quote(title)
-    )
-    summary = _fetch_json(summary_url)
-    extract = summary.get("extract", "")
-    page = summary.get("content_urls", {}).get("desktop", {}).get("page", "")
-    return [{"title": title, "href": page, "body": extract}]
+    normalized = normalize_search_query(text)
+    if cache is not None and normalized in cache:
+        return cache[normalized]
 
-
-def _wikidata_result(query: str) -> list[dict]:
-    q = urllib.parse.quote(query)
-    url = (
-        "https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json"
-        f"&language=en&type=item&limit=1&search={q}"
-    )
-    data = _fetch_json(url)
-    results = data.get("search", [])
-    if not results:
-        return []
-    item = results[0]
-    qid = item.get("id", "")
-    title = item.get("label", qid)
-    desc = item.get("description", "")
-    href = f"https://www.wikidata.org/wiki/{qid}" if qid else ""
-    return [{"title": title, "href": href, "body": desc}]
-
-
-def _provider_blocked(provider: str) -> bool:
-    return time.time() < _RATE_LIMIT_UNTIL.get(provider, 0.0)
-
-
-def _mark_rate_limited(provider: str):
-    _RATE_LIMIT_UNTIL[provider] = time.time() + RATE_LIMIT_COOLDOWN_SECONDS
-
-
-def deep_crawl_websearch(query: str, max_results: int = 8) -> str:
     try:
-        with DDGS() as ddgs:
-            results = list(ddgs.text(query, max_results=max_results))
-    except Exception as e:
-        return f"Deep crawl failed: {e}"
-
-    if not results:
-        return "No deep crawl results found."
-
-    parts = []
-    for i, r in enumerate(results, 1):
-        title = r.get("title", "")
-        url = r.get("href", "")
-        body = r.get("body", "")
-        words = body.split()
-        if len(words) > MAX_BODY_WORDS:
-            body = " ".join(words[:MAX_BODY_WORDS]) + "..."
-        parts.append(f"[{i}] {title}\n    {url}\n    {body}")
-    return "\n\n".join(parts)
-
-
-def tool_websearch(query: str) -> str:
-    base_query = (query or "").strip()
-    fallback_query = _simplify_query(base_query)
-    entity_query = _entity_query(base_query)
-    starts_question = bool(
-        re.match(r"^(what|who|when|where|why|how)\b", base_query.lower())
-    )
-
-    candidates = []
-    if starts_question:
-        candidates.extend([entity_query, fallback_query, base_query])
-    else:
-        candidates.extend([base_query, fallback_query, entity_query])
-    ordered_queries = []
-    for q in candidates:
-        q = (q or "").strip()
-        if q and q not in ordered_queries:
-            ordered_queries.append(q)
-
-    results = []
-    if _provider_blocked("wikipedia"):
-        results.append(
-            {
-                "title": "Wikipedia",
-                "href": "",
-                "body": "Wikipedia lookup skipped due to recent rate limit cooldown.",
-            }
-        )
-    else:
-        try:
-            for q in ordered_queries:
-                results.extend(_wiki_result(q))
-                if results and results[-1].get("title") != "Wikipedia":
-                    break
-        except HTTPError as e:
-            if e.code == 429:
-                _mark_rate_limited("wikipedia")
-            results.append(
-                {
-                    "title": "Wikipedia",
-                    "href": "",
-                    "body": f"Wikipedia lookup failed: HTTP Error {e.code}",
-                }
-            )
-        except Exception as e:
-            results.append(
-                {
-                    "title": "Wikipedia",
-                    "href": "",
-                    "body": f"Wikipedia lookup failed: {e}",
-                }
-            )
-
-    if _provider_blocked("wikidata"):
-        results.append(
-            {
-                "title": "Wikidata",
-                "href": "",
-                "body": "Wikidata lookup skipped due to recent rate limit cooldown.",
-            }
-        )
-    else:
-        try:
-            for q in ordered_queries:
-                if (
-                    len(
-                        [
-                            x
-                            for x in results
-                            if x.get("title") not in {"Wikipedia", "Wikidata"}
-                        ]
-                    )
-                    >= 2
+        rows = _search_rows(text, top_k=top_k)
+        if _avg_overlap_score(text, rows) < min_overlap:
+            rewritten = _rewrite_query(text)
+            if rewritten and rewritten != text:
+                retry_rows = _search_rows(rewritten, top_k=top_k)
+                if _avg_overlap_score(rewritten, retry_rows) > _avg_overlap_score(
+                    text, rows
                 ):
-                    break
-                results.extend(_wikidata_result(q))
-                if results and results[-1].get("title") != "Wikidata":
-                    break
-        except HTTPError as e:
-            if e.code == 429:
-                _mark_rate_limited("wikidata")
-            results.append(
-                {
-                    "title": "Wikidata",
-                    "href": "",
-                    "body": f"Wikidata lookup failed: HTTP Error {e.code}",
-                }
-            )
-        except Exception as e:
-            results.append(
-                {
-                    "title": "Wikidata",
-                    "href": "",
-                    "body": f"Wikidata lookup failed: {e}",
-                }
-            )
+                    rows = retry_rows
+    except Exception:
+        rows = []
 
-    if not results:
-        return "No curated web results found."
-
-    parts = []
-    for i, r in enumerate(results[:MAX_RESULTS], 1):
-        title = r.get("title", "")
-        url = r.get("href", "")
-        body = r.get("body", "")
-        words = body.split()
-        if len(words) > MAX_BODY_WORDS:
-            body = " ".join(words[:MAX_BODY_WORDS]) + "..."
-        parts.append(f"[{i}] {title}\n    {url}\n    {body}")
-    return "\n\n".join(parts)
+    result = _format_results(rows, max_chars=max_chars)
+    if cache is not None:
+        cache[normalized] = result
+    return result
