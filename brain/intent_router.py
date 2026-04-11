@@ -3,11 +3,14 @@ import json
 import math
 
 from brain.config import load_brain_config
+from brain.json_utils import extract_first_json_object
+from brain.prompt_builder import PromptBuilder
 
 
 class IntentRouter:
     def __init__(self, config: dict | None = None):
         self.config = config or load_brain_config()
+        self.prompt_builder = PromptBuilder()
         routing = self.config.get("routing", {})
         self.default_pathway = routing.get("default_pathway", "planner_full")
         self.intent_model_enabled = bool(routing.get("intent_model_enabled", True))
@@ -109,11 +112,9 @@ class IntentRouter:
             }
             for i in self._intents
         ]
-        prompt = (
-            "Classify user intent. Return JSON only with keys: intent, pathway, confidence."
-            "\nConfidence must be 0..1."
-            f"\nAvailable intents: {json.dumps(intents)}"
-            f"\nUser: {text}"
+        prompt = self.prompt_builder.build_intent_router_prompt(
+            user_input=text,
+            intents_json=json.dumps(intents),
         )
         try:
             import llama_client
@@ -122,11 +123,9 @@ class IntentRouter:
                 [{"role": "user", "content": prompt}], model=self.intent_model
             )
             raw = resp.get("message", {}).get("content", "")
-            start = raw.find("{")
-            end = raw.rfind("}") + 1
-            if start < 0 or end <= start:
+            data = extract_first_json_object(raw)
+            if not data:
                 return None
-            data = json.loads(raw[start:end])
             intent = str(data.get("intent", "")).strip()
             pathway = str(data.get("pathway", "")).strip()
             confidence = float(data.get("confidence", 0.0))
@@ -135,6 +134,8 @@ class IntentRouter:
             valid = next((i for i in self._intents if i["name"] == intent), None)
             if valid is None:
                 return None
+            if pathway != valid["pathway"]:
+                pathway = valid["pathway"]
             return {
                 "intent": intent,
                 "pathway": pathway,

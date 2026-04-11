@@ -188,7 +188,3 @@ def embed(prompt: str) -> dict:
     except Exception:
         pass
     return {"embedding": [0.0] * 768}
-
-
-def stop():
-    _stop_server()

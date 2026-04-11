@@ -1,14 +1,17 @@
 import llama_client
+from brain.prompt_builder import PromptBuilder
 
-SYSTEM_PROMPT = """You are amtavla, a CLI assistant.
-
-You have access to short-term memory (STM), long-term memory (LTM), web search results, and tools.
-Use the context provided to inform your responses.
-Be concise and direct. No yapping.
-Cite sources from web search when using them."""
+PROMPT_BUILDER = PromptBuilder()
 
 
-def generate_response(user_prompt, plan, plan_results, context_blocks):
+def generate_response(
+    user_prompt,
+    plan,
+    plan_results,
+    context_blocks,
+    intent: str | None = None,
+    pathway: str | None = None,
+):
     client = llama_client
 
     context_parts = []
@@ -56,9 +59,11 @@ def generate_response(user_prompt, plan, plan_results, context_blocks):
         context_parts.append("--- Web Grounding ---\n" + context_blocks["web_context"])
 
     context_str = "\n\n".join(context_parts)
-    system_message = SYSTEM_PROMPT
-    if context_str:
-        system_message += f"\n\n{context_str}"
+    system_message = PROMPT_BUILDER.build_generator_prompt(
+        assembled_context=context_str,
+        intent=intent,
+        pathway=pathway,
+    )
 
     messages = [
         {"role": "system", "content": system_message},

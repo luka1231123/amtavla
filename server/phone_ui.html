@@ -126,6 +126,7 @@
         </div>
     </div>
 
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
         const textContent = document.getElementById('textContent');
         const responseContent = document.getElementById('responseContent');
@@ -133,6 +134,7 @@
         const textInput = document.getElementById('textInput');
         const sendBtn = document.getElementById('sendBtn');
         const status = document.getElementById('status');
+        const socket = io({ transports: ['websocket', 'polling'] });
         let recognition = null;
         let isListening = false;
         let isProcessing = false;
@@ -144,16 +146,28 @@
             status.textContent = 'Processing...';
             isProcessing = true;
             try {
-                await fetch('http://127.0.0.1:8081/command', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({text: finalText})
-                });
+                socket.emit('submit_command', { text: finalText });
             } catch (e) {
                 isProcessing = false;
                 status.textContent = 'Failed to send command';
             }
         };
+
+        socket.on('connect', () => {
+            status.textContent = '';
+        });
+
+        socket.on('disconnect', () => {
+            status.textContent = 'Disconnected from server';
+        });
+
+        socket.on('assistant_response', (data) => {
+            const text = (data && data.text) || '';
+            if (!text) return;
+            responseContent.textContent = text;
+            isProcessing = false;
+            status.textContent = '';
+        });
 
         if ('webkitSpeechRecognition' in window) {
             recognition = new webkitSpeechRecognition();
@@ -237,22 +251,6 @@
             }
         });
 
-        let lastResponse = '';
-        setInterval(async () => {
-            try {
-                const resp = await fetch('http://127.0.0.1:8081/response');
-                const data = await resp.json();
-                if (data.response && data.response !== lastResponse) {
-                    responseContent.textContent = data.response;
-                    lastResponse = data.response;
-                    isProcessing = false;
-                    status.textContent = '';
-                    await fetch('http://127.0.0.1:8081/response/ack', { method: 'POST' });
-                }
-            } catch (e) {
-                // ignore connection errors
-            }
-        }, 1500);
     </script>
 </body>
 </html>

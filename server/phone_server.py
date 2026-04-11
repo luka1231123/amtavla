@@ -2,8 +2,10 @@ import os
 import time
 from datetime import datetime, timezone
 from flask import Flask, send_file, jsonify, make_response, request
+from flask_socketio import SocketIO
 
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 UI_FILE = os.path.join(os.path.dirname(__file__), "phone_ui.html")
 MAX_DEBUG_EVENTS = 500
@@ -14,6 +16,18 @@ response_updated_at = None
 server_started_at = time.time()
 debug_events = []
 debug_event_counter = 0
+
+
+def _store_command(text: str):
+    global command_store, command_updated_at
+    command_store = text
+    command_updated_at = time.time()
+
+
+def _store_response(text: str):
+    global response_store, response_updated_at
+    response_store = text
+    response_updated_at = time.time()
 
 
 def _iso_utc(ts):
@@ -68,11 +82,10 @@ def index():
 
 @app.route("/command", methods=["POST"])
 def set_command():
-    global command_store, command_updated_at
     data = request.get_json()
     if data and "text" in data:
-        command_store = data["text"]
-        command_updated_at = time.time()
+        _store_command(data["text"])
+        socketio.emit("command_submitted", {"text": data["text"], "source": "http"})
         return jsonify({"status": "ok"})
     return jsonify({"error": "No text provided"}), 400
 
@@ -94,11 +107,10 @@ def ack_command():
 
 @app.route("/response", methods=["POST"])
 def set_response():
-    global response_store, response_updated_at
     data = request.get_json()
     if data and "text" in data:
-        response_store = data["text"]
-        response_updated_at = time.time()
+        _store_response(data["text"])
+        socketio.emit("assistant_response", {"text": data["text"], "source": "http"})
         return jsonify({"status": "ok"})
     return jsonify({"error": "No text provided"}), 400
 
@@ -131,6 +143,7 @@ def push_debug_event():
     if not isinstance(payload, dict):
         payload = {"value": payload}
     event = _append_debug_event(str(event_type), payload)
+    socketio.emit("debug_event", event)
     return jsonify({"status": "ok", "event_id": event["id"]})
 
 
@@ -296,37 +309,67 @@ def debug_view():
         <div class="label">Status</div>
         <div class="value" id="status">Waiting...</div>
     </div>
+    <script src="/socket.io/socket.io.js"></script>
     <script>
         const STALE_SECONDS = 30;
-        let latestEventId = 0;
+        const MAX_EVENTS = 500;
+        const state = {
+            command: null,
+            response: null,
+            command_updated_at: null,
+            response_updated_at: null,
+            command_age_seconds: null,
+            response_age_seconds: null,
+            uptime_seconds: null,
+            debug_event_count: 0,
+            pending: { command: false, response: false },
+        };
+        let events = [];
 
-        function setValue(id, value, emptyText='(empty)') {
+        function setValue(id, value, emptyText = '(empty)') {
             const el = document.getElementById(id);
             const hasValue = value !== null && value !== undefined && value !== '';
             el.textContent = hasValue ? value : emptyText;
             el.className = hasValue ? 'value' : 'value empty';
         }
 
-        async function poll() {
-            const stateResp = await fetch('/debug/state');
-            const data = await stateResp.json();
+        function escapeHtml(value) {
+            const text = String(value ?? '');
+            return text
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;');
+        }
 
-            setValue('command', data.command);
-            setValue('response', data.response);
-            setValue('commandAge', data.command_age_seconds, 'n/a');
-            setValue('responseAge', data.response_age_seconds, 'n/a');
-            setValue('uptime', data.uptime_seconds, 'n/a');
-            setValue('commandUpdated', data.command_updated_at, 'n/a');
-            setValue('responseUpdated', data.response_updated_at, 'n/a');
-            setValue('eventCount', data.debug_event_count, '0');
+        function secondsSince(isoTs) {
+            if (!isoTs) return null;
+            const ms = Date.parse(isoTs);
+            if (Number.isNaN(ms)) return null;
+            return Math.max(0, ((Date.now() - ms) / 1000));
+        }
 
-            const eventsResp = await fetch('/debug/events?limit=200');
-            const eventsData = await eventsResp.json();
-            latestEventId = eventsData.latest_id || latestEventId;
-            renderEvents(eventsData.events || []);
+        function recomputeDerived() {
+            const commandAge = secondsSince(state.command_updated_at);
+            const responseAge = secondsSince(state.response_updated_at);
+            state.command_age_seconds = commandAge === null ? null : Number(commandAge.toFixed(2));
+            state.response_age_seconds = responseAge === null ? null : Number(responseAge.toFixed(2));
+            if (state.uptime_seconds !== null) {
+                state.uptime_seconds = Number((state.uptime_seconds + 1).toFixed(2));
+            }
+        }
 
-            const commandStale = data.pending.command && data.command_age_seconds !== null && data.command_age_seconds > STALE_SECONDS;
-            const responseStale = data.pending.response && data.response_age_seconds !== null && data.response_age_seconds > STALE_SECONDS;
+        function renderState() {
+            setValue('command', state.command);
+            setValue('response', state.response);
+            setValue('commandAge', state.command_age_seconds, 'n/a');
+            setValue('responseAge', state.response_age_seconds, 'n/a');
+            setValue('uptime', state.uptime_seconds, 'n/a');
+            setValue('commandUpdated', state.command_updated_at, 'n/a');
+            setValue('responseUpdated', state.response_updated_at, 'n/a');
+            setValue('eventCount', state.debug_event_count, '0');
+
+            const commandStale = state.pending.command && state.command_age_seconds !== null && state.command_age_seconds > STALE_SECONDS;
+            const responseStale = state.pending.response && state.response_age_seconds !== null && state.response_age_seconds > STALE_SECONDS;
             const health = document.getElementById('health');
             if (commandStale || responseStale) {
                 health.textContent = 'STALE';
@@ -335,17 +378,14 @@ def debug_view():
                 health.textContent = 'OK';
                 health.className = 'value ok';
             }
-
-            document.getElementById('status').textContent = 'Last update: ' + new Date().toLocaleTimeString();
         }
 
-        function renderEvents(events) {
+        function renderEvents() {
             const log = document.getElementById('eventLog');
             if (!events.length) {
                 log.innerHTML = '<div class="event"><div class="value empty">No events yet.</div></div>';
                 return;
             }
-
             log.innerHTML = events.map((event) => {
                 const payload = event.payload || {};
                 const summary = payload.summary || '(no summary)';
@@ -360,41 +400,130 @@ def debug_view():
             }).join('');
         }
 
-        function escapeHtml(text) {
-            return text
-                .replaceAll('&', '&amp;')
-                .replaceAll('<', '&lt;')
-                .replaceAll('>', '&gt;');
+        function applyStatePatch(data) {
+            if (!data || typeof data !== 'object') return;
+            Object.assign(state, data);
+            if (!state.pending) {
+                state.pending = { command: Boolean(state.command), response: Boolean(state.response) };
+            }
+            state.debug_event_count = Number(state.debug_event_count || events.length || 0);
+            renderState();
         }
 
-        async function loop() {
-            try {
-                await poll();
-            } catch (e) {
-                const health = document.getElementById('health');
-                health.textContent = 'UNREACHABLE';
-                health.className = 'value bad';
-                document.getElementById('status').textContent = 'Error: ' + e.message;
+        function appendEvent(event) {
+            if (!event || typeof event !== 'object') return;
+            events.push(event);
+            if (events.length > MAX_EVENTS) {
+                events = events.slice(events.length - MAX_EVENTS);
             }
+            state.debug_event_count = events.length;
+            renderState();
+            renderEvents();
         }
+
+        function setStatus(text) {
+            document.getElementById('status').textContent = text;
+        }
+
+        async function bootstrap() {
+            const stateResp = await fetch('/debug/state');
+            applyStatePatch(await stateResp.json());
+
+            const eventsResp = await fetch('/debug/events?limit=200');
+            const eventsData = await eventsResp.json();
+            events = Array.isArray(eventsData.events) ? eventsData.events : [];
+            state.debug_event_count = Number(eventsData.total || events.length || 0);
+            renderState();
+            renderEvents();
+            setStatus('Connected (snapshot loaded)');
+        }
+
+        const socket = io({ transports: ['websocket', 'polling'] });
+        socket.on('connect', () => setStatus('Realtime connected'));
+        socket.on('disconnect', () => setStatus('Realtime disconnected'));
+        socket.on('debug_event', appendEvent);
+        socket.on('command_submitted', (data) => {
+            const text = ((data || {}).text || '').trim();
+            state.command = text || state.command;
+            state.command_updated_at = new Date().toISOString();
+            state.pending = { ...(state.pending || {}), command: Boolean(text) };
+            renderState();
+        });
+        socket.on('assistant_response', (data) => {
+            const text = ((data || {}).text || '').trim();
+            state.response = text || state.response;
+            state.response_updated_at = new Date().toISOString();
+            state.pending = { ...(state.pending || {}), response: Boolean(text) };
+            renderState();
+        });
 
         document.getElementById('clearEvents').addEventListener('click', async () => {
             try {
                 await fetch('/debug/events/clear', { method: 'POST' });
-                latestEventId = 0;
-                await loop();
+                events = [];
+                state.debug_event_count = 0;
+                renderEvents();
+                renderState();
+                setStatus('Brain log cleared');
             } catch (e) {
-                document.getElementById('status').textContent = 'Clear failed: ' + e.message;
+                setStatus('Clear failed: ' + e.message);
             }
         });
 
-        loop();
-        setInterval(loop, 1000);
+        setInterval(() => {
+            recomputeDerived();
+            renderState();
+        }, 1000);
+
+        bootstrap().catch((e) => {
+            const health = document.getElementById('health');
+            health.textContent = 'UNREACHABLE';
+            health.className = 'value bad';
+            setStatus('Error: ' + e.message);
+        });
     </script>
 </body>
 </html>"""
     return make_response(html, 200, {"Content-Type": "text/html"})
 
 
+@socketio.on("submit_command")
+def ws_submit_command(data):
+    text = ((data or {}).get("text") or "").strip()
+    if not text:
+        return {"status": "error", "message": "No text provided"}
+    _store_command(text)
+    socketio.emit("command_submitted", {"text": text, "source": "socket"})
+    return {"status": "ok"}
+
+
+@socketio.on("assistant_response")
+def ws_assistant_response(data):
+    text = ((data or {}).get("text") or "").strip()
+    if not text:
+        return {"status": "error", "message": "No text provided"}
+    _store_response(text)
+    socketio.emit("assistant_response", {"text": text, "source": "socket"})
+    return {"status": "ok"}
+
+
+@socketio.on("debug_event")
+def ws_debug_event(data):
+    data = data or {}
+    event_type = data.get("type", "event")
+    payload = data.get("payload", {})
+    if not isinstance(payload, dict):
+        payload = {"value": payload}
+    event = _append_debug_event(str(event_type), payload)
+    socketio.emit("debug_event", event)
+    return {"status": "ok", "event_id": event["id"]}
+
+
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=8081, debug=False)
+    socketio.run(
+        app,
+        host="127.0.0.1",
+        port=8081,
+        debug=False,
+        allow_unsafe_werkzeug=True,
+    )

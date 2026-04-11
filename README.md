@@ -28,8 +28,6 @@ Each turn runs in this order:
 6. Response generation (`generator.py`)
 7. Episodic commit
 
-Deep research requests are handled by a dedicated `research_deep_crawl` intent and run as background jobs.
-
 When idle:
 
 - background synthesis jobs run
@@ -49,8 +47,9 @@ Memory is SQLite-backed in `brain/db/`:
 - `insight_ltm.db`
   - high-value synthesized discoveries only
   - supports proactive human confirmation states
-- `jobs.db`
-  - background job table (synthesis/maintenance bookkeeping)
+- `ltm_vectors.db`
+  - vector index for long-term insight retrieval
+  - KNN recall via `sqlite-vec` (with scan fallback if extension is unavailable)
 
 ## Proactive Insight Behavior
 
@@ -68,16 +67,14 @@ Foreground commands:
 
 - `/brain [status|ltm|full]` - memory debug summary
 - `/ask` - force one proactive insight ask
-- `/idle` - force idle cycle now (research jobs + synthesis + decay)
-- `/research-status` - list deep research job queue/status
-- `/delete` - clear all memory databases (episodic, semantic, insight, jobs)
+- `/idle` - force idle cycle now (synthesis + decay)
+- `/delete` - clear all memory databases (episodic, semantic, insight)
 
 Natural-language modes:
 
 - `tell me what's in your brain` / `brain dump` / `show all memory` -> `brain_dump_reply`
 - `remember this ...` / `don't forget ...` -> `remember_reply`
 - `where is my car ...` / `what did i say ...` / `remind me where ...` -> `memory_recall_reply`
-- `deep research ...` / `deep dive ...` / `investigate thoroughly ...` -> `research_deep_crawl` (background)
 
 Intent routing is hybrid: rules/regex + embedding retrieval + LLM rerank, with low-confidence fallback to `planner_full`.
 
@@ -114,31 +111,30 @@ python server/phone_server.py
 python main.py
 ```
 
-## Abilities Test
+## Raw Trace Run
 
-The test suite intentionally uses one end-to-end abilities run:
+Run the full raw terminal trace script:
 
 ```bash
-python3 -m unittest discover -s tests -p "test_*.py"
+python3 raw_full_trace.py
 ```
 
 Artifacts are written to:
 
-- `logs/abilities_runs/<timestamp>/turns.jsonl`
-- `logs/abilities_runs/<timestamp>/brain_trace.jsonl`
-- `logs/abilities_runs/<timestamp>/errors.jsonl`
-- `logs/abilities_runs/<timestamp>/summary.json`
+- `logs/raw_runs/<timestamp>/session_transcript.txt`
+- `logs/raw_runs/<timestamp>/brain_timeline.txt`
+- `logs/raw_runs/<timestamp>/memory_chronological.txt`
+- `logs/raw_runs/<timestamp>/web_searches.txt`
+- `logs/raw_runs/<timestamp>/idle_processes.txt`
+- `logs/raw_runs/<timestamp>/thoughts.txt`
 
 ## Operational Notes
 
-- Standard web grounding uses curated sources (Wikipedia + Wikidata adapters).
-- Broad multi-source crawl is only used by the `research_deep_crawl` background pathway.
-- `logs/amtavla.log` captures runtime web/search behavior and rate-limit patterns.
+- Web search uses direct web lookup via `ddgs`.
+- `logs/amtavla.log` captures runtime behavior.
 - Memory ingestion now filters assistant meta-prompts to reduce semantic pollution.
 
 ## What Is Still In Progress
 
-- Query normalization for hard natural-language factual questions still needs tuning for edge cases.
-- Wikipedia/Wikidata rate-limit handling is present (cooldown), but can still reduce result quality during bursts.
-- Proactive insight quality is improved, but long-running sessions need more calibration for better novelty detection.
-- Intent exemplars are currently config/keyword-heavy; a dedicated exemplar dataset would improve routing quality further.
+- Proactive insight quality still needs calibration in long sessions.
+- Intent routing is still config-heavy and can be simplified further.

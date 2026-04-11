@@ -1,9 +1,8 @@
-import json
-import re
-
-from brain.ltm_tree import _safe_chat
+from brain.json_utils import extract_first_json_object
+from brain.prompt_builder import PromptBuilder
 
 LLAMA_CLIENT = None
+PROMPT_BUILDER = PromptBuilder()
 
 
 def _get_client():
@@ -15,58 +14,16 @@ def _get_client():
     return LLAMA_CLIENT
 
 
-PLANNER_PROMPT = """You are a planning assistant. Create a short execution plan for the user's question.
-
-Rules:
-- Max 5 steps total
-- Include SEARCH only when external web knowledge is needed
-- Use TOOL only when user asks for system-like command output
-- Omit THINK unless it adds clear value
-- Output ONLY valid JSON, no other text
-
-JSON format:
-{{
-  "steps": [
-    {{"action": "SEARCH", "detail": "short query"}},
-    {{"action": "TOOL", "detail": "bash"}},
-    {{"action": "THINK", "detail": ""}}
-  ],
-  "thinking": "your reasoning about how to approach this question"
-}}
-
-Context from memory:
-{context}
-
-Examples:
-User: What is Python?
-{{"steps": [{{"action": "SEARCH", "detail": "Python programming language"}}, {{"action": "THINK", "detail": ""}}], "thinking": "Need to search for basic info about Python"}}
-
-User: How do decorators work?
-{{"steps": [{{"action": "SEARCH", "detail": "Python decorators tutorial"}}, {{"action": "THINK", "detail": ""}}], "thinking": "Search for Python decorator concepts"}}
-
-User: {user_input}
-Output only JSON:"""
-
-
 def _parse_plan(raw: str) -> list[tuple[str, str]]:
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
-        start = raw.find("{")
-        end = raw.rfind("}") + 1
-        if start >= 0 and end > start:
-            try:
-                data = json.loads(raw[start:end])
-            except json.JSONDecodeError:
-                return []
-        else:
-            return []
+    data = extract_first_json_object(raw)
+    if not data:
+        return []
 
     steps = []
     for step in data.get("steps", []):
         action = step.get("action", "").upper()
         detail = step.get("detail", "")
-        if action in ("SEARCH", "TOOL", "THINK"):
+        if action in ("SEARCH", "THINK"):
             steps.append((action, detail))
 
     deduped = []
@@ -84,10 +41,19 @@ def _parse_plan(raw: str) -> list[tuple[str, str]]:
     return deduped
 
 
-def generate_plan(user_input: str, context: str) -> tuple[list[tuple[str, str]], str]:
+def generate_plan(
+    user_input: str,
+    context: str,
+    intent: str | None = None,
+    pathway: str | None = None,
+) -> tuple[list[tuple[str, str]], str]:
     client = _get_client()
-    context_part = context[:500] if context else "No prior context."
-    prompt = PLANNER_PROMPT.format(user_input=user_input, context=context_part)
+    prompt = PROMPT_BUILDER.build_planner_prompt(
+        user_input=user_input,
+        memory_context=context,
+        intent=intent,
+        pathway=pathway,
+    )
 
     thinking = ""
     try:
@@ -104,16 +70,8 @@ def generate_plan(user_input: str, context: str) -> tuple[list[tuple[str, str]],
 
 
 def get_thinking(raw: str) -> str:
-    try:
-        data = json.loads(raw)
-        return data.get("thinking", "")
-    except json.JSONDecodeError:
-        start = raw.find("{")
-        end = raw.rfind("}") + 1
-        if start >= 0 and end > start:
-            try:
-                data = json.loads(raw[start:end])
-                return data.get("thinking", "")
-            except json.JSONDecodeError:
-                pass
-    return ""
+    data = extract_first_json_object(raw)
+    if not data:
+        return ""
+    value = data.get("thinking", "")
+    return value if isinstance(value, str) else ""

@@ -9,10 +9,6 @@
     "intent_embedding_enabled": true,
     "intent_low_confidence_fallback": "planner_full"
   },
-  "research": {
-    "deep_crawl_max_results": 8,
-    "deep_crawl_max_jobs_per_idle": 1
-  },
   "idle_memory": {
     "enabled": true,
     "idle_seconds": 4.0,
@@ -20,6 +16,9 @@
   },
   "memory": {
     "db_dir": "brain/db",
+    "vector_db_path": "brain/db/ltm_vectors.db",
+    "embedding_dim": 768,
+    "vector_top_k": 5,
     "episodic_ttl_seconds": 604800,
     "episodic_recall_extension_seconds": 172800,
     "episodic_strength_alpha": 0.25,
@@ -28,6 +27,11 @@
     "proactive_seconds_gap": 600,
     "proactive_max_asks": 2,
     "proactive_snooze_seconds": 900
+  },
+  "search": {
+    "enabled": true,
+    "top_k": 3,
+    "max_chars": 2200
   },
   "salience": {
     "max_facts_per_turn": 3,
@@ -128,27 +132,6 @@
       "regex": []
     },
     {
-      "name": "tool_command",
-      "priority": 80,
-      "pathway": "tool_then_reply",
-      "min_score": 1,
-      "keywords": [
-        "ls",
-        "list files",
-        "show files",
-        "directory",
-        "pwd",
-        "python version",
-        "pip version",
-        "disk space",
-        "whoami",
-        "cwd"
-      ],
-      "regex": [
-        "\\b(ls|pwd|whoami|df)\\b"
-      ]
-    },
-    {
       "name": "web_factual",
       "priority": 70,
       "pathway": "search_then_reply",
@@ -167,24 +150,6 @@
       ],
       "regex": [
         "\\b(weather|forecast|order|buy|near me|nearby)\\b"
-      ]
-    },
-    {
-      "name": "research_deep_crawl",
-      "priority": 85,
-      "pathway": "research_deep_crawl",
-      "min_score": 1,
-      "keywords": [
-        "deep research",
-        "deep dive",
-        "research thoroughly",
-        "comprehensive research",
-        "crawl sources",
-        "survey literature",
-        "investigate thoroughly"
-      ],
-      "regex": [
-        "\\b(deep(ly)? research|deep dive|comprehensive research|crawl( the)? web|survey literature|investigate thoroughly)\\b"
       ]
     }
   ]

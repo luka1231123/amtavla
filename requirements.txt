@@ -3,3 +3,6 @@ ollama
 ddgs
 numpy
 flask
+flask-socketio
+python-socketio
+sqlite-vec
