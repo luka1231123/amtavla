@@ -1,0 +1,2 @@
+[2026-04-11 18:35:22.714] TURN 22 planner thinking
+[2026-04-11 18:35:22.714]   Compare features, performance, and use cases of SQLite and PostgreSQL for small local-first assistants.

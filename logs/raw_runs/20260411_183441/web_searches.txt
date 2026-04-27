@@ -1,0 +1,342 @@
+[2026-04-11 18:34:48.060] tool_websearch query: Your bike blue and parked in garage B2 Remember this: my bike blue and parked in garage B2
+[2026-04-11 18:34:48.693] tool_websearch result (633 ms)
+[2026-04-11 18:34:48.693]   [1] Wikipedia
+[2026-04-11 18:34:48.693]       
+[2026-04-11 18:34:48.693]       Wikipedia lookup failed: HTTP Error 429
+[2026-04-11 18:34:48.693]   
+[2026-04-11 18:34:48.693]   [2] Wikidata
+[2026-04-11 18:34:48.693]       
+[2026-04-11 18:34:48.693]       Wikidata lookup failed: HTTP Error 429
+[2026-04-11 18:34:50.759] tool_websearch query: Give me a 3-step morning routine for focus.
+[2026-04-11 18:34:50.759] tool_websearch result (0 ms)
+[2026-04-11 18:34:50.759]   [1] Wikipedia
+[2026-04-11 18:34:50.759]       
+[2026-04-11 18:34:50.759]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:50.759]   
+[2026-04-11 18:34:50.759]   [2] Wikidata
+[2026-04-11 18:34:50.759]       
+[2026-04-11 18:34:50.759]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:53.709] tool_websearch query: What are two differences between RAM and storage?
+[2026-04-11 18:34:53.709] tool_websearch result (0 ms)
+[2026-04-11 18:34:53.709]   [1] Wikipedia
+[2026-04-11 18:34:53.709]       
+[2026-04-11 18:34:53.709]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:53.709]   
+[2026-04-11 18:34:53.709]   [2] Wikidata
+[2026-04-11 18:34:53.709]       
+[2026-04-11 18:34:53.709]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:53.709] tool_websearch query: What are two differences between RAM and storage?
+[2026-04-11 18:34:53.709] tool_websearch result (0 ms)
+[2026-04-11 18:34:53.709]   [1] Wikipedia
+[2026-04-11 18:34:53.709]       
+[2026-04-11 18:34:53.709]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:53.709]   
+[2026-04-11 18:34:53.709]   [2] Wikidata
+[2026-04-11 18:34:53.709]       
+[2026-04-11 18:34:53.709]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:56.122] tool_websearch query: What is 17 * 19?
+[2026-04-11 18:34:56.122] tool_websearch result (0 ms)
+[2026-04-11 18:34:56.122]   [1] Wikipedia
+[2026-04-11 18:34:56.122]       
+[2026-04-11 18:34:56.123]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:56.123]   
+[2026-04-11 18:34:56.123]   [2] Wikidata
+[2026-04-11 18:34:56.123]       
+[2026-04-11 18:34:56.123]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:56.123] tool_websearch query: What is 17 * 19?
+[2026-04-11 18:34:56.123] tool_websearch result (0 ms)
+[2026-04-11 18:34:56.123]   [1] Wikipedia
+[2026-04-11 18:34:56.123]       
+[2026-04-11 18:34:56.123]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:56.123]   
+[2026-04-11 18:34:56.123]   [2] Wikidata
+[2026-04-11 18:34:56.123]       
+[2026-04-11 18:34:56.123]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:56.740] tool_websearch query: What two differences between RAM and storage Give me 3-step morning routine for focus
+[2026-04-11 18:34:56.740] tool_websearch result (0 ms)
+[2026-04-11 18:34:56.740]   [1] Wikipedia
+[2026-04-11 18:34:56.740]       
+[2026-04-11 18:34:56.740]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:56.740]   
+[2026-04-11 18:34:56.740]   [2] Wikidata
+[2026-04-11 18:34:56.740]       
+[2026-04-11 18:34:56.740]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:57.407] tool_websearch query: Who wrote Pride and Prejudice?
+[2026-04-11 18:34:57.407] tool_websearch result (0 ms)
+[2026-04-11 18:34:57.407]   [1] Wikipedia
+[2026-04-11 18:34:57.407]       
+[2026-04-11 18:34:57.407]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:57.407]   
+[2026-04-11 18:34:57.407]   [2] Wikidata
+[2026-04-11 18:34:57.408]       
+[2026-04-11 18:34:57.408]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:57.408] tool_websearch query: Who wrote Pride and Prejudice?
+[2026-04-11 18:34:57.408] tool_websearch result (0 ms)
+[2026-04-11 18:34:57.408]   [1] Wikipedia
+[2026-04-11 18:34:57.408]       
+[2026-04-11 18:34:57.408]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:57.408]   
+[2026-04-11 18:34:57.408]   [2] Wikidata
+[2026-04-11 18:34:57.408]       
+[2026-04-11 18:34:57.408]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:58.838] tool_websearch query: What is the capital of Japan?
+[2026-04-11 18:34:58.839] tool_websearch result (0 ms)
+[2026-04-11 18:34:58.839]   [1] Wikipedia
+[2026-04-11 18:34:58.839]       
+[2026-04-11 18:34:58.839]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:58.839]   
+[2026-04-11 18:34:58.839]   [2] Wikidata
+[2026-04-11 18:34:58.839]       
+[2026-04-11 18:34:58.839]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:58.839] tool_websearch query: What is the capital of Japan?
+[2026-04-11 18:34:58.839] tool_websearch result (0 ms)
+[2026-04-11 18:34:58.839]   [1] Wikipedia
+[2026-04-11 18:34:58.839]       
+[2026-04-11 18:34:58.839]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:58.839]   
+[2026-04-11 18:34:58.839]   [2] Wikidata
+[2026-04-11 18:34:58.839]       
+[2026-04-11 18:34:58.839]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:00.214] tool_websearch query: Can you explain recursion simply?
+[2026-04-11 18:35:00.214] tool_websearch result (0 ms)
+[2026-04-11 18:35:00.214]   [1] Wikipedia
+[2026-04-11 18:35:00.214]       
+[2026-04-11 18:35:00.214]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:00.214]   
+[2026-04-11 18:35:00.214]   [2] Wikidata
+[2026-04-11 18:35:00.214]       
+[2026-04-11 18:35:00.214]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:02.192] tool_websearch query: Give one Python example of recursion.
+[2026-04-11 18:35:02.192] tool_websearch result (0 ms)
+[2026-04-11 18:35:02.192]   [1] Wikipedia
+[2026-04-11 18:35:02.192]       
+[2026-04-11 18:35:02.192]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:02.192]   
+[2026-04-11 18:35:02.192]   [2] Wikidata
+[2026-04-11 18:35:02.192]       
+[2026-04-11 18:35:02.192]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:04.615] tool_websearch query: Give one Python example recursion Can you explain recursion
+[2026-04-11 18:35:04.615] tool_websearch result (0 ms)
+[2026-04-11 18:35:04.615]   [1] Wikipedia
+[2026-04-11 18:35:04.615]       
+[2026-04-11 18:35:04.615]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:04.615]   
+[2026-04-11 18:35:04.615]   [2] Wikidata
+[2026-04-11 18:35:04.615]       
+[2026-04-11 18:35:04.615]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:10.142] tool_websearch query: What color is my bike?
+[2026-04-11 18:35:10.142] tool_websearch result (0 ms)
+[2026-04-11 18:35:10.142]   [1] Wikipedia
+[2026-04-11 18:35:10.142]       
+[2026-04-11 18:35:10.143]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:10.143]   
+[2026-04-11 18:35:10.143]   [2] Wikidata
+[2026-04-11 18:35:10.143]       
+[2026-04-11 18:35:10.143]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:10.143] tool_websearch query: What color is my bike?
+[2026-04-11 18:35:10.143] tool_websearch result (0 ms)
+[2026-04-11 18:35:10.143]   [1] Wikipedia
+[2026-04-11 18:35:10.143]       
+[2026-04-11 18:35:10.143]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:10.143]   
+[2026-04-11 18:35:10.143]   [2] Wikidata
+[2026-04-11 18:35:10.143]       
+[2026-04-11 18:35:10.143]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:10.811] tool_websearch query: What color my bike Your bike blue and parked in garage B2
+[2026-04-11 18:35:10.811] tool_websearch result (0 ms)
+[2026-04-11 18:35:10.811]   [1] Wikipedia
+[2026-04-11 18:35:10.811]       
+[2026-04-11 18:35:10.811]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:10.812]   
+[2026-04-11 18:35:10.812]   [2] Wikidata
+[2026-04-11 18:35:10.812]       
+[2026-04-11 18:35:10.812]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:14.086] tool_websearch query: Ask me a quick quiz from our conversation.
+[2026-04-11 18:35:14.086] tool_websearch result (0 ms)
+[2026-04-11 18:35:14.086]   [1] Wikipedia
+[2026-04-11 18:35:14.086]       
+[2026-04-11 18:35:14.086]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:14.086]   
+[2026-04-11 18:35:14.086]   [2] Wikidata
+[2026-04-11 18:35:14.086]       
+[2026-04-11 18:35:14.086]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:18.611] tool_websearch query: Now answer that quiz yourself briefly Ask me quick quiz from our conversation
+[2026-04-11 18:35:18.611] tool_websearch result (0 ms)
+[2026-04-11 18:35:18.611]   [1] Wikipedia
+[2026-04-11 18:35:18.611]       
+[2026-04-11 18:35:18.611]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:18.611]   
+[2026-04-11 18:35:18.611]   [2] Wikidata
+[2026-04-11 18:35:18.611]       
+[2026-04-11 18:35:18.611]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:18.624] tool_websearch query: List files in current directory and explain the command.
+[2026-04-11 18:35:18.624] tool_websearch result (0 ms)
+[2026-04-11 18:35:18.624]   [1] Wikipedia
+[2026-04-11 18:35:18.624]       
+[2026-04-11 18:35:18.624]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:18.624]   
+[2026-04-11 18:35:18.624]   [2] Wikidata
+[2026-04-11 18:35:18.624]       
+[2026-04-11 18:35:18.624]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:20.708] tool_websearch query: deep research: compare sqlite vs postgres for small local-first assistants
+[2026-04-11 18:35:20.708] tool_websearch result (0 ms)
+[2026-04-11 18:35:20.708]   [1] Wikipedia
+[2026-04-11 18:35:20.708]       
+[2026-04-11 18:35:20.708]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:20.708]   
+[2026-04-11 18:35:20.708]   [2] Wikidata
+[2026-04-11 18:35:20.708]       
+[2026-04-11 18:35:20.708]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:22.714] tool_websearch query: SQLite vs PostgreSQL comparison
+[2026-04-11 18:35:22.714] tool_websearch result (0 ms)
+[2026-04-11 18:35:22.714]   [1] Wikipedia
+[2026-04-11 18:35:22.714]       
+[2026-04-11 18:35:22.714]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:22.714]   
+[2026-04-11 18:35:22.714]   [2] Wikidata
+[2026-04-11 18:35:22.714]       
+[2026-04-11 18:35:22.714]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:22.714] tool_websearch query: use cases for SQLite
+[2026-04-11 18:35:22.714] tool_websearch result (0 ms)
+[2026-04-11 18:35:22.714]   [1] Wikipedia
+[2026-04-11 18:35:22.714]       
+[2026-04-11 18:35:22.714]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:22.714]   
+[2026-04-11 18:35:22.714]   [2] Wikidata
+[2026-04-11 18:35:22.714]       
+[2026-04-11 18:35:22.714]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:22.714] tool_websearch query: use cases for PostgreSQL
+[2026-04-11 18:35:22.714] tool_websearch result (0 ms)
+[2026-04-11 18:35:22.714]   [1] Wikipedia
+[2026-04-11 18:35:22.714]       
+[2026-04-11 18:35:22.714]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:22.714]   
+[2026-04-11 18:35:22.714]   [2] Wikidata
+[2026-04-11 18:35:22.714]       
+[2026-04-11 18:35:22.714]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:25.010] tool_websearch query: List files in current directory and explain command Now answer that quiz yourself briefly
+[2026-04-11 18:35:25.011] tool_websearch result (0 ms)
+[2026-04-11 18:35:25.011]   [1] Wikipedia
+[2026-04-11 18:35:25.011]       
+[2026-04-11 18:35:25.011]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:25.011]   
+[2026-04-11 18:35:25.011]   [2] Wikidata
+[2026-04-11 18:35:25.011]       
+[2026-04-11 18:35:25.011]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:25.530] tool_websearch query: List files in current directory and explain command Now answer that quiz yourself briefly
+[2026-04-11 18:35:25.530] tool_websearch result (0 ms)
+[2026-04-11 18:35:25.530]   [1] Wikipedia
+[2026-04-11 18:35:25.530]       
+[2026-04-11 18:35:25.530]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:25.530]   
+[2026-04-11 18:35:25.530]   [2] Wikidata
+[2026-04-11 18:35:25.530]       
+[2026-04-11 18:35:25.530]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:26.036] tool_websearch query: List files in current directory and explain command Now answer that quiz yourself briefly
+[2026-04-11 18:35:26.036] tool_websearch result (0 ms)
+[2026-04-11 18:35:26.036]   [1] Wikipedia
+[2026-04-11 18:35:26.036]       
+[2026-04-11 18:35:26.036]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:26.036]   
+[2026-04-11 18:35:26.036]   [2] Wikidata
+[2026-04-11 18:35:26.036]       
+[2026-04-11 18:35:26.036]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:26.542] tool_websearch query: List files in current directory and explain command Now answer that quiz yourself briefly
+[2026-04-11 18:35:26.542] tool_websearch result (0 ms)
+[2026-04-11 18:35:26.542]   [1] Wikipedia
+[2026-04-11 18:35:26.542]       
+[2026-04-11 18:35:26.542]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:26.542]   
+[2026-04-11 18:35:26.542]   [2] Wikidata
+[2026-04-11 18:35:26.542]       
+[2026-04-11 18:35:26.542]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:27.048] tool_websearch query: List files in current directory and explain command Now answer that quiz yourself briefly
+[2026-04-11 18:35:27.048] tool_websearch result (0 ms)
+[2026-04-11 18:35:27.048]   [1] Wikipedia
+[2026-04-11 18:35:27.048]       
+[2026-04-11 18:35:27.048]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:27.048]   
+[2026-04-11 18:35:27.048]   [2] Wikidata
+[2026-04-11 18:35:27.048]       
+[2026-04-11 18:35:27.048]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:27.554] tool_websearch query: List files in current directory and explain command Now answer that quiz yourself briefly
+[2026-04-11 18:35:27.554] tool_websearch result (0 ms)
+[2026-04-11 18:35:27.555]   [1] Wikipedia
+[2026-04-11 18:35:27.555]       
+[2026-04-11 18:35:27.555]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:27.555]   
+[2026-04-11 18:35:27.555]   [2] Wikidata
+[2026-04-11 18:35:27.555]       
+[2026-04-11 18:35:27.555]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:28.061] tool_websearch query: List files in current directory and explain command Now answer that quiz yourself briefly
+[2026-04-11 18:35:28.061] tool_websearch result (0 ms)
+[2026-04-11 18:35:28.061]   [1] Wikipedia
+[2026-04-11 18:35:28.061]       
+[2026-04-11 18:35:28.061]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:28.061]   
+[2026-04-11 18:35:28.061]   [2] Wikidata
+[2026-04-11 18:35:28.061]       
+[2026-04-11 18:35:28.061]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:28.567] tool_websearch query: List files in current directory and explain command Now answer that quiz yourself briefly
+[2026-04-11 18:35:28.567] tool_websearch result (0 ms)
+[2026-04-11 18:35:28.567]   [1] Wikipedia
+[2026-04-11 18:35:28.567]       
+[2026-04-11 18:35:28.567]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:28.567]   
+[2026-04-11 18:35:28.567]   [2] Wikidata
+[2026-04-11 18:35:28.567]       
+[2026-04-11 18:35:28.567]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:29.073] tool_websearch query: List files in current directory and explain command Now answer that quiz yourself briefly
+[2026-04-11 18:35:29.073] tool_websearch result (0 ms)
+[2026-04-11 18:35:29.073]   [1] Wikipedia
+[2026-04-11 18:35:29.073]       
+[2026-04-11 18:35:29.073]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:29.073]   
+[2026-04-11 18:35:29.073]   [2] Wikidata
+[2026-04-11 18:35:29.073]       
+[2026-04-11 18:35:29.073]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:29.579] tool_websearch query: List files in current directory and explain command Now answer that quiz yourself briefly
+[2026-04-11 18:35:29.579] tool_websearch result (0 ms)
+[2026-04-11 18:35:29.579]   [1] Wikipedia
+[2026-04-11 18:35:29.579]       
+[2026-04-11 18:35:29.579]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:29.579]   
+[2026-04-11 18:35:29.579]   [2] Wikidata
+[2026-04-11 18:35:29.579]       
+[2026-04-11 18:35:29.579]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:30.085] tool_websearch query: List files in current directory and explain command Now answer that quiz yourself briefly
+[2026-04-11 18:35:30.085] tool_websearch result (0 ms)
+[2026-04-11 18:35:30.085]   [1] Wikipedia
+[2026-04-11 18:35:30.085]       
+[2026-04-11 18:35:30.085]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:30.085]   
+[2026-04-11 18:35:30.085]   [2] Wikidata
+[2026-04-11 18:35:30.085]       
+[2026-04-11 18:35:30.085]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:30.591] tool_websearch query: List files in current directory and explain command Now answer that quiz yourself briefly
+[2026-04-11 18:35:30.591] tool_websearch result (0 ms)
+[2026-04-11 18:35:30.591]   [1] Wikipedia
+[2026-04-11 18:35:30.591]       
+[2026-04-11 18:35:30.591]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:30.591]   
+[2026-04-11 18:35:30.591]   [2] Wikidata
+[2026-04-11 18:35:30.591]       
+[2026-04-11 18:35:30.591]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:30.667] tool_websearch query: deep research: compare sqlite vs postgres for small local-first assistants List files in current directory and explain command
+[2026-04-11 18:35:30.667] tool_websearch result (0 ms)
+[2026-04-11 18:35:30.667]   [1] Wikipedia
+[2026-04-11 18:35:30.667]       
+[2026-04-11 18:35:30.667]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:30.667]   
+[2026-04-11 18:35:30.667]   [2] Wikidata
+[2026-04-11 18:35:30.667]       
+[2026-04-11 18:35:30.667]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:33.819] tool_websearch query: Summarize everything in 5 bullets deep research: compare sqlite vs postgres for small local-first assistants
+[2026-04-11 18:35:33.819] tool_websearch result (0 ms)
+[2026-04-11 18:35:33.819]   [1] Wikipedia
+[2026-04-11 18:35:33.819]       
+[2026-04-11 18:35:33.819]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:33.819]   
+[2026-04-11 18:35:33.819]   [2] Wikidata
+[2026-04-11 18:35:33.819]       
+[2026-04-11 18:35:33.819]       Wikidata lookup skipped due to recent rate limit cooldown.

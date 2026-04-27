@@ -1,0 +1,91 @@
+[2026-04-11 19:43:18.667] run_idle_jobs start
+[2026-04-11 19:43:18.670] run_idle_jobs done (3 ms)
+[2026-04-11 19:43:18.670]   insight_candidates_created: 0
+[2026-04-11 19:43:18.670]   insights_promoted: 0
+[2026-04-11 19:43:18.670]   episodic_decayed: 4
+[2026-04-11 19:43:18.670]   episodic_deleted: 0
+[2026-04-11 19:43:18.671] periodic idle run after turn 4
+[2026-04-11 19:43:18.671]   status:
+[2026-04-11 19:43:18.671]     episodic_count: 4
+[2026-04-11 19:43:18.671]     semantic_count: 3
+[2026-04-11 19:43:18.671]     insight_count: 0
+[2026-04-11 19:43:18.671]     pending_feedback_count: 0
+[2026-04-11 19:43:18.671]   metrics:
+[2026-04-11 19:43:18.671]     insight_candidates_created: 0
+[2026-04-11 19:43:18.671]     insights_promoted: 0
+[2026-04-11 19:43:18.671]     episodic_decayed: 4
+[2026-04-11 19:43:18.671]     episodic_deleted: 0
+[2026-04-11 19:43:26.615] run_idle_jobs start
+[2026-04-11 19:43:26.619] run_idle_jobs done (3 ms)
+[2026-04-11 19:43:26.619]   insight_candidates_created: 0
+[2026-04-11 19:43:26.619]   insights_promoted: 0
+[2026-04-11 19:43:26.619]   episodic_decayed: 8
+[2026-04-11 19:43:26.619]   episodic_deleted: 0
+[2026-04-11 19:43:26.620] periodic idle run after turn 8
+[2026-04-11 19:43:26.620]   status:
+[2026-04-11 19:43:26.620]     episodic_count: 8
+[2026-04-11 19:43:26.620]     semantic_count: 3
+[2026-04-11 19:43:26.620]     insight_count: 0
+[2026-04-11 19:43:26.620]     pending_feedback_count: 0
+[2026-04-11 19:43:26.620]   metrics:
+[2026-04-11 19:43:26.620]     insight_candidates_created: 0
+[2026-04-11 19:43:26.620]     insights_promoted: 0
+[2026-04-11 19:43:26.620]     episodic_decayed: 8
+[2026-04-11 19:43:26.620]     episodic_deleted: 0
+[2026-04-11 19:43:34.830] run_idle_jobs start
+[2026-04-11 19:43:34.834] run_idle_jobs done (3 ms)
+[2026-04-11 19:43:34.834]   insight_candidates_created: 0
+[2026-04-11 19:43:34.834]   insights_promoted: 0
+[2026-04-11 19:43:34.834]   episodic_decayed: 12
+[2026-04-11 19:43:34.834]   episodic_deleted: 0
+[2026-04-11 19:43:34.834] periodic idle run after turn 12
+[2026-04-11 19:43:34.834]   status:
+[2026-04-11 19:43:34.834]     episodic_count: 12
+[2026-04-11 19:43:34.834]     semantic_count: 3
+[2026-04-11 19:43:34.835]     insight_count: 0
+[2026-04-11 19:43:34.835]     pending_feedback_count: 0
+[2026-04-11 19:43:34.835]   metrics:
+[2026-04-11 19:43:34.835]     insight_candidates_created: 0
+[2026-04-11 19:43:34.835]     insights_promoted: 0
+[2026-04-11 19:43:34.835]     episodic_decayed: 12
+[2026-04-11 19:43:34.835]     episodic_deleted: 0
+[2026-04-11 19:43:40.491] run_idle_jobs start
+[2026-04-11 19:43:40.735] run_idle_jobs done (243 ms)
+[2026-04-11 19:43:40.735]   insight_candidates_created: 1
+[2026-04-11 19:43:40.735]   insights_promoted: 0
+[2026-04-11 19:43:40.735]   episodic_decayed: 16
+[2026-04-11 19:43:40.735]   episodic_deleted: 0
+[2026-04-11 19:43:40.735] periodic idle run after turn 16
+[2026-04-11 19:43:40.735]   status:
+[2026-04-11 19:43:40.735]     episodic_count: 16
+[2026-04-11 19:43:40.735]     semantic_count: 5
+[2026-04-11 19:43:40.735]     insight_count: 0
+[2026-04-11 19:43:40.735]     pending_feedback_count: 1
+[2026-04-11 19:43:40.735]   metrics:
+[2026-04-11 19:43:40.735]     insight_candidates_created: 1
+[2026-04-11 19:43:40.735]     insights_promoted: 0
+[2026-04-11 19:43:40.735]     episodic_decayed: 16
+[2026-04-11 19:43:40.735]     episodic_deleted: 0
+[2026-04-11 19:43:47.684] run_idle_jobs start
+[2026-04-11 19:43:47.925] run_idle_jobs done (241 ms)
+[2026-04-11 19:43:47.925]   insight_candidates_created: 0
+[2026-04-11 19:43:47.925]   insights_promoted: 0
+[2026-04-11 19:43:47.925]   episodic_decayed: 20
+[2026-04-11 19:43:47.925]   episodic_deleted: 0
+[2026-04-11 19:43:47.926] periodic idle run after turn 20
+[2026-04-11 19:43:47.926]   status:
+[2026-04-11 19:43:47.926]     episodic_count: 20
+[2026-04-11 19:43:47.926]     semantic_count: 5
+[2026-04-11 19:43:47.926]     insight_count: 0
+[2026-04-11 19:43:47.926]     pending_feedback_count: 1
+[2026-04-11 19:43:47.926]   metrics:
+[2026-04-11 19:43:47.926]     insight_candidates_created: 0
+[2026-04-11 19:43:47.926]     insights_promoted: 0
+[2026-04-11 19:43:47.926]     episodic_decayed: 20
+[2026-04-11 19:43:47.926]     episodic_deleted: 0
+[2026-04-11 19:43:52.219] run_idle_jobs start
+[2026-04-11 19:43:52.464] run_idle_jobs done (245 ms)
+[2026-04-11 19:43:52.464]   insight_candidates_created: 0
+[2026-04-11 19:43:52.464]   insights_promoted: 0
+[2026-04-11 19:43:52.464]   episodic_decayed: 21
+[2026-04-11 19:43:52.464]   episodic_deleted: 0

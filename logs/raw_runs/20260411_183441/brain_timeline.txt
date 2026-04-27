@@ -1,0 +1,813 @@
+[2026-04-11 18:34:41.341] === RAW FULL TRACE START ===
+[2026-04-11 18:34:43.535] Memory cleared at start
+[2026-04-11 18:34:43.535] turn=1 user_prompt=hi there
+[2026-04-11 18:34:44.397] route: intent=smalltalk pathway=direct_reply score=4 confidence=0.9 source=llm
+[2026-04-11 18:34:44.398] context summary
+[2026-04-11 18:34:44.398]   include_web: False
+[2026-04-11 18:34:44.398]   semantic_count: 0
+[2026-04-11 18:34:44.398]   episodic_count: 0
+[2026-04-11 18:34:44.398]   insight_count: 0
+[2026-04-11 18:34:44.398]   pending_feedback_prompt: 
+[2026-04-11 18:34:44.398] planner
+[2026-04-11 18:34:44.398]   thinking: 
+[2026-04-11 18:34:44.398]   plan:
+[2026-04-11 18:34:44.398]     (empty)
+[2026-04-11 18:34:44.627] response
+[2026-04-11 18:34:44.627]   response_preview: Hello! How can I assist you today?
+[2026-04-11 18:34:44.627]   latency_ms: 1092
+[2026-04-11 18:34:44.639] turn=2 user_prompt=I like concise answers with bullet points.
+[2026-04-11 18:34:45.238] route: intent=smalltalk pathway=direct_reply score=4 confidence=0.8 source=llm
+[2026-04-11 18:34:45.242] context summary
+[2026-04-11 18:34:45.242]   include_web: False
+[2026-04-11 18:34:45.242]   semantic_count: 0
+[2026-04-11 18:34:45.242]   episodic_count: 1
+[2026-04-11 18:34:45.242]   insight_count: 0
+[2026-04-11 18:34:45.242]   pending_feedback_prompt: 
+[2026-04-11 18:34:45.242] planner
+[2026-04-11 18:34:45.242]   thinking: 
+[2026-04-11 18:34:45.242]   plan:
+[2026-04-11 18:34:45.242]     (empty)
+[2026-04-11 18:34:45.619] response
+[2026-04-11 18:34:45.619]   response_preview: Great! I'll make sure to provide concise answers with bullet points. How can I assist you today?
+[2026-04-11 18:34:45.619]   latency_ms: 980
+[2026-04-11 18:34:45.631] turn=3 user_prompt=Remember this: my name is Mira.
+[2026-04-11 18:34:46.452] route: intent=remember pathway=remember_reply score=5 confidence=1.0 source=llm
+[2026-04-11 18:34:46.454] context summary
+[2026-04-11 18:34:46.454]   include_web: False
+[2026-04-11 18:34:46.454]   semantic_count: 0
+[2026-04-11 18:34:46.454]   episodic_count: 0
+[2026-04-11 18:34:46.454]   insight_count: 0
+[2026-04-11 18:34:46.454]   pending_feedback_prompt: 
+[2026-04-11 18:34:46.454] planner
+[2026-04-11 18:34:46.454]   thinking: 
+[2026-04-11 18:34:46.454]   plan:
+[2026-04-11 18:34:46.454]     (empty)
+[2026-04-11 18:34:46.743] response
+[2026-04-11 18:34:46.743]   response_preview: Mira, nice to meet you! How can I assist you today?
+[2026-04-11 18:34:46.743]   latency_ms: 1111
+[2026-04-11 18:34:46.754] turn=4 user_prompt=Remember this: my bike is blue and parked in garage B2.
+[2026-04-11 18:34:47.357] route: intent=remember pathway=remember_reply score=4 confidence=0.9 source=llm
+[2026-04-11 18:34:47.646] context summary
+[2026-04-11 18:34:47.646]   include_web: False
+[2026-04-11 18:34:47.646]   semantic_count: 1
+[2026-04-11 18:34:47.646]   episodic_count: 1
+[2026-04-11 18:34:47.646]   insight_count: 0
+[2026-04-11 18:34:47.646]   pending_feedback_prompt: 
+[2026-04-11 18:34:47.646] planner
+[2026-04-11 18:34:47.646]   thinking: 
+[2026-04-11 18:34:47.646]   plan:
+[2026-04-11 18:34:47.646]     (empty)
+[2026-04-11 18:34:48.047] response
+[2026-04-11 18:34:48.047]   response_preview: Got it! Your bike is blue and parked in garage B2. How can I assist you further?
+[2026-04-11 18:34:48.047]   latency_ms: 1292
+[2026-04-11 18:34:48.700] idle metrics
+[2026-04-11 18:34:48.700]   insight_candidates_created: 1
+[2026-04-11 18:34:48.700]   insights_promoted: 0
+[2026-04-11 18:34:48.700]   episodic_decayed: 4
+[2026-04-11 18:34:48.700]   episodic_deleted: 0
+[2026-04-11 18:34:48.700]   research_jobs_processed: 0
+[2026-04-11 18:34:48.700]   research_jobs_completed: 0
+[2026-04-11 18:34:48.700]   research_jobs_failed: 0
+[2026-04-11 18:34:48.701] turn=5 user_prompt=What do you remember about me so far?
+[2026-04-11 18:34:49.320] route: intent=memory_recall pathway=memory_recall_reply score=4 confidence=0.9 source=llm
+[2026-04-11 18:34:49.328] context summary
+[2026-04-11 18:34:49.328]   include_web: False
+[2026-04-11 18:34:49.328]   semantic_count: 2
+[2026-04-11 18:34:49.328]   episodic_count: 4
+[2026-04-11 18:34:49.328]   insight_count: 0
+[2026-04-11 18:34:49.328]   pending_feedback_prompt: Quick memory check: should I keep this insight — "Your bike blue and parked in garage B2. I like concise answers with bullet points"?
+[2026-04-11 18:34:49.328] planner
+[2026-04-11 18:34:49.328]   thinking: 
+[2026-04-11 18:34:49.328]   plan:
+[2026-04-11 18:34:49.328]     (empty)
+[2026-04-11 18:34:49.846] response
+[2026-04-11 18:34:49.846]   response_preview: - Your name is Mira.
+[2026-04-11 18:34:49.846]   - You mentioned your bike is blue and parked in garage B2.
+[2026-04-11 18:34:49.846]   
+[2026-04-11 18:34:49.846]   Quick memory check: should I keep this insight — "Your bike blue and parked in garage B2. I like concise answers with bullet points"?
+[2026-04-11 18:34:49.846]   latency_ms: 1144
+[2026-04-11 18:34:49.869] turn=6 user_prompt=Give me a 3-step morning routine for focus.
+[2026-04-11 18:34:50.754] route: intent=creative_helper pathway=creative_reply score=4 confidence=0.95 source=llm
+[2026-04-11 18:34:50.760] context summary
+[2026-04-11 18:34:50.760]   include_web: True
+[2026-04-11 18:34:50.760]   semantic_count: 1
+[2026-04-11 18:34:50.760]   episodic_count: 1
+[2026-04-11 18:34:50.760]   insight_count: 0
+[2026-04-11 18:34:50.760]   pending_feedback_prompt: 
+[2026-04-11 18:34:50.760] planner
+[2026-04-11 18:34:50.760]   thinking: 
+[2026-04-11 18:34:50.760]   plan:
+[2026-04-11 18:34:50.760]     (empty)
+[2026-04-11 18:34:53.104] response
+[2026-04-11 18:34:53.104]   response_preview: Sure! Here's a 3-step morning routine to help you focus:
+[2026-04-11 18:34:53.104]   
+[2026-04-11 18:34:53.104]   1. **Mindfulness and Breathing:** Start with 5-10 minutes of focused breathing exercises. Sit in a quiet place, close your eyes, and focus on your breath. Inhale slowly through your nose, hold for a few seconds, and exhale slowly through your mouth.
+[2026-04-11 18:34:53.104]   
+[2026-04-11 18:34:53.104]   2. **Physical Activity:** Engage in a quick physical activity, such as a 5-minute jog, some stretching, or a few push-ups. This helps to clear your mind and increase alertness.
+[2026-04-11 18:34:53.104]   
+[2026-04-11 18:34:53.104]   3. **Scheduled Tasks:** Set aside a specific time for checking emails, social media, or any other tasks that might distract you. This helps to maintain focus on your primary tasks for the day.
+[2026-04-11 18:34:53.104]   latency_ms: 3235
+[2026-04-11 18:34:53.116] turn=7 user_prompt=What are two differences between RAM and storage?
+[2026-04-11 18:34:53.705] route: intent=web_factual pathway=search_then_reply score=4 confidence=0.9 source=llm
+[2026-04-11 18:34:53.709] context summary
+[2026-04-11 18:34:53.709]   include_web: True
+[2026-04-11 18:34:53.709]   semantic_count: 4
+[2026-04-11 18:34:53.709]   episodic_count: 3
+[2026-04-11 18:34:53.709]   insight_count: 0
+[2026-04-11 18:34:53.709]   pending_feedback_prompt: 
+[2026-04-11 18:34:53.709] planner
+[2026-04-11 18:34:53.709]   thinking: 
+[2026-04-11 18:34:53.709]   plan:
+[2026-04-11 18:34:53.709]     - item 1:
+[2026-04-11 18:34:53.709]       action: SEARCH
+[2026-04-11 18:34:53.709]       detail: What are two differences between RAM and storage?
+[2026-04-11 18:34:53.709] plan step SEARCH detail=What are two differences between RAM and storage? (0 ms)
+[2026-04-11 18:34:53.709]   [1] Wikipedia
+[2026-04-11 18:34:53.709]       
+[2026-04-11 18:34:53.709]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:53.709]   
+[2026-04-11 18:34:53.709]   [2] Wikidata
+[2026-04-11 18:34:53.709]       
+[2026-04-11 18:34:53.709]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:55.441] response
+[2026-04-11 18:34:55.441]   response_preview: RAM (Random Access Memory) and storage are both crucial components of a computer, but they serve different purposes and have distinct characteristics:
+[2026-04-11 18:34:55.441]   
+[2026-04-11 18:34:55.441]   1. **Purpose**: RAM is used for temporary data storage that the CPU can access quickly. Storage, on the other hand, is used for long-term data storage.
+[2026-04-11 18:34:55.441]   
+[2026-04-11 18:34:55.441]   2. **Speed**: RAM is significantly faster than storage. Data in RAM can be accessed much quicker than data stored on a hard drive or SSD.
+[2026-04-11 18:34:55.441]   latency_ms: 2325
+[2026-04-11 18:34:55.454] turn=8 user_prompt=What is 17 * 19?
+[2026-04-11 18:34:56.118] route: intent=web_factual pathway=search_then_reply score=5 confidence=1.0 source=llm
+[2026-04-11 18:34:56.123] context summary
+[2026-04-11 18:34:56.123]   include_web: True
+[2026-04-11 18:34:56.123]   semantic_count: 2
+[2026-04-11 18:34:56.123]   episodic_count: 4
+[2026-04-11 18:34:56.123]   insight_count: 0
+[2026-04-11 18:34:56.123]   pending_feedback_prompt: 
+[2026-04-11 18:34:56.123] planner
+[2026-04-11 18:34:56.123]   thinking: 
+[2026-04-11 18:34:56.123]   plan:
+[2026-04-11 18:34:56.123]     - item 1:
+[2026-04-11 18:34:56.123]       action: SEARCH
+[2026-04-11 18:34:56.123]       detail: What is 17 * 19?
+[2026-04-11 18:34:56.123] plan step SEARCH detail=What is 17 * 19? (0 ms)
+[2026-04-11 18:34:56.123]   [1] Wikipedia
+[2026-04-11 18:34:56.123]       
+[2026-04-11 18:34:56.123]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:56.123]   
+[2026-04-11 18:34:56.123]   [2] Wikidata
+[2026-04-11 18:34:56.123]       
+[2026-04-11 18:34:56.123]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:56.727] response
+[2026-04-11 18:34:56.727]   response_preview: 17 * 19 = 323
+[2026-04-11 18:34:56.727]   latency_ms: 1273
+[2026-04-11 18:34:56.747] idle metrics
+[2026-04-11 18:34:56.747]   insight_candidates_created: 1
+[2026-04-11 18:34:56.747]   insights_promoted: 0
+[2026-04-11 18:34:56.747]   episodic_decayed: 8
+[2026-04-11 18:34:56.747]   episodic_deleted: 0
+[2026-04-11 18:34:56.747]   research_jobs_processed: 0
+[2026-04-11 18:34:56.747]   research_jobs_completed: 0
+[2026-04-11 18:34:56.747]   research_jobs_failed: 0
+[2026-04-11 18:34:56.748] turn=9 user_prompt=Who wrote Pride and Prejudice?
+[2026-04-11 18:34:57.403] route: intent=web_factual pathway=search_then_reply score=4 confidence=0.9 source=llm
+[2026-04-11 18:34:57.408] context summary
+[2026-04-11 18:34:57.408]   include_web: True
+[2026-04-11 18:34:57.408]   semantic_count: 4
+[2026-04-11 18:34:57.408]   episodic_count: 4
+[2026-04-11 18:34:57.408]   insight_count: 0
+[2026-04-11 18:34:57.408]   pending_feedback_prompt: 
+[2026-04-11 18:34:57.408] planner
+[2026-04-11 18:34:57.408]   thinking: 
+[2026-04-11 18:34:57.408]   plan:
+[2026-04-11 18:34:57.408]     - item 1:
+[2026-04-11 18:34:57.408]       action: SEARCH
+[2026-04-11 18:34:57.408]       detail: Who wrote Pride and Prejudice?
+[2026-04-11 18:34:57.408] plan step SEARCH detail=Who wrote Pride and Prejudice? (0 ms)
+[2026-04-11 18:34:57.408]   [1] Wikipedia
+[2026-04-11 18:34:57.408]       
+[2026-04-11 18:34:57.408]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:57.408]   
+[2026-04-11 18:34:57.408]   [2] Wikidata
+[2026-04-11 18:34:57.408]       
+[2026-04-11 18:34:57.408]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:58.150] response
+[2026-04-11 18:34:58.150]   response_preview: Jane Austen wrote Pride and Prejudice.
+[2026-04-11 18:34:58.150]   latency_ms: 1401
+[2026-04-11 18:34:58.163] turn=10 user_prompt=What is the capital of Japan?
+[2026-04-11 18:34:58.834] route: intent=web_factual pathway=search_then_reply score=4 confidence=0.9 source=llm
+[2026-04-11 18:34:58.839] context summary
+[2026-04-11 18:34:58.839]   include_web: True
+[2026-04-11 18:34:58.839]   semantic_count: 3
+[2026-04-11 18:34:58.839]   episodic_count: 5
+[2026-04-11 18:34:58.839]   insight_count: 0
+[2026-04-11 18:34:58.839]   pending_feedback_prompt: 
+[2026-04-11 18:34:58.839] planner
+[2026-04-11 18:34:58.839]   thinking: 
+[2026-04-11 18:34:58.839]   plan:
+[2026-04-11 18:34:58.839]     - item 1:
+[2026-04-11 18:34:58.839]       action: SEARCH
+[2026-04-11 18:34:58.839]       detail: What is the capital of Japan?
+[2026-04-11 18:34:58.839] plan step SEARCH detail=What is the capital of Japan? (0 ms)
+[2026-04-11 18:34:58.839]   [1] Wikipedia
+[2026-04-11 18:34:58.839]       
+[2026-04-11 18:34:58.839]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:58.839]   
+[2026-04-11 18:34:58.839]   [2] Wikidata
+[2026-04-11 18:34:58.839]       
+[2026-04-11 18:34:58.839]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:34:59.559] response
+[2026-04-11 18:34:59.559]   response_preview: The capital of Japan is Tokyo.
+[2026-04-11 18:34:59.559]   latency_ms: 1396
+[2026-04-11 18:34:59.570] turn=11 user_prompt=Can you explain recursion simply?
+[2026-04-11 18:35:00.210] route: intent=creative_helper pathway=creative_reply score=4 confidence=0.8 source=llm
+[2026-04-11 18:35:00.214] context summary
+[2026-04-11 18:35:00.214]   include_web: True
+[2026-04-11 18:35:00.214]   semantic_count: 2
+[2026-04-11 18:35:00.214]   episodic_count: 5
+[2026-04-11 18:35:00.214]   insight_count: 0
+[2026-04-11 18:35:00.214]   pending_feedback_prompt: 
+[2026-04-11 18:35:00.214] planner
+[2026-04-11 18:35:00.214]   thinking: 
+[2026-04-11 18:35:00.214]   plan:
+[2026-04-11 18:35:00.214]     (empty)
+[2026-04-11 18:35:01.541] response
+[2026-04-11 18:35:01.541]   response_preview: - Recursion is when a function calls itself repeatedly.
+[2026-04-11 18:35:01.541]   - It's used to solve problems by breaking them into smaller, similar subproblems.
+[2026-04-11 18:35:01.541]   - Each recursive call works on a smaller part of the original problem until it reaches a base case, which is a problem that can be solved directly.
+[2026-04-11 18:35:01.541]   - The solution to the original problem is then built from the solutions to the subproblems.
+[2026-04-11 18:35:01.541]   latency_ms: 1970
+[2026-04-11 18:35:01.552] turn=12 user_prompt=Give one Python example of recursion.
+[2026-04-11 18:35:02.189] route: intent=creative_helper pathway=creative_reply score=4 confidence=0.95 source=llm
+[2026-04-11 18:35:02.192] context summary
+[2026-04-11 18:35:02.192]   include_web: True
+[2026-04-11 18:35:02.192]   semantic_count: 2
+[2026-04-11 18:35:02.193]   episodic_count: 4
+[2026-04-11 18:35:02.193]   insight_count: 0
+[2026-04-11 18:35:02.193]   pending_feedback_prompt: 
+[2026-04-11 18:35:02.193] planner
+[2026-04-11 18:35:02.193]   thinking: 
+[2026-04-11 18:35:02.193]   plan:
+[2026-04-11 18:35:02.193]     (empty)
+[2026-04-11 18:35:04.604] response
+[2026-04-11 18:35:04.604]   response_preview: Certainly! Here's a simple Python example of recursion that calculates the factorial of a number:
+[2026-04-11 18:35:04.604]   
+[2026-04-11 18:35:04.604]   ```python
+[2026-04-11 18:35:04.604]   def factorial(n):
+[2026-04-11 18:35:04.604]       if n == 0:
+[2026-04-11 18:35:04.604]           return 1
+[2026-04-11 18:35:04.604]       else:
+[2026-04-11 18:35:04.604]           return n * factorial(n - 1)
+[2026-04-11 18:35:04.604]   
+[2026-04-11 18:35:04.604]   # Example usage
+[2026-04-11 18:35:04.604]   result = factorial(5)
+[2026-04-11 18:35:04.604]   print("The factorial of 5 is:", result)
+[2026-04-11 18:35:04.604]   ```
+[2026-04-11 18:35:04.604]   
+[2026-04-11 18:35:04.604]   In this example:
+[2026-04-11 18:35:04.604]   - The `factorial` function calls itself with a decremented value of `n` until `n` reaches 0.
+[2026-04-11 18:35:04.604]   - When `n` is 0, the function returns 1 (base case).
+[2026-04-11 18:35:04.604]   - The recursive calls then multiply the numbers together to compute the factorial.
+[2026-04-11 18:35:04.604]   latency_ms: 3051
+[2026-04-11 18:35:04.622] idle metrics
+[2026-04-11 18:35:04.622]   insight_candidates_created: 1
+[2026-04-11 18:35:04.622]   insights_promoted: 0
+[2026-04-11 18:35:04.622]   episodic_decayed: 12
+[2026-04-11 18:35:04.622]   episodic_deleted: 0
+[2026-04-11 18:35:04.622]   research_jobs_processed: 0
+[2026-04-11 18:35:04.622]   research_jobs_completed: 0
+[2026-04-11 18:35:04.622]   research_jobs_failed: 0
+[2026-04-11 18:35:04.623] turn=13 user_prompt=I have a meeting Tuesday 14:00, remind me tomorrow morning.
+[2026-04-11 18:35:05.293] route: intent=memory_recall pathway=memory_recall_reply score=4 confidence=0.9 source=llm
+[2026-04-11 18:35:05.297] context summary
+[2026-04-11 18:35:05.297]   include_web: False
+[2026-04-11 18:35:05.297]   semantic_count: 3
+[2026-04-11 18:35:05.297]   episodic_count: 5
+[2026-04-11 18:35:05.297]   insight_count: 0
+[2026-04-11 18:35:05.297]   pending_feedback_prompt: 
+[2026-04-11 18:35:05.297] planner
+[2026-04-11 18:35:05.297]   thinking: 
+[2026-04-11 18:35:05.297]   plan:
+[2026-04-11 18:35:05.297]     (empty)
+[2026-04-11 18:35:06.446] response
+[2026-04-11 18:35:06.446]   response_preview: Sure! Here's a quick reminder for you:
+[2026-04-11 18:35:06.446]   
+[2026-04-11 18:35:06.446]   - **Meeting**: Tuesday at 14:00
+[2026-04-11 18:35:06.446]   - **Reminder**: Set a reminder for tomorrow morning to make sure you don't forget your meeting.
+[2026-04-11 18:35:06.446]   latency_ms: 1822
+[2026-04-11 18:35:06.457] turn=14 user_prompt=Based on my notes, make a compact checklist.
+[2026-04-11 18:35:07.113] route: intent=smalltalk pathway=direct_reply score=4 confidence=0.8 source=llm
+[2026-04-11 18:35:07.117] context summary
+[2026-04-11 18:35:07.117]   include_web: False
+[2026-04-11 18:35:07.117]   semantic_count: 2
+[2026-04-11 18:35:07.117]   episodic_count: 5
+[2026-04-11 18:35:07.117]   insight_count: 0
+[2026-04-11 18:35:07.117]   pending_feedback_prompt: 
+[2026-04-11 18:35:07.117] planner
+[2026-04-11 18:35:07.117]   thinking: 
+[2026-04-11 18:35:07.117]   plan:
+[2026-04-11 18:35:07.117]     (empty)
+[2026-04-11 18:35:08.218] response
+[2026-04-11 18:35:08.218]   response_preview: Sure! Here's a compact checklist based on your notes:
+[2026-04-11 18:35:08.218]   
+[2026-04-11 18:35:08.218]   1. **Bike:** Blue and parked in garage B2.
+[2026-04-11 18:35:08.218]   2. **Meeting:** Tuesday at 14:00.
+[2026-04-11 18:35:08.218]   latency_ms: 1760
+[2026-04-11 18:35:08.229] turn=15 user_prompt=Where is my bike parked?
+[2026-04-11 18:35:08.886] route: intent=memory_recall pathway=memory_recall_reply score=4 confidence=0.8 source=llm
+[2026-04-11 18:35:08.890] context summary
+[2026-04-11 18:35:08.891]   include_web: False
+[2026-04-11 18:35:08.891]   semantic_count: 5
+[2026-04-11 18:35:08.891]   episodic_count: 5
+[2026-04-11 18:35:08.891]   insight_count: 0
+[2026-04-11 18:35:08.891]   pending_feedback_prompt: 
+[2026-04-11 18:35:08.891] planner
+[2026-04-11 18:35:08.891]   thinking: 
+[2026-04-11 18:35:08.891]   plan:
+[2026-04-11 18:35:08.891]     (empty)
+[2026-04-11 18:35:09.465] response
+[2026-04-11 18:35:09.465]   response_preview: Your bike is parked in garage B2.
+[2026-04-11 18:35:09.465]   latency_ms: 1235
+[2026-04-11 18:35:09.478] turn=16 user_prompt=What color is my bike?
+[2026-04-11 18:35:10.136] route: intent=web_factual pathway=search_then_reply score=4 confidence=0.9 source=llm
+[2026-04-11 18:35:10.143] context summary
+[2026-04-11 18:35:10.143]   include_web: True
+[2026-04-11 18:35:10.143]   semantic_count: 5
+[2026-04-11 18:35:10.143]   episodic_count: 5
+[2026-04-11 18:35:10.143]   insight_count: 0
+[2026-04-11 18:35:10.143]   pending_feedback_prompt: 
+[2026-04-11 18:35:10.143] planner
+[2026-04-11 18:35:10.143]   thinking: 
+[2026-04-11 18:35:10.143]   plan:
+[2026-04-11 18:35:10.143]     - item 1:
+[2026-04-11 18:35:10.143]       action: SEARCH
+[2026-04-11 18:35:10.143]       detail: What color is my bike?
+[2026-04-11 18:35:10.143] plan step SEARCH detail=What color is my bike? (0 ms)
+[2026-04-11 18:35:10.143]   [1] Wikipedia
+[2026-04-11 18:35:10.143]       
+[2026-04-11 18:35:10.143]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:10.143]   
+[2026-04-11 18:35:10.143]   [2] Wikidata
+[2026-04-11 18:35:10.143]       
+[2026-04-11 18:35:10.143]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:10.798] response
+[2026-04-11 18:35:10.798]   response_preview: Your bike is blue and parked in garage B2.
+[2026-04-11 18:35:10.798]   latency_ms: 1320
+[2026-04-11 18:35:10.818] idle metrics
+[2026-04-11 18:35:10.818]   insight_candidates_created: 1
+[2026-04-11 18:35:10.818]   insights_promoted: 0
+[2026-04-11 18:35:10.818]   episodic_decayed: 16
+[2026-04-11 18:35:10.819]   episodic_deleted: 0
+[2026-04-11 18:35:10.819]   research_jobs_processed: 0
+[2026-04-11 18:35:10.819]   research_jobs_completed: 0
+[2026-04-11 18:35:10.819]   research_jobs_failed: 0
+[2026-04-11 18:35:10.820] turn=17 user_prompt=What is my name?
+[2026-04-11 18:35:11.454] route: intent=smalltalk pathway=direct_reply score=4 confidence=0.9 source=llm
+[2026-04-11 18:35:11.459] context summary
+[2026-04-11 18:35:11.459]   include_web: False
+[2026-04-11 18:35:11.459]   semantic_count: 5
+[2026-04-11 18:35:11.459]   episodic_count: 5
+[2026-04-11 18:35:11.459]   insight_count: 0
+[2026-04-11 18:35:11.459]   pending_feedback_prompt: 
+[2026-04-11 18:35:11.459] planner
+[2026-04-11 18:35:11.459]   thinking: 
+[2026-04-11 18:35:11.459]   plan:
+[2026-04-11 18:35:11.459]     (empty)
+[2026-04-11 18:35:11.943] response
+[2026-04-11 18:35:11.943]   response_preview: Your name is Mira.
+[2026-04-11 18:35:11.943]   latency_ms: 1122
+[2026-04-11 18:35:11.955] turn=18 user_prompt=Tell me one memory trivia question about what I told you.
+[2026-04-11 18:35:12.614] route: intent=memory_recall pathway=memory_recall_reply score=4 confidence=0.9 source=llm
+[2026-04-11 18:35:12.618] context summary
+[2026-04-11 18:35:12.618]   include_web: False
+[2026-04-11 18:35:12.618]   semantic_count: 5
+[2026-04-11 18:35:12.618]   episodic_count: 5
+[2026-04-11 18:35:12.618]   insight_count: 0
+[2026-04-11 18:35:12.618]   pending_feedback_prompt: 
+[2026-04-11 18:35:12.618] planner
+[2026-04-11 18:35:12.618]   thinking: 
+[2026-04-11 18:35:12.618]   plan:
+[2026-04-11 18:35:12.618]     (empty)
+[2026-04-11 18:35:13.438] response
+[2026-04-11 18:35:13.438]   response_preview: Sure! Here's a memory trivia question about what I told you:
+[2026-04-11 18:35:13.438]   
+[2026-04-11 18:35:13.438]   What color is your bike and where is it parked?
+[2026-04-11 18:35:13.438]   latency_ms: 1482
+[2026-04-11 18:35:13.449] turn=19 user_prompt=Ask me a quick quiz from our conversation.
+[2026-04-11 18:35:14.081] route: intent=creative_helper pathway=creative_reply score=4 confidence=0.8 source=llm
+[2026-04-11 18:35:14.086] context summary
+[2026-04-11 18:35:14.086]   include_web: True
+[2026-04-11 18:35:14.086]   semantic_count: 4
+[2026-04-11 18:35:14.086]   episodic_count: 5
+[2026-04-11 18:35:14.086]   insight_count: 0
+[2026-04-11 18:35:14.086]   pending_feedback_prompt: 
+[2026-04-11 18:35:14.086] planner
+[2026-04-11 18:35:14.086]   thinking: 
+[2026-04-11 18:35:14.086]   plan:
+[2026-04-11 18:35:14.086]     (empty)
+[2026-04-11 18:35:15.409] response
+[2026-04-11 18:35:15.409]   response_preview: Sure! Here's a quick quiz based on our conversation:
+[2026-04-11 18:35:15.409]   
+[2026-04-11 18:35:15.409]   1. What is the 3-step morning routine for focus?
+[2026-04-11 18:35:15.409]   2. What is the time of your meeting on Tuesday?
+[2026-04-11 18:35:15.409]   3. What color is your bike, and where is it parked?
+[2026-04-11 18:35:15.409]   latency_ms: 1960
+[2026-04-11 18:35:15.421] turn=20 user_prompt=Now answer that quiz yourself briefly.
+[2026-04-11 18:35:16.063] route: intent=smalltalk pathway=direct_reply score=5 confidence=1.0 source=llm
+[2026-04-11 18:35:16.067] context summary
+[2026-04-11 18:35:16.067]   include_web: False
+[2026-04-11 18:35:16.067]   semantic_count: 1
+[2026-04-11 18:35:16.067]   episodic_count: 5
+[2026-04-11 18:35:16.067]   insight_count: 0
+[2026-04-11 18:35:16.067]   pending_feedback_prompt: 
+[2026-04-11 18:35:16.067] planner
+[2026-04-11 18:35:16.067]   thinking: 
+[2026-04-11 18:35:16.067]   plan:
+[2026-04-11 18:35:16.067]     (empty)
+[2026-04-11 18:35:18.599] response
+[2026-04-11 18:35:18.599]   response_preview: Sure! Here are the answers to the quiz based on our conversation:
+[2026-04-11 18:35:18.599]   
+[2026-04-11 18:35:18.599]   1. **What is the 3-step morning routine for focus?**
+[2026-04-11 18:35:18.599]      - Mindfulness and Breathing: 5-10 minutes of focused breathing exercises.
+[2026-04-11 18:35:18.599]      - Physical Activity: 5-minute jog, stretching, or push-ups.
+[2026-04-11 18:35:18.599]      - Scheduled Tasks: Specific time for emails, social media, etc.
+[2026-04-11 18:35:18.599]   
+[2026-04-11 18:35:18.599]   2. **What is the time of your meeting on Tuesday?**
+[2026-04-11 18:35:18.599]      - No specific time provided in the conversation.
+[2026-04-11 18:35:18.599]   
+[2026-04-11 18:35:18.599]   3. **What color is your bike, and where is it parked?**
+[2026-04-11 18:35:18.599]      - No specific color or parking location provided in the conversation.
+[2026-04-11 18:35:18.599]   latency_ms: 3178
+[2026-04-11 18:35:18.618] idle metrics
+[2026-04-11 18:35:18.618]   insight_candidates_created: 1
+[2026-04-11 18:35:18.618]   insights_promoted: 0
+[2026-04-11 18:35:18.618]   episodic_decayed: 20
+[2026-04-11 18:35:18.618]   episodic_deleted: 0
+[2026-04-11 18:35:18.618]   research_jobs_processed: 0
+[2026-04-11 18:35:18.618]   research_jobs_completed: 0
+[2026-04-11 18:35:18.618]   research_jobs_failed: 0
+[2026-04-11 18:35:18.619] turn=21 user_prompt=List files in current directory and explain the command.
+[2026-04-11 18:35:18.619] route: intent=tool_command pathway=tool_then_reply score=2 confidence=0.75 source=rules
+[2026-04-11 18:35:18.624] context summary
+[2026-04-11 18:35:18.624]   include_web: True
+[2026-04-11 18:35:18.624]   semantic_count: 5
+[2026-04-11 18:35:18.624]   episodic_count: 5
+[2026-04-11 18:35:18.624]   insight_count: 0
+[2026-04-11 18:35:18.624]   pending_feedback_prompt: 
+[2026-04-11 18:35:18.624] planner
+[2026-04-11 18:35:18.624]   thinking: 
+[2026-04-11 18:35:18.624]   plan:
+[2026-04-11 18:35:18.624]     - item 1:
+[2026-04-11 18:35:18.624]       action: TOOL
+[2026-04-11 18:35:18.624]       detail: bash
+[2026-04-11 18:35:18.624] plan step TOOL detail=bash (0 ms)
+[2026-04-11 18:35:18.624]   file1.txt
+[2026-04-11 18:35:18.624]   hidden_folder
+[2026-04-11 18:35:18.624]   system_log.csv
+[2026-04-11 18:35:20.689] response
+[2026-04-11 18:35:20.689]   response_preview: To list files in the current directory, you can use the `ls` command in bash. Here’s how you can do it:
+[2026-04-11 18:35:20.689]   
+[2026-04-11 18:35:20.689]   ```bash
+[2026-04-11 18:35:20.689]   ls
+[2026-04-11 18:35:20.689]   ```
+[2026-04-11 18:35:20.689]   
+[2026-04-11 18:35:20.689]   This command will display all files and directories in the current working directory. If you want to see hidden files as well, you can use:
+[2026-04-11 18:35:20.689]   
+[2026-04-11 18:35:20.689]   ```bash
+[2026-04-11 18:35:20.689]   ls -a
+[2026-04-11 18:35:20.689]   ```
+[2026-04-11 18:35:20.689]   
+[2026-04-11 18:35:20.689]   This will list all files, including those starting with a dot (.), which are hidden on Unix-like systems.
+[2026-04-11 18:35:20.689]   latency_ms: 2069
+[2026-04-11 18:35:20.702] turn=22 user_prompt=deep research: compare sqlite vs postgres for small local-first assistants
+[2026-04-11 18:35:20.702] route: intent=research_deep_crawl pathway=research_deep_crawl score=3 confidence=0.9500000000000001 source=rules
+[2026-04-11 18:35:20.708] context summary
+[2026-04-11 18:35:20.708]   include_web: True
+[2026-04-11 18:35:20.708]   semantic_count: 1
+[2026-04-11 18:35:20.708]   episodic_count: 5
+[2026-04-11 18:35:20.708]   insight_count: 0
+[2026-04-11 18:35:20.708]   pending_feedback_prompt: 
+[2026-04-11 18:35:22.713] planner
+[2026-04-11 18:35:22.713]   thinking: Compare features, performance, and use cases of SQLite and PostgreSQL for small local-first assistants.
+[2026-04-11 18:35:22.713]   plan:
+[2026-04-11 18:35:22.713]     - item 1:
+[2026-04-11 18:35:22.713]       action: SEARCH
+[2026-04-11 18:35:22.713]       detail: SQLite vs PostgreSQL comparison
+[2026-04-11 18:35:22.713]     - item 2:
+[2026-04-11 18:35:22.713]       action: SEARCH
+[2026-04-11 18:35:22.713]       detail: use cases for SQLite
+[2026-04-11 18:35:22.713]     - item 3:
+[2026-04-11 18:35:22.713]       action: SEARCH
+[2026-04-11 18:35:22.713]       detail: use cases for PostgreSQL
+[2026-04-11 18:35:22.714]     - item 4:
+[2026-04-11 18:35:22.714]       action: TOOL
+[2026-04-11 18:35:22.714]       detail: bash
+[2026-04-11 18:35:22.714] plan step SEARCH detail=SQLite vs PostgreSQL comparison (0 ms)
+[2026-04-11 18:35:22.714]   [1] Wikipedia
+[2026-04-11 18:35:22.714]       
+[2026-04-11 18:35:22.714]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:22.714]   
+[2026-04-11 18:35:22.714]   [2] Wikidata
+[2026-04-11 18:35:22.714]       
+[2026-04-11 18:35:22.714]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:22.714] plan step SEARCH detail=use cases for SQLite (0 ms)
+[2026-04-11 18:35:22.714]   [1] Wikipedia
+[2026-04-11 18:35:22.714]       
+[2026-04-11 18:35:22.714]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:22.714]   
+[2026-04-11 18:35:22.714]   [2] Wikidata
+[2026-04-11 18:35:22.714]       
+[2026-04-11 18:35:22.714]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:22.714] plan step SEARCH detail=use cases for PostgreSQL (0 ms)
+[2026-04-11 18:35:22.714]   [1] Wikipedia
+[2026-04-11 18:35:22.714]       
+[2026-04-11 18:35:22.714]       Wikipedia lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:22.714]   
+[2026-04-11 18:35:22.714]   [2] Wikidata
+[2026-04-11 18:35:22.714]       
+[2026-04-11 18:35:22.714]       Wikidata lookup skipped due to recent rate limit cooldown.
+[2026-04-11 18:35:22.714] plan step TOOL detail=bash (0 ms)
+[2026-04-11 18:35:22.714]   Simulated output for: deep research: compare sqlite vs postgres for small local-first assistants
+[2026-04-11 18:35:25.029] idle metrics
+[2026-04-11 18:35:25.029]   insight_candidates_created: 1
+[2026-04-11 18:35:25.029]   insights_promoted: 0
+[2026-04-11 18:35:25.029]   episodic_decayed: 21
+[2026-04-11 18:35:25.029]   episodic_deleted: 0
+[2026-04-11 18:35:25.029]   research_jobs_processed: 0
+[2026-04-11 18:35:25.029]   research_jobs_completed: 0
+[2026-04-11 18:35:25.029]   research_jobs_failed: 0
+[2026-04-11 18:35:25.535] idle metrics
+[2026-04-11 18:35:25.535]   insight_candidates_created: 0
+[2026-04-11 18:35:25.535]   insights_promoted: 0
+[2026-04-11 18:35:25.535]   episodic_decayed: 21
+[2026-04-11 18:35:25.535]   episodic_deleted: 0
+[2026-04-11 18:35:25.535]   research_jobs_processed: 0
+[2026-04-11 18:35:25.535]   research_jobs_completed: 0
+[2026-04-11 18:35:25.535]   research_jobs_failed: 0
+[2026-04-11 18:35:26.040] idle metrics
+[2026-04-11 18:35:26.040]   insight_candidates_created: 0
+[2026-04-11 18:35:26.040]   insights_promoted: 0
+[2026-04-11 18:35:26.040]   episodic_decayed: 21
+[2026-04-11 18:35:26.040]   episodic_deleted: 0
+[2026-04-11 18:35:26.040]   research_jobs_processed: 0
+[2026-04-11 18:35:26.040]   research_jobs_completed: 0
+[2026-04-11 18:35:26.040]   research_jobs_failed: 0
+[2026-04-11 18:35:26.546] idle metrics
+[2026-04-11 18:35:26.546]   insight_candidates_created: 0
+[2026-04-11 18:35:26.546]   insights_promoted: 0
+[2026-04-11 18:35:26.546]   episodic_decayed: 21
+[2026-04-11 18:35:26.546]   episodic_deleted: 0
+[2026-04-11 18:35:26.546]   research_jobs_processed: 0
+[2026-04-11 18:35:26.546]   research_jobs_completed: 0
+[2026-04-11 18:35:26.546]   research_jobs_failed: 0
+[2026-04-11 18:35:27.053] idle metrics
+[2026-04-11 18:35:27.053]   insight_candidates_created: 0
+[2026-04-11 18:35:27.053]   insights_promoted: 0
+[2026-04-11 18:35:27.053]   episodic_decayed: 21
+[2026-04-11 18:35:27.053]   episodic_deleted: 0
+[2026-04-11 18:35:27.053]   research_jobs_processed: 0
+[2026-04-11 18:35:27.053]   research_jobs_completed: 0
+[2026-04-11 18:35:27.053]   research_jobs_failed: 0
+[2026-04-11 18:35:27.559] idle metrics
+[2026-04-11 18:35:27.559]   insight_candidates_created: 0
+[2026-04-11 18:35:27.559]   insights_promoted: 0
+[2026-04-11 18:35:27.559]   episodic_decayed: 21
+[2026-04-11 18:35:27.559]   episodic_deleted: 0
+[2026-04-11 18:35:27.559]   research_jobs_processed: 0
+[2026-04-11 18:35:27.559]   research_jobs_completed: 0
+[2026-04-11 18:35:27.559]   research_jobs_failed: 0
+[2026-04-11 18:35:28.065] idle metrics
+[2026-04-11 18:35:28.065]   insight_candidates_created: 0
+[2026-04-11 18:35:28.065]   insights_promoted: 0
+[2026-04-11 18:35:28.065]   episodic_decayed: 21
+[2026-04-11 18:35:28.065]   episodic_deleted: 0
+[2026-04-11 18:35:28.065]   research_jobs_processed: 0
+[2026-04-11 18:35:28.065]   research_jobs_completed: 0
+[2026-04-11 18:35:28.065]   research_jobs_failed: 0
+[2026-04-11 18:35:28.571] idle metrics
+[2026-04-11 18:35:28.571]   insight_candidates_created: 0
+[2026-04-11 18:35:28.571]   insights_promoted: 0
+[2026-04-11 18:35:28.572]   episodic_decayed: 21
+[2026-04-11 18:35:28.572]   episodic_deleted: 0
+[2026-04-11 18:35:28.572]   research_jobs_processed: 0
+[2026-04-11 18:35:28.572]   research_jobs_completed: 0
+[2026-04-11 18:35:28.572]   research_jobs_failed: 0
+[2026-04-11 18:35:29.077] idle metrics
+[2026-04-11 18:35:29.077]   insight_candidates_created: 0
+[2026-04-11 18:35:29.077]   insights_promoted: 0
+[2026-04-11 18:35:29.077]   episodic_decayed: 21
+[2026-04-11 18:35:29.077]   episodic_deleted: 0
+[2026-04-11 18:35:29.077]   research_jobs_processed: 0
+[2026-04-11 18:35:29.077]   research_jobs_completed: 0
+[2026-04-11 18:35:29.077]   research_jobs_failed: 0
+[2026-04-11 18:35:29.583] idle metrics
+[2026-04-11 18:35:29.583]   insight_candidates_created: 0
+[2026-04-11 18:35:29.583]   insights_promoted: 0
+[2026-04-11 18:35:29.583]   episodic_decayed: 21
+[2026-04-11 18:35:29.583]   episodic_deleted: 0
+[2026-04-11 18:35:29.583]   research_jobs_processed: 0
+[2026-04-11 18:35:29.583]   research_jobs_completed: 0
+[2026-04-11 18:35:29.583]   research_jobs_failed: 0
+[2026-04-11 18:35:30.089] idle metrics
+[2026-04-11 18:35:30.089]   insight_candidates_created: 0
+[2026-04-11 18:35:30.089]   insights_promoted: 0
+[2026-04-11 18:35:30.089]   episodic_decayed: 21
+[2026-04-11 18:35:30.089]   episodic_deleted: 0
+[2026-04-11 18:35:30.089]   research_jobs_processed: 0
+[2026-04-11 18:35:30.089]   research_jobs_completed: 0
+[2026-04-11 18:35:30.089]   research_jobs_failed: 0
+[2026-04-11 18:35:30.595] idle metrics
+[2026-04-11 18:35:30.595]   insight_candidates_created: 0
+[2026-04-11 18:35:30.595]   insights_promoted: 0
+[2026-04-11 18:35:30.595]   episodic_decayed: 21
+[2026-04-11 18:35:30.595]   episodic_deleted: 0
+[2026-04-11 18:35:30.595]   research_jobs_processed: 0
+[2026-04-11 18:35:30.595]   research_jobs_completed: 0
+[2026-04-11 18:35:30.595]   research_jobs_failed: 0
+[2026-04-11 18:35:30.646] response
+[2026-04-11 18:35:30.646]   response_preview: ### Comparison of SQLite vs PostgreSQL for Small Local-First Assistants
+[2026-04-11 18:35:30.646]   
+[2026-04-11 18:35:30.646]   #### Overview
+[2026-04-11 18:35:30.646]   Both SQLite and PostgreSQL are popular database management systems (DBMS) that can be used in small local-first assistant applications. Here’s a detailed comparison to help you decide which one is better suited for your needs.
+[2026-04-11 18:35:30.646]   
+[2026-04-11 18:35:30.646]   #### SQLite
+[2026-04-11 18:35:30.646]   
+[2026-04-11 18:35:30.646]   **Pros:**
+[2026-04-11 18:35:30.646]   1. **Lightweight and Portable:**
+[2026-04-11 18:35:30.646]      - SQLite is a self-contained, file-based database that doesn’t require a separate server process.
+[2026-04-11 18:35:30.646]      - It’s very lightweight and easy to deploy, making it ideal for small applications.
+[2026-04-11 18:35:30.646]   
+[2026-04-11 18:35:30.646]   2. **Embedded and Simple:**
+[2026-04-11 18:35:30.646]      - SQLite is embeddable into applications directly, which simplifies integration and reduces dependencies.
+[2026-04-11 18:35:30.646]      - It’s straightforward to use and doesn’t require complex setup procedures.
+[2026-04-11 18:35:30.646]   
+[2026-04-11 18:35:30.646]   3. **Performance:**
+[2026-04-11 18:35:30.646]      - SQLite is designed for small to medium-sized applications and performs well with small datasets.
+[2026-04-11 18:35:30.646]      - It’s highly optimized for disk I/O operations, which is beneficial for local storage.
+[2026-04-11 18:35:30.646]   
+[2026-04-11 18:35:30.646]   **Cons:**
+[2026-04-11 18:35:30.646]   1. **Scalability:**
+[2026-04-11 18:35:30.646]      - SQLite is not designed for large-scale applications or high concurrency.
+[2026-04-11 18:35:30.646]      - It may not be suitable for applications with high write loads or large datasets.
+[2026-04-11 18:35:30.646]   
+[2026-04-11 18:35:30.646]   2. **Security:**
+[2026-04-11 18:35:30.646]      - SQLite has a reputation for being less secure compared to more robust DBMSs.
+[2026-04-11 18:35:30.646]      - It lacks some advanced security features that are essential for larger applications.
+[2026-04-11 18:35:30.646]   
+[2026-04-11 18:35:30.646]   3. **Complexity:**
+[2026-04-11 18:35:30.646]      - SQLite’s API is simpler but lacks some advanced features that may be necessary for complex applications.
+[2026-04-11 18:35:30.646]      - It doesn’t support some advanced SQL features that PostgreSQL offers.
+[2026-04-11 18:35:30.646]   
+[2026-04-11 18:35:30.646]   #### PostgreSQL
+[2026-04-11 18:35:30.646]   
+[2026-04-11 18:35:30.646]   **
+[2026-04-11 18:35:30.646]   latency_ms: 9944
+[2026-04-11 18:35:30.658] turn=23 user_prompt=/research-status
+[2026-04-11 18:35:30.658] command /research-status
+[2026-04-11 18:35:30.658]   counts:
+[2026-04-11 18:35:30.658]     (empty)
+[2026-04-11 18:35:30.658]   jobs:
+[2026-04-11 18:35:30.658]     (empty)
+[2026-04-11 18:35:30.660] turn=24 user_prompt=/brain status
+[2026-04-11 18:35:30.660] command /brain status
+[2026-04-11 18:35:30.660]   === Memory Status ===
+[2026-04-11 18:35:30.660]   Episodic events: 22
+[2026-04-11 18:35:30.660]   Semantic facts: 25
+[2026-04-11 18:35:30.660]   Promoted insights: 0
+[2026-04-11 18:35:30.660]   Pending insight feedback: 6
+[2026-04-11 18:35:30.661] turn=25 user_prompt=/brain full
+[2026-04-11 18:35:30.662] command /brain full
+[2026-04-11 18:35:30.662]   === Full Memory ===
+[2026-04-11 18:35:30.662]   
+[2026-04-11 18:35:30.662]   Status: {'episodic_count': 22, 'semantic_count': 25, 'insight_count': 0, 'pending_feedback_count': 6}
+[2026-04-11 18:35:30.662]   
+[2026-04-11 18:35:30.662]   --- Semantic ---
+[2026-04-11 18:35:30.662]   
+[2026-04-11 18:35:30.662]   
+[2026-04-11 18:35:30.662]   --- Episodic ---
+[2026-04-11 18:35:30.662] turn=26 user_prompt=/ask
+[2026-04-11 18:35:30.666] command /ask
+[2026-04-11 18:35:30.666]   prompt: Quick memory check: should I keep this insight — "Now answer that quiz yourself briefly. Ask me quick quiz from our conversation"?
+[2026-04-11 18:35:30.666]   insight_id: 60
+[2026-04-11 18:35:30.666] turn=27 user_prompt=/idle
+[2026-04-11 18:35:30.673] idle metrics
+[2026-04-11 18:35:30.673]   insight_candidates_created: 1
+[2026-04-11 18:35:30.673]   insights_promoted: 0
+[2026-04-11 18:35:30.673]   episodic_decayed: 22
+[2026-04-11 18:35:30.673]   episodic_deleted: 0
+[2026-04-11 18:35:30.673]   research_jobs_processed: 0
+[2026-04-11 18:35:30.673]   research_jobs_completed: 0
+[2026-04-11 18:35:30.673]   research_jobs_failed: 0
+[2026-04-11 18:35:30.674] command /idle
+[2026-04-11 18:35:30.674]   status:
+[2026-04-11 18:35:30.674]     episodic_count: 22
+[2026-04-11 18:35:30.674]     semantic_count: 25
+[2026-04-11 18:35:30.674]     insight_count: 0
+[2026-04-11 18:35:30.674]     pending_feedback_count: 7
+[2026-04-11 18:35:30.674]   metrics:
+[2026-04-11 18:35:30.674]     insight_candidates_created: 1
+[2026-04-11 18:35:30.674]     insights_promoted: 0
+[2026-04-11 18:35:30.674]     episodic_decayed: 22
+[2026-04-11 18:35:30.674]     episodic_deleted: 0
+[2026-04-11 18:35:30.674]     research_jobs_processed: 0
+[2026-04-11 18:35:30.674]     research_jobs_completed: 0
+[2026-04-11 18:35:30.674]     research_jobs_failed: 0
+[2026-04-11 18:35:30.675] turn=28 user_prompt=Summarize everything in 5 bullets.
+[2026-04-11 18:35:31.355] route: intent=smalltalk pathway=direct_reply score=4 confidence=0.8 source=llm
+[2026-04-11 18:35:31.361] context summary
+[2026-04-11 18:35:31.361]   include_web: False
+[2026-04-11 18:35:31.361]   semantic_count: 5
+[2026-04-11 18:35:31.361]   episodic_count: 5
+[2026-04-11 18:35:31.361]   insight_count: 0
+[2026-04-11 18:35:31.361]   pending_feedback_prompt: 
+[2026-04-11 18:35:31.361] planner
+[2026-04-11 18:35:31.361]   thinking: 
+[2026-04-11 18:35:31.361]   plan:
+[2026-04-11 18:35:31.361]     (empty)
+[2026-04-11 18:35:33.804] response
+[2026-04-11 18:35:33.804]   response_preview: - **Your Bike:** Blue and parked in garage B2.
+[2026-04-11 18:35:33.804]   - **Morning Routine:** 5-10 minutes of focused breathing, quick physical activity, and specific time for emails/social media.
+[2026-04-11 18:35:33.804]   - **Quiz Answers:** 1. Mindfulness and Breathing, Physical Activity, Scheduled Tasks. 2. No specific time for meeting on Tuesday. 3. No specific color or parking location for the bike.
+[2026-04-11 18:35:33.804]   - **Python Example:** Recursive function to calculate the factorial of a number.
+[2026-04-11 18:35:33.804]   - **RAM vs Storage:** RAM for temporary, quick access data; Storage for long-term data.
+[2026-04-11 18:35:33.804]   latency_ms: 3129
+[2026-04-11 18:35:33.828] idle metrics
+[2026-04-11 18:35:33.828]   insight_candidates_created: 1
+[2026-04-11 18:35:33.828]   insights_promoted: 0
+[2026-04-11 18:35:33.828]   episodic_decayed: 23
+[2026-04-11 18:35:33.828]   episodic_deleted: 0
+[2026-04-11 18:35:33.828]   research_jobs_processed: 0
+[2026-04-11 18:35:33.828]   research_jobs_completed: 0
+[2026-04-11 18:35:33.828]   research_jobs_failed: 0
+[2026-04-11 18:35:33.830] turn=29 user_prompt=If I forget, where is my bike?
+[2026-04-11 18:35:34.503] route: intent=memory_recall pathway=memory_recall_reply score=4 confidence=0.9 source=llm
+[2026-04-11 18:35:34.509] context summary
+[2026-04-11 18:35:34.509]   include_web: False
+[2026-04-11 18:35:34.509]   semantic_count: 5
+[2026-04-11 18:35:34.509]   episodic_count: 5
+[2026-04-11 18:35:34.509]   insight_count: 0
+[2026-04-11 18:35:34.509]   pending_feedback_prompt: 
+[2026-04-11 18:35:34.509] planner
+[2026-04-11 18:35:34.509]   thinking: 
+[2026-04-11 18:35:34.509]   plan:
+[2026-04-11 18:35:34.509]     (empty)
+[2026-04-11 18:35:35.104] response
+[2026-04-11 18:35:35.104]   response_preview: Your bike is parked in garage B2.
+[2026-04-11 18:35:35.104]   latency_ms: 1274
+[2026-04-11 18:35:35.117] turn=30 user_prompt=/delete
+[2026-04-11 18:35:35.132] command /delete
+[2026-04-11 18:35:35.132]   All memory databases cleared (episodic, semantic, insight, jobs).
+[2026-04-11 18:35:35.133] turn=31 user_prompt=What do you remember about my bike now?
+[2026-04-11 18:35:35.772] route: intent=memory_recall pathway=memory_recall_reply score=4 confidence=0.9 source=llm
+[2026-04-11 18:35:35.773] context summary
+[2026-04-11 18:35:35.773]   include_web: False
+[2026-04-11 18:35:35.773]   semantic_count: 0
+[2026-04-11 18:35:35.773]   episodic_count: 0
+[2026-04-11 18:35:35.773]   insight_count: 0
+[2026-04-11 18:35:35.773]   pending_feedback_prompt: 
+[2026-04-11 18:35:35.773] planner
+[2026-04-11 18:35:35.774]   thinking: 
+[2026-04-11 18:35:35.774]   plan:
+[2026-04-11 18:35:35.774]     (empty)
+[2026-04-11 18:35:36.223] response
+[2026-04-11 18:35:36.223]   response_preview: I don't have any specific information about your bike from previous conversations. How can I assist you with it today?
+[2026-04-11 18:35:36.223]   latency_ms: 1089
+[2026-04-11 18:35:36.234] turn=32 user_prompt=/brain status
+[2026-04-11 18:35:36.235] command /brain status
+[2026-04-11 18:35:36.235]   === Memory Status ===
+[2026-04-11 18:35:36.235]   Episodic events: 1
+[2026-04-11 18:35:36.235]   Semantic facts: 1
+[2026-04-11 18:35:36.235]   Promoted insights: 0
+[2026-04-11 18:35:36.235]   Pending insight feedback: 0
+[2026-04-11 18:35:36.236] turn=33 user_prompt=thanks
+[2026-04-11 18:35:36.236] route: intent=smalltalk pathway=direct_reply score=3 confidence=0.9500000000000001 source=rules
+[2026-04-11 18:35:36.237] context summary
+[2026-04-11 18:35:36.237]   include_web: False
+[2026-04-11 18:35:36.237]   semantic_count: 0
+[2026-04-11 18:35:36.237]   episodic_count: 0
+[2026-04-11 18:35:36.237]   insight_count: 0
+[2026-04-11 18:35:36.237]   pending_feedback_prompt: 
+[2026-04-11 18:35:36.237] planner
+[2026-04-11 18:35:36.237]   thinking: 
+[2026-04-11 18:35:36.237]   plan:
+[2026-04-11 18:35:36.237]     (empty)
+[2026-04-11 18:35:36.420] response
+[2026-04-11 18:35:36.420]   response_preview: You're welcome! How can I assist you today?
+[2026-04-11 18:35:36.420]   latency_ms: 183
+[2026-04-11 18:35:36.431] turn=34 user_prompt=exit
+[2026-04-11 18:35:36.433] FINAL BRAIN DUMP
+[2026-04-11 18:35:36.433]   === Brain Dump ===
+[2026-04-11 18:35:36.433]   Status: {'episodic_count': 2, 'semantic_count': 1, 'insight_count': 0, 'pending_feedback_count': 0}
+[2026-04-11 18:35:36.433]   
+[2026-04-11 18:35:36.433]   --- Semantic Memory ---
+[2026-04-11 18:35:36.433]   [259] conf=0.55 prov=1 :: What do you remember about my bike now
+[2026-04-11 18:35:36.433]   
+[2026-04-11 18:35:36.433]   --- Episodic Memory ---
+[2026-04-11 18:35:36.433]   [103] strength=0.20 recalls=0 exp=1776522936 :: thanks -> You're welcome! How can I assist you today?
+[2026-04-11 18:35:36.433]   [102] strength=0.20 recalls=0 exp=1776522936 :: What do you remember about my bike now? -> I don't have any specific information about your bike from previous conversations. How can I assist you with i
+[2026-04-11 18:35:36.433]   
+[2026-04-11 18:35:36.433]   --- Insight LTM ---
+[2026-04-11 18:35:36.433]   (empty)
+[2026-04-11 18:35:36.433]   
+[2026-04-11 18:35:36.433]   --- Jobs ---
+[2026-04-11 18:35:36.433]   (empty)
