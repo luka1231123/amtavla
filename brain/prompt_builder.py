@@ -16,6 +16,7 @@ class PromptBuilder:
         "search_then_reply": ("skills/web_search.md",),
         "remember_reply": ("skills/memory_ops.md",),
         "memory_recall_reply": ("skills/memory_ops.md",),
+        "creative_reply": ("skills/creative.md",),
     }
 
     def __init__(

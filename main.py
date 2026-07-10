@@ -1,27 +1,42 @@
 import asyncio
 import logging
-import re
 import sys
+import time
 
 sys.path.insert(0, ".")
 
 import llama_client
 import socketio
+from brain.action_runner import ActionRunner
 from brain.config import load_brain_config
+from brain.health import HealthReporter, render_health
 from brain.intent_router import IntentRouter
 from brain.memory_controller import MemoryController
-from brain.planner import generate_plan
-from generator import generate_response
+from brain.orchestrator import TurnOrchestrator
+from brain.planner import Planner
+from generator import ResponseGenerator
 from logging_setup import configure_logging
-from tools.websearch import tool_websearch
 
 configure_logging()
 logger = logging.getLogger("amtavla.main")
 CONFIG = load_brain_config()
 MEMORY = MemoryController()
 ROUTER = IntentRouter(CONFIG)
-REALTIME_URL = "http://127.0.0.1:8081"
+ACTION_RUNNER = ActionRunner(memory_client=MEMORY)
+HEALTH = HealthReporter(MEMORY, search_client=ACTION_RUNNER.search_client)
+ORCHESTRATOR = TurnOrchestrator(
+    router=ROUTER,
+    memory=MEMORY,
+    planner=Planner(
+        max_steps=int(CONFIG.get("routing", {}).get("max_plan_steps", 5))
+    ),
+    action_runner=ACTION_RUNNER,
+    response_generator=ResponseGenerator(),
+    health_reporter=HEALTH,
+    config=CONFIG,
+)
 
+REALTIME_URL = "http://127.0.0.1:8081"
 SIO_CLIENT = None
 ASYNC_LOOP = None
 
@@ -60,225 +75,54 @@ def _clip_text(value, max_chars: int = 3000):
     return text[:max_chars] + "... [truncated]"
 
 
-def _build_debug_payload(event_type: str, payload: dict) -> dict:
-    summary = ""
+def _build_debug_payload(event_type: str, event: dict) -> dict:
+    inputs = event.get("inputs", {})
+    outputs = event.get("outputs", {})
+    summary = event_type.replace("_", " ").title()
     if event_type == "user_prompt":
-        summary = f"User prompt: {_clip_text(payload.get('prompt', ''), 100)}"
+        summary = f"User prompt: {_clip_text(inputs.get('text', ''), 100)}"
     elif event_type == "intent_decision":
         summary = (
-            f"Intent={payload.get('intent')} pathway={payload.get('pathway')} "
-            f"confidence={payload.get('confidence', 0):.2f}"
+            f"Intent={outputs.get('intent')} pathway={outputs.get('pathway')} "
+            f"confidence={outputs.get('confidence', 0):.2f}"
         )
     elif event_type == "route_pathway":
-        summary = f"Routing pathway: {payload.get('pathway')} ({payload.get('intent')})"
+        summary = (
+            f"Routing pathway: {outputs.get('pathway')} ({outputs.get('intent')})"
+        )
     elif event_type == "context":
-        summary = "Recall context prepared (semantic+episodic+insights+web)."
+        summary = (
+            "Context prepared: "
+            f"{outputs.get('semantic_count', 0)} facts, "
+            f"{outputs.get('episodic_count', 0)} episodes, "
+            f"{outputs.get('insight_count', 0)} insights"
+        )
     elif event_type == "plan":
-        summary = f"Plan built with {len(payload.get('steps', []))} steps."
-    elif event_type == "plan_result":
-        summary = f"Executed {payload.get('action')} step."
+        summary = f"Plan built with {len(outputs.get('actions', []))} actions."
+    elif event_type == "action_result":
+        summary = (
+            f"{outputs.get('action')} "
+            f"{'completed' if outputs.get('ok') else 'failed'}."
+        )
     elif event_type == "assistant_response":
         summary = "Assistant response generated."
+    elif event_type == "health":
+        summary = "Model, search, and embedding health checked."
 
     return {
         "type": event_type,
         "payload": {
             "summary": summary,
-            "data": payload,
+            "data": event,
         },
     }
 
 
-def _send_debug_event(event_type: str, payload: dict):
-    _dispatch_socket_emit("debug_event", _build_debug_payload(event_type, payload))
+def _send_debug_event(event_type: str, event: dict):
+    _dispatch_socket_emit("debug_event", _build_debug_payload(event_type, event))
 
 
-def _compress_search_result(query: str, raw: str) -> str:
-    max_chars = int(CONFIG.get("routing", {}).get("max_search_chars", 2200))
-    if not raw:
-        return ""
-
-    blocks = [b.strip() for b in raw.split("\n\n") if b.strip()]
-    if not blocks:
-        return _clip_text(raw, max_chars)
-
-    query_tokens = set(re.findall(r"[a-z0-9]+", query.lower()))
-    ranked = []
-    for block in blocks:
-        lower = block.lower()
-        score = 0
-        for token in query_tokens:
-            if token and token in lower:
-                score += 1
-        ranked.append((score, block))
-
-    ranked.sort(key=lambda item: item[0], reverse=True)
-    selected = [item[1] for item in ranked[:3]]
-
-    lines = []
-    for idx, block in enumerate(selected, 1):
-        block_lines = [line.strip() for line in block.splitlines() if line.strip()]
-        title = block_lines[0] if block_lines else f"Result {idx}"
-        url = block_lines[1] if len(block_lines) > 1 else ""
-        snippet = block_lines[2] if len(block_lines) > 2 else ""
-        line = f"[{idx}] {title}"
-        if url:
-            line += f"\n    {url}"
-        if snippet:
-            line += f"\n    {snippet[:260]}"
-        lines.append(line)
-
-    compressed = "\n\n".join(lines)
-    return _clip_text(compressed, max_chars)
-
-
-def _is_short_ack_or_smalltalk(text: str) -> bool:
-    tokens = re.findall(r"[a-z0-9']+", (text or "").lower())
-    if len(tokens) <= 2:
-        ack = {
-            "hi",
-            "hiya",
-            "hey",
-            "yo",
-            "hello",
-            "sup",
-            "wazzup",
-            "ok",
-            "okay",
-            "no",
-            "yes",
-            "thanks",
-            "thx",
-        }
-        return all(t in ack for t in tokens) if tokens else True
-    return False
-
-
-def execute_plan_step(
-    action: str,
-    detail: str,
-    user_input: str,
-    memory_text: str,
-    search_cache: dict | None = None,
-) -> tuple[str, str, str]:
-    del memory_text
-    if action == "SEARCH":
-        query = detail.strip() or user_input
-        raw = tool_websearch(query, cache=search_cache)
-        result = _compress_search_result(query, raw)
-        return action, query, result
-    if action == "THINK":
-        return action, detail, ""
-    return action, detail, ""
-
-
-async def _run_plan_steps(
-    plan: list[tuple[str, str]],
-    user_input: str,
-    context_text: str,
-    search_cache: dict | None = None,
-):
-    tasks = [
-        asyncio.to_thread(
-            execute_plan_step,
-            action,
-            detail,
-            user_input,
-            context_text,
-            search_cache,
-        )
-        for action, detail in plan
-    ]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    out = []
-    for idx, result in enumerate(results):
-        if isinstance(result, Exception):
-            action, detail = plan[idx]
-            out.append((action, detail, f"Error: {result}"))
-            continue
-        out.append(result)
-    return out
-
-
-async def _route_to_plan(
-    user_input: str,
-    route: dict,
-    context_text: str,
-    search_cache: dict | None = None,
-):
-    pathway = route.get("pathway", "planner_full")
-    thinking = ""
-    if pathway in (
-        "direct_reply",
-        "creative_reply",
-        "remember_reply",
-        "memory_recall_reply",
-    ):
-        return [], [], thinking
-
-    if pathway == "search_then_reply":
-        plan = [("SEARCH", user_input)]
-        return (
-            plan,
-            await _run_plan_steps(plan, user_input, context_text, search_cache),
-            thinking,
-        )
-
-    plan, thinking = await asyncio.to_thread(
-        generate_plan,
-        user_input,
-        context_text,
-        route.get("intent"),
-        pathway,
-    )
-    if not plan:
-        plan = [("THINK", "")]
-
-    filtered = []
-    max_steps = int(CONFIG.get("routing", {}).get("max_plan_steps", 4))
-    for action, detail in plan:
-        if action == "THINK":
-            continue
-        filtered.append((action, detail))
-        if len(filtered) >= max_steps:
-            break
-
-    if not filtered:
-        filtered = [("THINK", "")]
-    return (
-        filtered,
-        await _run_plan_steps(filtered, user_input, context_text, search_cache),
-        thinking,
-    )
-
-
-def _has_any_context(context: dict) -> bool:
-    if context.get("semantic_facts"):
-        return True
-    if context.get("episodic_context"):
-        return True
-    if context.get("ltm_context"):
-        return True
-    if (context.get("web_context") or "").strip():
-        return True
-    return False
-
-
-def _build_todo_from_plan(plan: list[tuple[str, str]]) -> list[dict]:
-    todos = []
-    for idx, (action, detail) in enumerate(plan, 1):
-        todos.append(
-            {
-                "task_id": f"task-{idx}",
-                "action": action,
-                "detail": detail,
-                "priority": "medium",
-            }
-        )
-    return todos
-
-
-async def _connect_realtime(command_queue: asyncio.Queue[str]):
+async def _connect_realtime(command_queue: asyncio.Queue[tuple[str, str]]):
     global SIO_CLIENT
     sio = socketio.AsyncClient(reconnection=True, logger=False, engineio_logger=False)
 
@@ -294,7 +138,7 @@ async def _connect_realtime(command_queue: asyncio.Queue[str]):
     async def on_command_submitted(data):
         text = ((data or {}).get("text") or "").strip()
         if text:
-            await command_queue.put(text)
+            await command_queue.put((text, "phone"))
 
     attempts = 0
     while attempts < 10:
@@ -312,18 +156,18 @@ async def _connect_realtime(command_queue: asyncio.Queue[str]):
 async def run():
     global ASYNC_LOOP
     ASYNC_LOOP = asyncio.get_running_loop()
-    command_queue: asyncio.Queue[str] = asyncio.Queue()
+    command_queue: asyncio.Queue[tuple[str, str]] = asyncio.Queue()
 
     MEMORY.set_debug_hook(_send_debug_event)
+    ORCHESTRATOR.debug_hook = _send_debug_event
 
     try:
         await asyncio.to_thread(llama_client._ensure_server_running)
-    except Exception as e:
-        print(f"[FATAL] Failed to start llama-server: {e}")
+    except Exception as exc:
+        print(f"[WARN] Failed to start llama-server: {exc}")
         print(
-            "Please install/build llama.cpp server and ensure a .gguf model exists in ~/llama.cpp/models."
+            "Amtavla is running in degraded mode. Use /health for details."
         )
-        return
 
     await _connect_realtime(command_queue)
 
@@ -333,209 +177,148 @@ async def run():
         def _on_stdin_ready():
             line = sys.stdin.readline()
             if line:
-                command_queue.put_nowait(line.strip())
+                command_queue.put_nowait((line.strip(), "cli"))
 
         ASYNC_LOOP.add_reader(sys.stdin, _on_stdin_ready)
         stdin_reader_installed = True
 
     print(
-        "amtavla - CLI assistant (type 'exit' to quit, '/brain <mode>' debug, '/ask' proactive debug, '/idle' force idle, '/delete')\n"
+        "amtavla - CLI assistant (type 'exit' to quit, '/brain <mode>', "
+        "'/health', '/ask', '/idle', '/delete', '/brief', '/loops', "
+        "'/done <id>', '/focus <min|off>', '/review')\n"
     )
     print("Or use phone UI at http://127.0.0.1:8081\n")
 
     try:
         while True:
-            user_input = await command_queue.get()
+            user_input, input_source = await command_queue.get()
             if not user_input:
                 continue
+            command = user_input.split(maxsplit=1)[0].lower()
 
             if user_input.lower() in ("exit", "quit", "q"):
                 print("Goodbye.")
                 break
 
-            if user_input.startswith("/brain"):
+            if command == "/brain":
                 parts = user_input.split()
                 mode = parts[1] if len(parts) > 1 else "status"
-                debug_info = await asyncio.to_thread(MEMORY.get_debug_info, mode)
-                print(debug_info)
-                print()
+                response = await asyncio.to_thread(MEMORY.get_debug_info, mode)
+                print(f"{response}\n")
+                _send_response_to_ui(response)
                 continue
 
-            if user_input.startswith("/ask"):
+            if command == "/health":
+                health = await asyncio.to_thread(HEALTH.snapshot)
+                response = render_health(health)
+                print(f"{response}\n")
+                _send_response_to_ui(response)
+                continue
+
+            if command == "/ask":
                 forced = await asyncio.to_thread(MEMORY.force_proactive_ask)
-                prompt = (
+                response = (
                     forced.get("prompt")
                     or "No pending insight is ready for proactive ask."
                 )
                 if forced.get("insight_id"):
-                    prompt += f" [insight_id={forced['insight_id']}]"
-                print(f"{prompt}\n")
+                    response += f" [insight_id={forced['insight_id']}]"
+                print(f"{response}\n")
+                _send_response_to_ui(response)
                 continue
 
-            if user_input.startswith("/idle"):
+            if command == "/idle":
                 result = await asyncio.to_thread(MEMORY.run_idle_now)
-                print("Idle maintenance run complete.")
-                print(f"Status: {result.get('status')}")
-                print(f"Metrics: {result.get('metrics')}\n")
-                continue
-
-            if user_input.startswith("/delete"):
-                await asyncio.to_thread(MEMORY.clear_all_memory)
-                print("All memory databases cleared (episodic, semantic, insight).\n")
-                continue
-
-            try:
-                await asyncio.to_thread(MEMORY.begin_foreground_turn)
-                await asyncio.to_thread(MEMORY.note_user_activity)
-                _send_debug_event(
-                    "user_prompt", {"prompt": _clip_text(user_input, 2000)}
-                )
-
-                route = await asyncio.to_thread(ROUTER.route, user_input)
-                _send_debug_event("intent_decision", route)
-                _send_debug_event(
-                    "route_pathway",
-                    {
-                        "pathway": route.get("pathway"),
-                        "intent": route.get("intent"),
-                    },
-                )
-
-                if route.get("pathway") == "brain_dump_reply":
-                    mode = "full"
-                    text = user_input.lower()
-                    if "semantic" in text:
-                        mode = "semantic"
-                    elif "episodic" in text:
-                        mode = "episodic"
-                    elif "insight" in text or "ltm" in text:
-                        mode = "insights"
-                    elif "job" in text:
-                        mode = "jobs"
-                    dump = await asyncio.to_thread(MEMORY.get_brain_dump, mode)
-                    print(f"{dump}\n")
-                    _send_response_to_ui(dump)
-                    MEMORY.process_turn_async(
-                        user_input,
-                        dump,
-                        trace={
-                            "intent": route.get("intent", ""),
-                            "pathway": route.get("pathway", ""),
-                            "todo": [],
-                            "context": {"brain_dump_mode": mode},
-                            "session_id": "cli",
-                        },
-                    )
-                    continue
-
-                include_web = route.get("pathway") not in {
-                    "remember_reply",
-                    "memory_recall_reply",
-                    "brain_dump_reply",
-                    "direct_reply",
-                }
-                if route.get("intent") in {"smalltalk", "greeting"}:
-                    include_web = False
-                if _is_short_ack_or_smalltalk(user_input):
-                    include_web = False
-                turn_search_cache = {}
-                context = await asyncio.to_thread(
-                    MEMORY.get_context_for_prompt,
-                    user_input,
-                    include_web,
-                    route.get("intent", ""),
-                    route.get("pathway", ""),
-                    turn_search_cache,
-                )
-                semantic_text = "\n".join(
-                    f"- {item.get('statement', '')}"
-                    for item in context.get("semantic_facts", [])
-                )
-                context_text = context.get("combined_context", "") or semantic_text
-                _send_debug_event(
-                    "context",
-                    {
-                        "semantic_facts": _clip_text(semantic_text, 6000),
-                        "combined_context": _clip_text(
-                            context.get("combined_context", ""), 6000
-                        ),
-                        "web_context": _clip_text(context.get("web_context", ""), 6000),
-                    },
-                )
-
-                plan, plan_results, thinking = await _route_to_plan(
-                    user_input,
-                    route,
-                    context_text,
-                    turn_search_cache,
-                )
-                todo_list = _build_todo_from_plan(plan)
-                _send_debug_event(
-                    "plan",
-                    {
-                        "thinking": _clip_text(thinking, 800),
-                        "steps": [
-                            {"action": action, "detail": detail}
-                            for action, detail in plan
-                        ],
-                        "todo": todo_list,
-                    },
-                )
-
-                for action, detail, result in plan_results:
-                    _send_debug_event(
-                        "plan_result",
-                        {
-                            "action": action,
-                            "detail": detail,
-                            "result": _clip_text(result, 6000),
-                        },
-                    )
-
-                if route.get("intent") == "memory_recall" and not _has_any_context(
-                    context
-                ):
-                    response = "IDK"
-                else:
-                    response = await asyncio.to_thread(
-                        generate_response,
-                        user_input,
-                        plan,
-                        plan_results,
-                        context,
-                        route.get("intent"),
-                        route.get("pathway"),
-                    )
-                memory_response = response
-                if context.get("pending_feedback_prompt"):
-                    response += "\n\n" + context["pending_feedback_prompt"]
-                _send_debug_event(
-                    "assistant_response", {"response": _clip_text(response, 8000)}
+                response = (
+                    "Idle maintenance run complete.\n"
+                    f"Status: {result.get('status')}\n"
+                    f"Metrics: {result.get('metrics')}"
                 )
                 print(f"{response}\n")
-
                 _send_response_to_ui(response)
-                MEMORY.process_turn_async(
-                    user_input,
-                    memory_response,
-                    trace={
-                        "intent": route.get("intent", ""),
-                        "pathway": route.get("pathway", ""),
-                        "todo": todo_list,
-                        "context": {
-                            "semantic": context.get("semantic_facts", []),
-                            "insights": context.get("ltm_context", []),
-                            "web": context.get("web_context", ""),
-                        },
-                        "session_id": "cli",
-                    },
-                )
+                continue
 
-            except Exception as e:
-                print(f"   [ERROR] {e}")
-                print("I'm having trouble right now. Please try again.\n")
-            finally:
-                await asyncio.to_thread(MEMORY.end_foreground_turn)
+            if command == "/brief":
+                response = await asyncio.to_thread(MEMORY.daily_brief)
+                print(f"{response}\n")
+                _send_response_to_ui(response)
+                continue
+
+            if command == "/loops":
+                loops = await asyncio.to_thread(MEMORY.open_commitments)
+                if loops:
+                    lines = ["=== Open Loops ==="]
+                    for item in loops:
+                        due = item["metadata"].get("due_at")
+                        due_str = (
+                            f" (due {time.strftime('%Y-%m-%d', time.localtime(due))})"
+                            if due
+                            else ""
+                        )
+                        lines.append(f"#{item['id']}{due_str}: {item['content']}")
+                    response = "\n".join(lines)
+                else:
+                    response = "No open commitments."
+                print(f"{response}\n")
+                _send_response_to_ui(response)
+                continue
+
+            if command == "/done":
+                parts = user_input.split()
+                try:
+                    item = await asyncio.to_thread(
+                        MEMORY.complete_commitment, int(parts[1])
+                    )
+                    response = f"Marked done: {item['content']}"
+                except (IndexError, ValueError, KeyError) as exc:
+                    response = f"Usage: /done <commitment id> ({exc})"
+                print(f"{response}\n")
+                _send_response_to_ui(response)
+                continue
+
+            if command == "/focus":
+                parts = user_input.split()
+                arg = parts[1] if len(parts) > 1 else "25"
+                if arg.lower() in ("off", "end", "stop"):
+                    await asyncio.to_thread(MEMORY.end_focus)
+                    response = "Focus session ended."
+                else:
+                    try:
+                        minutes = float(arg)
+                    except ValueError:
+                        minutes = 25.0
+                    until = await asyncio.to_thread(MEMORY.start_focus, minutes)
+                    response = (
+                        f"Focus session until "
+                        f"{time.strftime('%H:%M', time.localtime(until))}. "
+                        "Non-urgent prompts are suppressed."
+                    )
+                print(f"{response}\n")
+                _send_response_to_ui(response)
+                continue
+
+            if command == "/review":
+                response = await asyncio.to_thread(MEMORY.review_drill)
+                print(f"{response}\n")
+                _send_response_to_ui(response)
+                continue
+
+            if command == "/delete":
+                await asyncio.to_thread(MEMORY.clear_all_memory)
+                response = (
+                    "All memory databases cleared (episodic, semantic, insight)."
+                )
+                print(f"{response}\n")
+                _send_response_to_ui(response)
+                continue
+
+            turn = await ORCHESTRATOR.process(
+                user_input,
+                session_id=input_source,
+                input_source=input_source,
+            )
+            print(f"{turn.response}\n")
+            _send_response_to_ui(turn.response)
     except (KeyboardInterrupt, EOFError):
         print("\nExiting.")
     finally:
@@ -543,6 +326,7 @@ async def run():
             ASYNC_LOOP.remove_reader(sys.stdin)
         if SIO_CLIENT is not None and SIO_CLIENT.connected:
             await SIO_CLIENT.disconnect()
+        await asyncio.to_thread(MEMORY.close)
 
 
 if __name__ == "__main__":

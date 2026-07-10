@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amtavla Memory</title>
+    <style>
+        * { box-sizing: border-box; }
+        html, body { margin: 0; min-height: 100%; }
+        body {
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #101214;
+            color: #e7eaed;
+            letter-spacing: 0;
+        }
+        button, input, select, textarea { font: inherit; letter-spacing: 0; }
+        button { cursor: pointer; }
+        header {
+            min-height: 58px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 10px 16px;
+            border-bottom: 1px solid #2c3136;
+            background: #171a1d;
+        }
+        h1 { margin: 0; font-size: 18px; font-weight: 700; white-space: nowrap; }
+        .overview { display: flex; gap: 14px; color: #9da6ad; font-size: 13px; flex: 1; }
+        .overview strong { color: #e7eaed; }
+        .button {
+            min-height: 34px;
+            padding: 6px 11px;
+            border: 1px solid #3a4249;
+            border-radius: 6px;
+            background: #24292e;
+            color: #e7eaed;
+        }
+        .button:hover { background: #30363c; }
+        .button.primary { background: #176b87; border-color: #2389aa; }
+        .button.good { background: #245a3b; border-color: #337d52; }
+        .button.warn { background: #654c1f; border-color: #8a692d; }
+        .button.danger { background: #682e35; border-color: #923f49; }
+        .button:disabled { opacity: 0.45; cursor: default; }
+        .toolbar {
+            min-height: 54px;
+            display: grid;
+            grid-template-columns: minmax(220px, 1fr) 150px 150px auto auto;
+            gap: 8px;
+            align-items: center;
+            padding: 9px 12px;
+            border-bottom: 1px solid #2c3136;
+        }
+        input, select, textarea {
+            width: 100%;
+            color: #e7eaed;
+            background: #15181b;
+            border: 1px solid #3a4249;
+            border-radius: 5px;
+            padding: 8px 10px;
+        }
+        textarea { min-height: 120px; resize: vertical; line-height: 1.45; }
+        input:focus, select:focus, textarea:focus { outline: 2px solid #287e9a; outline-offset: 0; }
+        .toggle { display: flex; align-items: center; gap: 6px; color: #aeb6bd; font-size: 13px; white-space: nowrap; }
+        .toggle input { width: 16px; height: 16px; }
+        main {
+            display: grid;
+            grid-template-columns: minmax(290px, 36%) minmax(0, 1fr);
+            min-height: calc(100vh - 113px);
+        }
+        .list-panel { border-right: 1px solid #2c3136; overflow: auto; max-height: calc(100vh - 113px); }
+        .memory-row {
+            display: grid;
+            grid-template-columns: 28px minmax(0, 1fr);
+            border-bottom: 1px solid #272c30;
+            background: transparent;
+        }
+        .memory-row.active { background: #202a2f; box-shadow: inset 3px 0 #2f9dba; }
+        .memory-row input { width: 15px; height: 15px; align-self: start; margin: 17px 0 0 10px; }
+        .row-button {
+            min-width: 0;
+            text-align: left;
+            padding: 11px 12px 12px 5px;
+            color: inherit;
+            background: transparent;
+            border: 0;
+        }
+        .row-button:hover { background: #1b2024; }
+        .row-meta { display: flex; gap: 7px; align-items: center; margin-bottom: 6px; color: #9da6ad; font-size: 11px; }
+        .row-content { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-height: 1.38; font-size: 14px; }
+        .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; background: #30363c; color: #cbd1d6; }
+        .badge.confirmed, .badge.corrected { color: #8fe0aa; background: #203c2b; }
+        .badge.candidate { color: #f0cd78; background: #493b1d; }
+        .badge.rejected, .badge.deleted { color: #f0a0a8; background: #492429; }
+        .badge.archived { color: #aeb6bd; background: #30353a; }
+        .badge.stale { color: #f0cd78; background: #493b1d; }
+        .badge.conflict { color: #f0a0a8; background: #492429; }
+        .tag-chip { display: inline-block; padding: 1px 7px; border-radius: 9px; background: #24303c; color: #9ec7e8; font-size: 11px; margin-right: 4px; }
+        .tag-chip.suggested { opacity: 0.65; border: 1px dashed #46606f; }
+        .tag-chip.accepted { border: 1px solid #35576d; }
+        .tag-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #252a2e; font-size: 13px; }
+        .tag-row:last-child { border-bottom: 0; }
+        .tag-row .grow { flex: 1; }
+        .tag-actions button { padding: 2px 8px; font-size: 11px; }
+        .detail-panel { min-width: 0; overflow: auto; max-height: calc(100vh - 113px); padding: 18px 20px 32px; }
+        .empty { color: #818a91; padding: 24px; }
+        .detail-head { display: flex; align-items: start; gap: 12px; margin-bottom: 14px; }
+        .detail-head h2 { margin: 0; font-size: 17px; flex: 1; overflow-wrap: anywhere; }
+        .field-label { display: block; margin: 15px 0 6px; color: #9da6ad; font-size: 12px; font-weight: 650; text-transform: uppercase; }
+        .actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+        .section { border-top: 1px solid #2c3136; margin-top: 19px; padding-top: 13px; }
+        .section h3 { margin: 0 0 10px; font-size: 13px; color: #c8ced3; }
+        .record { padding: 9px 0; border-bottom: 1px solid #252a2e; font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+        .record:last-child { border-bottom: 0; }
+        .record-meta { color: #818b92; font-size: 11px; margin-bottom: 3px; }
+        .status-line { min-height: 24px; padding: 5px 12px; color: #9da6ad; font-size: 12px; border-top: 1px solid #2c3136; }
+        @media (max-width: 780px) {
+            header { flex-wrap: wrap; }
+            .overview { order: 3; width: 100%; }
+            .toolbar { grid-template-columns: 1fr 1fr; }
+            .toolbar input[type="search"] { grid-column: 1 / -1; }
+            main { grid-template-columns: 1fr; }
+            .list-panel { border-right: 0; max-height: 40vh; border-bottom: 1px solid #2c3136; }
+            .detail-panel { max-height: none; padding: 15px 13px 28px; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Amtavla Memory</h1>
+        <div class="overview" id="overview"></div>
+        <button class="button" id="exportButton">Export</button>
+    </header>
+    <div class="toolbar">
+        <input id="search" type="search" placeholder="Search memory" autocomplete="off">
+        <select id="typeFilter" aria-label="Memory type">
+            <option value="">All types</option>
+            <option value="fact">Facts</option>
+            <option value="episode">Episodes</option>
+            <option value="decision">Decisions</option>
+            <option value="commitment">Commitments</option>
+            <option value="preference">Preferences</option>
+            <option value="idea">Ideas</option>
+            <option value="insight">Insights</option>
+            <option value="source_excerpt">Source excerpts</option>
+        </select>
+        <select id="stateFilter" aria-label="Review state">
+            <option value="">All states</option>
+            <option value="candidate">Candidate</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="corrected">Corrected</option>
+            <option value="rejected">Rejected</option>
+            <option value="archived">Archived</option>
+            <option value="deleted">Deleted</option>
+        </select>
+        <label class="toggle"><input id="includeDeleted" type="checkbox">Deleted</label>
+        <button class="button" id="mergeButton" disabled>Merge</button>
+    </div>
+    <main>
+        <section class="list-panel" id="memoryList"></section>
+        <section class="detail-panel" id="detail"><div class="empty">Select a memory.</div></section>
+    </main>
+    <div class="status-line" id="status"></div>
+
+    <script>
+        const state = { items: [], selectedId: null, mergeIds: new Set(), selected: null };
+        const listEl = document.getElementById('memoryList');
+        const detailEl = document.getElementById('detail');
+        const statusEl = document.getElementById('status');
+        const mergeButton = document.getElementById('mergeButton');
+
+        const escapeHtml = (value) => String(value ?? '')
+            .replaceAll('&', '&amp;').replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+        const setStatus = (text) => { statusEl.textContent = text || ''; };
+
+        async function api(path, options = {}) {
+            const response = await fetch(path, options);
+            if (!response.ok) {
+                const body = await response.json().catch(() => ({}));
+                throw new Error(body.error || `Request failed (${response.status})`);
+            }
+            return response;
+        }
+
+        async function loadOverview() {
+            const data = await (await api('/api/memory/overview')).json();
+            const total = Object.values(data.by_state || {}).reduce((sum, value) => sum + value, 0);
+            document.getElementById('overview').innerHTML =
+                `<span><strong>${total}</strong> items</span>` +
+                `<span><strong>${data.entity_count || 0}</strong> entities</span>` +
+                `<span><strong>${data.relation_count || 0}</strong> relations</span>` +
+                `<span><strong>${data.suggested_tag_count || 0}</strong> tags to review</span>` +
+                (data.contradiction_count ? `<span class="badge conflict"><strong>${data.contradiction_count}</strong> conflicts</span>` : '');
+        }
+
+        async function loadItems() {
+            const params = new URLSearchParams();
+            const query = document.getElementById('search').value.trim();
+            const type = document.getElementById('typeFilter').value;
+            const reviewState = document.getElementById('stateFilter').value;
+            if (query) params.set('q', query);
+            if (type) params.set('type', type);
+            if (reviewState) params.set('state', reviewState);
+            if (document.getElementById('includeDeleted').checked || reviewState === 'deleted') {
+                params.set('include_deleted', '1');
+            }
+            const data = await (await api(`/api/memory/items?${params}`)).json();
+            state.items = data.items || [];
+            renderList();
+            setStatus(`${state.items.length} memories`);
+        }
+
+        function renderList() {
+            if (!state.items.length) {
+                listEl.innerHTML = '<div class="empty">No memories found.</div>';
+                return;
+            }
+            listEl.innerHTML = state.items.map((item) => `
+                <div class="memory-row ${item.id === state.selectedId ? 'active' : ''}">
+                    <input type="checkbox" data-merge-id="${item.id}" ${state.mergeIds.has(item.id) ? 'checked' : ''} aria-label="Select memory ${item.id} for merge">
+                    <button class="row-button" data-item-id="${item.id}">
+                        <div class="row-meta">
+                            <span>#${item.id}</span>
+                            <span>${escapeHtml(item.item_type)}</span>
+                            <span class="badge ${escapeHtml(item.review_state)}">${escapeHtml(item.review_state)}</span>
+                            ${(item.metadata || {}).stale ? '<span class="badge stale">stale</span>' : ''}
+                            ${((item.metadata || {}).contradicts || []).length ? '<span class="badge conflict">conflict</span>' : ''}
+                        </div>
+                        <div class="row-content">${escapeHtml(item.content)}</div>
+                        ${(item.tags || []).length ? `<div style="margin-top:5px">${item.tags.map((tag) =>
+                            `<span class="tag-chip ${escapeHtml(tag.status)}">${escapeHtml(tag.tag_type)}:${escapeHtml(tag.name)}</span>`).join('')}</div>` : ''}
+                    </button>
+                </div>
+            `).join('');
+            listEl.querySelectorAll('[data-item-id]').forEach((button) => {
+                button.addEventListener('click', () => selectItem(Number(button.dataset.itemId)));
+            });
+            listEl.querySelectorAll('[data-merge-id]').forEach((checkbox) => {
+                checkbox.addEventListener('change', () => {
+                    const id = Number(checkbox.dataset.mergeId);
+                    checkbox.checked ? state.mergeIds.add(id) : state.mergeIds.delete(id);
+                    mergeButton.disabled = !state.selectedId || [...state.mergeIds].filter((value) => value !== state.selectedId).length === 0;
+                });
+            });
+        }
+
+        async function selectItem(itemId) {
+            state.selectedId = itemId;
+            state.selected = await (await api(`/api/memory/items/${itemId}`)).json();
+            renderList();
+            renderDetail();
+            mergeButton.disabled = [...state.mergeIds].filter((value) => value !== itemId).length === 0;
+        }
+
+        function renderRecords(rows, renderer) {
+            if (!rows || !rows.length) return '<div class="record-meta">None</div>';
+            return rows.map(renderer).join('');
+        }
+
+        function renderDetail() {
+            const item = state.selected;
+            if (!item) {
+                detailEl.innerHTML = '<div class="empty">Select a memory.</div>';
+                return;
+            }
+            detailEl.innerHTML = `
+                <div class="detail-head">
+                    <h2>#${item.id} ${escapeHtml(item.item_type)}</h2>
+                    <span class="badge ${escapeHtml(item.review_state)}">${escapeHtml(item.review_state)}</span>
+                </div>
+                <label class="field-label" for="contentEditor">Content</label>
+                <textarea id="contentEditor">${escapeHtml(item.content)}</textarea>
+                <div class="actions">
+                    <button class="button primary" id="saveCorrection">Save correction</button>
+                    <button class="button good" data-state="confirmed">Confirm</button>
+                    <button class="button" data-state="rejected">Reject</button>
+                    <button class="button warn" data-state="archived">Archive</button>
+                    <button class="button danger" data-state="deleted">Delete</button>
+                </div>
+                <div class="section">
+                    <h3>Tags</h3>
+                    ${renderRecords((item.tags || []).filter((tag) => tag.status !== 'corrected'), (tag) => `
+                        <div class="tag-row">
+                            <span class="tag-chip ${escapeHtml(tag.status)}">${escapeHtml(tag.tag_type)}:${escapeHtml(tag.name)}</span>
+                            <span class="record-meta grow">${escapeHtml(tag.status)} (${Number(tag.confidence).toFixed(2)})</span>
+                            <span class="tag-actions">
+                                ${tag.status !== 'accepted' ? `<button class="button good" data-tag-action="accept" data-tag-id="${tag.tag_id}">✓</button>` : ''}
+                                ${tag.status !== 'rejected' ? `<button class="button danger" data-tag-action="reject" data-tag-id="${tag.tag_id}">✗</button>` : ''}
+                                <button class="button" data-tag-action="correct" data-tag-id="${tag.tag_id}">✎</button>
+                            </span>
+                        </div>`)}
+                    <div class="actions" style="margin-top:8px">
+                        <button class="button" id="addTagButton">Add tag</button>
+                    </div>
+                </div>
+                <div class="section">
+                    <h3>Provenance</h3>
+                    ${renderRecords(item.sources, (source) => `
+                        <div class="record">
+                            <div class="record-meta">${escapeHtml(source.source_type)} | ${escapeHtml(source.source_id)}</div>
+                            <div>${escapeHtml(source.excerpt || '(no excerpt)')}</div>
+                        </div>`)}
+                </div>
+                <div class="section">
+                    <h3>Entities</h3>
+                    ${renderRecords(item.entities, (entity) => `
+                        <div class="record">
+                            <div class="record-meta">${escapeHtml(entity.entity_type)} | ${escapeHtml(entity.role)}</div>
+                            <div>${escapeHtml(entity.name)}</div>
+                        </div>`)}
+                </div>
+                <div class="section">
+                    <h3>Relations</h3>
+                    ${renderRecords(item.relations, (relation) => `
+                        <div class="record">${escapeHtml(relation.source_name)} ${escapeHtml(relation.relation_type)} ${escapeHtml(relation.target_name)}</div>`)}
+                </div>
+                <div class="section">
+                    <h3>History</h3>
+                    ${renderRecords(item.history, (entry) => `
+                        <div class="record">
+                            <div class="record-meta">${escapeHtml(entry.operation)} | ${new Date(entry.created_at * 1000).toLocaleString()}</div>
+                            <div>${escapeHtml(entry.note || '')}</div>
+                        </div>`)}
+                </div>
+            `;
+            document.getElementById('saveCorrection').addEventListener('click', saveCorrection);
+            detailEl.querySelectorAll('[data-state]').forEach((button) => {
+                button.addEventListener('click', () => changeState(button.dataset.state));
+            });
+            detailEl.querySelectorAll('[data-tag-action]').forEach((button) => {
+                button.addEventListener('click', () => reviewTag(button.dataset.tagAction, Number(button.dataset.tagId)));
+            });
+            document.getElementById('addTagButton').addEventListener('click', addTag);
+        }
+
+        async function reviewTag(action, tagId) {
+            const body = { action };
+            if (action === 'correct') {
+                const replacement = prompt('Correct tag as "type:name" (project/person/location/time/topic):');
+                if (!replacement || !replacement.includes(':')) return;
+                const [tagType, ...rest] = replacement.split(':');
+                body.tag_type = tagType.trim();
+                body.name = rest.join(':').trim();
+            }
+            setStatus(`Tag ${action}...`);
+            await api(`/api/memory/items/${state.selectedId}/tags/${tagId}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            await selectItem(state.selectedId);
+            setStatus(`Tag ${action}ed`);
+        }
+
+        async function addTag() {
+            const value = prompt('New tag as "type:name" (project/person/location/time/topic):');
+            if (!value || !value.includes(':')) return;
+            const [tagType, ...rest] = value.split(':');
+            setStatus('Adding tag...');
+            await api(`/api/memory/items/${state.selectedId}/tags`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tag_type: tagType.trim(), name: rest.join(':').trim() })
+            });
+            await selectItem(state.selectedId);
+            setStatus('Tag added');
+        }
+
+        async function saveCorrection() {
+            const content = document.getElementById('contentEditor').value.trim();
+            if (!content) return;
+            setStatus('Saving correction...');
+            state.selected = await (await api(`/api/memory/items/${state.selectedId}/correct`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content })
+            })).json();
+            await refresh();
+            setStatus('Correction saved');
+        }
+
+        async function changeState(reviewState) {
+            if (reviewState === 'deleted' && !confirm('Delete this memory from active recall?')) return;
+            setStatus(`Setting ${reviewState}...`);
+            state.selected = await (await api(`/api/memory/items/${state.selectedId}/state`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ review_state: reviewState })
+            })).json();
+            await refresh();
+            setStatus(`Memory ${reviewState}`);
+        }
+
+        async function mergeSelected() {
+            const sourceIds = [...state.mergeIds].filter((id) => id !== state.selectedId);
+            if (!state.selectedId || !sourceIds.length) return;
+            if (!confirm(`Merge ${sourceIds.length} selected memories into #${state.selectedId}?`)) return;
+            setStatus('Merging...');
+            state.selected = await (await api('/api/memory/merge', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ target_id: state.selectedId, source_ids: sourceIds })
+            })).json();
+            state.mergeIds.clear();
+            await refresh();
+            setStatus('Memories merged');
+        }
+
+        async function exportMemory() {
+            setStatus('Preparing export...');
+            const response = await api('/api/memory/export', { method: 'POST' });
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'amtavla-memory.zip';
+            link.click();
+            URL.revokeObjectURL(url);
+            setStatus(`Exported ${response.headers.get('X-Memory-Item-Count') || 0} memories`);
+        }
+
+        async function refresh() {
+            await Promise.all([loadOverview(), loadItems()]);
+            if (state.selectedId) {
+                try {
+                    state.selected = await (await api(`/api/memory/items/${state.selectedId}`)).json();
+                    renderDetail();
+                } catch (_) {
+                    state.selected = null;
+                    state.selectedId = null;
+                    renderDetail();
+                }
+            }
+        }
+
+        let searchTimer = null;
+        document.getElementById('search').addEventListener('input', () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => loadItems().catch(showError), 180);
+        });
+        document.getElementById('typeFilter').addEventListener('change', () => loadItems().catch(showError));
+        document.getElementById('stateFilter').addEventListener('change', () => loadItems().catch(showError));
+        document.getElementById('includeDeleted').addEventListener('change', () => loadItems().catch(showError));
+        mergeButton.addEventListener('click', () => mergeSelected().catch(showError));
+        document.getElementById('exportButton').addEventListener('click', () => exportMemory().catch(showError));
+        const showError = (error) => setStatus(`Error: ${error.message}`);
+
+        refresh().catch(showError);
+    </script>
+</body>
+</html>

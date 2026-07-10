@@ -12,7 +12,7 @@ MODEL_PATH = os.path.join(
     os.path.expanduser("~"),
     "llama.cpp",
     "models",
-    "Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf",
+    "Qwen2.5-Coder-7B-Instruct-Q6_K_L.gguf",
 )
 LLAMA_SERVER_BIN = os.path.expanduser("~/llama.cpp/build/bin/llama-server")
 

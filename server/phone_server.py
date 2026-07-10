@@ -1,13 +1,30 @@
 import os
+import shutil
+import sys
+import threading
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from flask import Flask, send_file, jsonify, make_response, request
 from flask_socketio import SocketIO
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from brain.config import load_brain_config
+from brain.memory.catalog import MemoryCatalog
+from brain.memory.context_engine import ContextEngine
+from brain.memory.tagging import TagEngine
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 UI_FILE = os.path.join(os.path.dirname(__file__), "phone_ui.html")
+MEMORY_UI_FILE = os.path.join(os.path.dirname(__file__), "memory_ui.html")
+EXPORT_ROOT = REPO_ROOT / "exports" / "memory"
+MEMORY_CATALOG = None
+MEMORY_CATALOG_LOCK = threading.Lock()
 MAX_DEBUG_EVENTS = 500
 command_store = None
 response_store = None
@@ -16,6 +33,32 @@ response_updated_at = None
 server_started_at = time.time()
 debug_events = []
 debug_event_counter = 0
+
+
+def _get_memory_catalog() -> MemoryCatalog:
+    global MEMORY_CATALOG
+    if MEMORY_CATALOG is not None:
+        return MEMORY_CATALOG
+    with MEMORY_CATALOG_LOCK:
+        if MEMORY_CATALOG is None:
+            config = load_brain_config()
+            memory_config = config.get("memory", {})
+            db_dir = memory_config.get("db_dir", "brain/db")
+            db_path = os.environ.get("AMTAVLA_CATALOG_DB") or memory_config.get(
+                "catalog_db_path",
+                os.path.join(db_dir, "memory_catalog.db"),
+            )
+            MEMORY_CATALOG = MemoryCatalog(db_path)
+    return MEMORY_CATALOG
+
+
+def _memory_api_error(exc: Exception):
+    if isinstance(exc, KeyError):
+        return jsonify({"error": str(exc).strip("'")}), 404
+    if isinstance(exc, (TypeError, ValueError)):
+        return jsonify({"error": str(exc)}), 400
+    app.logger.exception("Memory API operation failed")
+    return jsonify({"error": "Memory operation failed"}), 500
 
 
 def _store_command(text: str):
@@ -78,6 +121,248 @@ def _append_debug_event(event_type: str, payload: dict):
 @app.route("/")
 def index():
     return send_file(UI_FILE)
+
+
+@app.route("/memory")
+def memory_view():
+    return send_file(MEMORY_UI_FILE)
+
+
+@app.route("/api/memory/overview", methods=["GET"])
+def memory_overview():
+    return jsonify(_get_memory_catalog().overview())
+
+
+@app.route("/api/memory/items", methods=["GET"])
+def memory_items():
+    try:
+        rows = _get_memory_catalog().list_items(
+            query=request.args.get("q", ""),
+            item_type=request.args.get("type") or None,
+            review_state=request.args.get("state") or None,
+            include_deleted=request.args.get("include_deleted", "0") == "1",
+            entity_id=(
+                int(request.args["entity_id"])
+                if request.args.get("entity_id")
+                else None
+            ),
+            tag=request.args.get("tag") or None,
+            since=float(request.args["since"]) if request.args.get("since") else None,
+            until=float(request.args["until"]) if request.args.get("until") else None,
+            limit=request.args.get("limit", 200),
+            offset=request.args.get("offset", 0),
+        )
+        return jsonify({"items": rows, "count": len(rows)})
+    except Exception as exc:
+        return _memory_api_error(exc)
+
+
+@app.route("/api/memory/items/<int:item_id>", methods=["GET"])
+def memory_item_detail(item_id: int):
+    try:
+        return jsonify(_get_memory_catalog().inspect_item(item_id))
+    except Exception as exc:
+        return _memory_api_error(exc)
+
+
+@app.route("/api/memory/items/<int:item_id>/correct", methods=["POST"])
+def correct_memory_item(item_id: int):
+    data = request.get_json(silent=True) or {}
+    try:
+        item = _get_memory_catalog().correct_item(
+            item_id,
+            data.get("content", ""),
+            data.get("reason", ""),
+        )
+        return jsonify(item)
+    except Exception as exc:
+        return _memory_api_error(exc)
+
+
+@app.route("/api/memory/items/<int:item_id>/state", methods=["POST"])
+def set_memory_item_state(item_id: int):
+    data = request.get_json(silent=True) or {}
+    try:
+        item = _get_memory_catalog().set_review_state(
+            item_id,
+            data.get("review_state", ""),
+            data.get("note", ""),
+        )
+        return jsonify(item)
+    except Exception as exc:
+        return _memory_api_error(exc)
+
+
+@app.route("/api/memory/merge", methods=["POST"])
+def merge_memory_items():
+    data = request.get_json(silent=True) or {}
+    try:
+        item = _get_memory_catalog().merge_items(
+            int(data.get("target_id")),
+            list(data.get("source_ids") or []),
+            content=data.get("content") or None,
+            note=data.get("note", ""),
+        )
+        return jsonify(item)
+    except Exception as exc:
+        return _memory_api_error(exc)
+
+
+@app.route("/api/memory/entities", methods=["GET", "POST"])
+def memory_entities():
+    catalog = _get_memory_catalog()
+    try:
+        if request.method == "GET":
+            rows = catalog.list_entities(
+                query=request.args.get("q", ""),
+                limit=request.args.get("limit", 200),
+            )
+            return jsonify({"entities": rows, "count": len(rows)})
+        data = request.get_json(silent=True) or {}
+        entity = catalog.upsert_entity(
+            data.get("entity_type", "other"),
+            data.get("name", ""),
+            description=data.get("description", ""),
+            review_state=data.get("review_state", "candidate"),
+            metadata=data.get("metadata") or {},
+        )
+        if data.get("memory_item_id") is not None:
+            catalog.link_item_entity(
+                int(data["memory_item_id"]),
+                entity["id"],
+                role=data.get("role", "related"),
+                confidence=float(data.get("confidence", 0.5)),
+            )
+        return jsonify(entity), 201
+    except Exception as exc:
+        return _memory_api_error(exc)
+
+
+@app.route("/api/memory/relations", methods=["GET", "POST"])
+def memory_relations():
+    catalog = _get_memory_catalog()
+    try:
+        if request.method == "GET":
+            rows = catalog.list_relations(limit=request.args.get("limit", 500))
+            return jsonify({"relations": rows, "count": len(rows)})
+        data = request.get_json(silent=True) or {}
+        relation = catalog.create_relation(
+            int(data.get("source_entity_id")),
+            data.get("relation_type", ""),
+            int(data.get("target_entity_id")),
+            memory_item_id=data.get("memory_item_id"),
+            confidence=float(data.get("confidence", 0.5)),
+            metadata=data.get("metadata") or {},
+        )
+        return jsonify(relation), 201
+    except Exception as exc:
+        return _memory_api_error(exc)
+
+
+@app.route("/api/memory/items/<int:item_id>/tags", methods=["POST"])
+def add_memory_item_tag(item_id: int):
+    data = request.get_json(silent=True) or {}
+    try:
+        assignment = _get_memory_catalog().assign_tag(
+            item_id,
+            data.get("tag_type", ""),
+            data.get("name", ""),
+            status=data.get("status", "accepted"),
+            confidence=float(data.get("confidence", 1.0)),
+            source="user",
+        )
+        return jsonify(assignment), 201
+    except Exception as exc:
+        return _memory_api_error(exc)
+
+
+@app.route("/api/memory/items/<int:item_id>/tags/<int:tag_id>", methods=["POST"])
+def review_memory_item_tag(item_id: int, tag_id: int):
+    """One-tap tag review: accept, reject, or correct (with replacement)."""
+    data = request.get_json(silent=True) or {}
+    action = (data.get("action") or "").strip().lower()
+    catalog = _get_memory_catalog()
+    try:
+        if action in ("accepted", "accept"):
+            result = catalog.set_tag_status(item_id, tag_id, "accepted", data.get("note", ""))
+        elif action in ("rejected", "reject"):
+            result = catalog.set_tag_status(item_id, tag_id, "rejected", data.get("note", ""))
+        elif action in ("corrected", "correct"):
+            result = catalog.correct_tag_assignment(
+                item_id,
+                tag_id,
+                data.get("tag_type", ""),
+                data.get("name", ""),
+                note=data.get("note", ""),
+            )
+        else:
+            raise ValueError(f"Unsupported tag action: {action}")
+        return jsonify(result)
+    except Exception as exc:
+        return _memory_api_error(exc)
+
+
+@app.route("/api/memory/tags", methods=["GET"])
+def memory_tags():
+    try:
+        rows = _get_memory_catalog().list_tags(
+            tag_type=request.args.get("type") or None
+        )
+        return jsonify({"tags": rows, "count": len(rows)})
+    except Exception as exc:
+        return _memory_api_error(exc)
+
+
+@app.route("/api/memory/capture", methods=["POST"])
+def capture_memory():
+    """Direct capture pipeline: store a note, auto-tag it, log the capture event."""
+    data = request.get_json(silent=True) or {}
+    catalog = _get_memory_catalog()
+    try:
+        content = (data.get("content") or "").strip()
+        item = catalog.upsert_item(
+            item_type=data.get("item_type", "episode"),
+            content=content,
+            review_state="confirmed",
+            confidence=0.7,
+            importance=0.5,
+            metadata={"captured": True, "session_id": data.get("session_id", "capture")},
+        )
+        event = catalog.record_capture_event(
+            data.get("capture_type", "pasted"),
+            content,
+            session_id=data.get("session_id", "capture"),
+            memory_item_id=item["id"],
+        )
+        engine = TagEngine(catalog)
+        context = ContextEngine(catalog).current_context(
+            data.get("session_id", "capture")
+        )
+        tags = engine.tag_item(item, session_context=context)
+        return jsonify(
+            {"item": catalog.inspect_item(item["id"]), "event": event, "tags": tags}
+        ), 201
+    except Exception as exc:
+        return _memory_api_error(exc)
+
+
+@app.route("/api/memory/export", methods=["POST"])
+def export_memory():
+    try:
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        export_dir = EXPORT_ROOT / stamp
+        result = _get_memory_catalog().export(str(export_dir))
+        archive_path = shutil.make_archive(str(export_dir), "zip", root_dir=export_dir)
+        response = send_file(
+            archive_path,
+            as_attachment=True,
+            download_name=f"amtavla-memory-{stamp}.zip",
+            mimetype="application/zip",
+        )
+        response.headers["X-Memory-Item-Count"] = str(result["item_count"])
+        return response
+    except Exception as exc:
+        return _memory_api_error(exc)
 
 
 @app.route("/command", methods=["POST"])

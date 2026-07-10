@@ -29,6 +29,7 @@ class MemoryController:
         self._last_idle_run_ts = 0.0
         self._turn_queue: queue.Queue[tuple[str, str, dict] | None] = queue.Queue()
         self._stop_event = threading.Event()
+        self._closed = False
         self._debug_hook = None
         self._foreground_lock = threading.Lock()
         self._foreground_active = 0
@@ -66,6 +67,9 @@ class MemoryController:
         self.note_user_activity()
 
     def _shutdown_on_exit(self):
+        if self._closed:
+            return
+        self._closed = True
         self.wait_for_idle(timeout=2.0)
         self._stop_event.set()
         self._turn_queue.put(None)
@@ -73,6 +77,9 @@ class MemoryController:
             self._worker_thread.join(timeout=1.0)
         if self._idle_thread.is_alive():
             self._idle_thread.join(timeout=1.0)
+
+    def close(self):
+        self._shutdown_on_exit()
 
     def _worker_loop(self):
         while not self._stop_event.is_set():
@@ -158,13 +165,94 @@ class MemoryController:
             search_cache=search_cache,
         )
         return {
+            "memory_items": recall.get("memory_items", []),
             "semantic_facts": recall["semantic"],
             "episodic_context": recall["episodic"],
             "ltm_context": recall["insights"],
             "web_context": recall["web"],
+            "web_results": recall.get("web_results", []),
+            "combined_context": recall["combined_context"],
+            "style_context": recall.get("style_context", ""),
+            "pending_feedback_prompt": recall["pending_feedback_prompt"],
+            "pending_feedback_id": recall.get("pending_feedback_id"),
+        }
+
+    def search_memory(self, query: str, top_k: int = 5) -> dict:
+        recall = self.memory.search_memory(query, top_k=top_k)
+        return {
+            "memory_items": recall.get("memory_items", []),
+            "semantic_facts": recall["semantic"],
+            "episodic_context": recall["episodic"],
+            "ltm_context": recall["insights"],
+            "web_context": recall["web"],
+            "web_results": recall.get("web_results", []),
             "combined_context": recall["combined_context"],
             "pending_feedback_prompt": recall["pending_feedback_prompt"],
+            "pending_feedback_id": recall.get("pending_feedback_id"),
         }
+
+    def write_memory(self, statement: str) -> dict:
+        self.note_user_activity()
+        return self.memory.write_memory(statement)
+
+    def list_memory_items(self, **filters) -> list[dict]:
+        return self.memory.list_memory_items(**filters)
+
+    def inspect_memory_item(self, item_id: int) -> dict:
+        return self.memory.inspect_memory_item(item_id)
+
+    def correct_memory_item(self, item_id: int, content: str, reason: str = "") -> dict:
+        return self.memory.correct_memory_item(item_id, content, reason)
+
+    def set_memory_review_state(
+        self, item_id: int, review_state: str, note: str = ""
+    ) -> dict:
+        return self.memory.set_memory_review_state(item_id, review_state, note)
+
+    def merge_memory_items(
+        self,
+        target_id: int,
+        source_ids: list[int],
+        content: str | None = None,
+        note: str = "",
+    ) -> dict:
+        return self.memory.merge_memory_items(
+            target_id,
+            source_ids,
+            content=content,
+            note=note,
+        )
+
+    def export_memory(self, export_dir: str) -> dict:
+        return self.memory.export_memory(export_dir)
+
+    def memory_overview(self) -> dict:
+        return self.memory.memory_overview()
+
+    def daily_brief(self) -> str:
+        return self.memory.daily_brief()
+
+    def review_drill(self, limit: int = 3) -> str:
+        return self.memory.review_drill(limit=limit)
+
+    def start_focus(self, minutes: float) -> float:
+        return self.memory.start_focus(minutes)
+
+    def end_focus(self):
+        self.memory.end_focus()
+
+    def in_focus(self) -> bool:
+        return self.memory.in_focus()
+
+    def open_commitments(self) -> list[dict]:
+        return self.memory.open_commitments()
+
+    def complete_commitment(self, item_id: int) -> dict:
+        return self.memory.complete_commitment(item_id)
+
+    def capture_note(self, content: str, **kwargs) -> dict:
+        self.note_user_activity()
+        return self.memory.capture_note(content, **kwargs)
 
     def process_turn_async(self, user_input, response, trace: dict | None = None):
         self.note_user_activity()
@@ -179,6 +267,10 @@ class MemoryController:
                 f"Semantic facts: {status['semantic_count']}\n"
                 f"Promoted insights: {status['insight_count']}\n"
                 f"Pending insight feedback: {status['pending_feedback_count']}"
+                f"\nMemory catalog: {sum(status['memory_catalog']['by_state'].values())}"
+                f"\nEntities: {status['memory_catalog']['entity_count']}"
+                f"\nEmbedding available: {status['embedding_available']}"
+                f"\nEmbedding error: {status['embedding_last_error'] or '(none)'}"
             )
         if mode == "ltm":
             recall = self.memory.recall_context("", include_web=False)

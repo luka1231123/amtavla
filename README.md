@@ -20,13 +20,13 @@ amtavla treats the assistant as a cooperative cognitive layer, not just a chat b
 
 Each turn runs in this order:
 
-1. Intent detection (`brain/intent_router.py`)
-2. Semantic fact extraction and prefetch (`brain/memory/service.py`)
-3. Context recall (episodic + semantic + insights + live web)
-4. Todo/plan creation (`main.py` + planner)
-5. Tool/search execution
-6. Response generation (`generator.py`)
-7. Episodic commit
+1. Create a typed turn and sample subsystem health (`brain/orchestrator.py`)
+2. Select an intent pathway (`brain/intent_router.py`)
+3. Recall source-aware semantic, episodic, and insight context
+4. Build a validated plan (`brain/planner.py`)
+5. Execute bounded actions (`brain/action_runner.py`)
+6. Generate against structured results and source IDs (`generator.py`)
+7. Commit the response, action results, and complete trace
 
 When idle:
 
@@ -52,6 +52,15 @@ Memory is SQLite-backed in `brain/db/`:
 - `ltm_vectors.db`
   - vector index for long-term insight retrieval
   - KNN recall via `sqlite-vec` (with scan fallback if extension is unavailable)
+- `memory_catalog.db`
+  - unified facts, episodes, decisions, commitments, preferences, ideas, insights, and source excerpts
+  - provenance, review history, corrections, merges, archive/delete state
+  - people, places, projects, documents, commitments, and entity relations
+  - tags, tag assignments (suggested/accepted/corrected/rejected), and tag feedback
+  - capture events and per-turn context snapshots
+  - style profile (in `catalog_meta`)
+
+The old databases remain raw evidence and compatibility stores. The catalog is the editable source of truth for recall.
 
 ## Proactive Insight Behavior
 
@@ -63,20 +72,56 @@ Proactive prompts are intentionally infrequent and quality-gated:
 - quality scoring to avoid malformed insight prompts
 - explicit user feedback handling (`confirmed`, `rejected`, `snoozed`)
 
+## Tagging, Capture, and Context (Phase 3)
+
+Every committed turn and captured note is auto-tagged within milliseconds by a
+heuristic `TagEngine` (project, person, location, time — no model calls). Tags
+are suggestions until reviewed: one-tap accept/reject/correct in the `/memory`
+dashboard, and every decision feeds `tag_feedback` so repeated rejections
+suppress a tag and accepts boost it. A `ContextEngine` infers the active
+project from recent context snapshots and accepted tags, and feeds it back
+into tagging and retrieval.
+
+- capture pipeline: every turn logs a `capture_events` row; `POST /api/memory/capture` ingests pasted/voice notes directly
+- retrieval filters: by tag, entity, and time window (`what did I say yesterday...` narrows recall to yesterday)
+- contradiction detection: facts with the same property but conflicting values (e.g. two parking spots) are flagged on both sides, never silently collapsed — the generator is instructed to present both
+- staleness rules: overdue commitments and past-dated memories are marked stale during idle cycles and disclosed in answers
+- source-backed answers: replies end with a readable `Sources:` footer showing the memories/web pages actually used (config `routing.show_sources`)
+
+## Executive Function (Phase 4)
+
+- commitments are extracted from normal conversation ("remind me to...", "I promised...", "I need to... by friday") with deadlines resolved to dates
+- `/loops` lists open commitments; `/done <id>` closes one
+- reminders surface with responses when a commitment is overdue, due within a day, or related to the active project (6h gap between repeats)
+- `/focus [minutes|off]` starts a focus session: proactive asks and non-urgent reminders are suppressed; overdue commitments still get through
+- `/brief` prints the daily brief: one overdue commitment, one contradiction, one pattern, open-loop count
+
+## Creativity and Learning (Phase 5)
+
+- style instructions in conversation ("be concise", "use bullet points", "never use emoji", "always ...") accumulate into a persistent style profile applied to every generation
+- creative replies revive related old `idea` items from memory and offer divergent, numbered directions (kill/merge/continue)
+- `/review` runs a spaced review drill over the least-recently-reviewed confirmed memories
+
 ## Modes And Commands
 
 Foreground commands:
 
 - `/brain [status|ltm|full]` - memory debug summary
+- `/health` - model, search, and embedding provider state
 - `/ask` - force one proactive insight ask
-- `/idle` - force idle cycle now (synthesis + decay)
-- `/delete` - clear all memory databases (episodic, semantic, insight, jobs, vectors)
+- `/idle` - force idle cycle now (synthesis + decay + staleness)
+- `/brief` - daily brief (overdue commitment, contradiction, pattern)
+- `/loops` - open commitments; `/done <id>` marks one done
+- `/focus [minutes|off]` - focus session (suppresses non-urgent prompts)
+- `/review` - spaced review drill
+- `/delete` - clear raw memory, the editable catalog, entities, jobs, and vectors
 
 Natural-language modes:
 
 - `tell me what's in your brain` / `brain dump` / `show all memory` -> `brain_dump_reply`
 - `remember this ...` / `don't forget ...` -> `remember_reply`
 - `where is my car ...` / `what did i say ...` / `remind me where ...` -> `memory_recall_reply`
+- `what do you know about ...` / `what do you remember about ...` -> `memory_recall_reply`
 
 Intent routing is hybrid: rules/regex + embedding retrieval + LLM rerank, with low-confidence fallback to `planner_full`.
 
@@ -109,15 +154,30 @@ ollama pull nomic-embed-text
 ## Run
 
 ```bash
-python server/phone_server.py
-python main.py
+# Terminal 1: phone UI, debug UI, and memory review API
+venv/bin/python server/phone_server.py
+
+# Terminal 2: assistant loop
+venv/bin/python main.py
 ```
 
-Open the phone UI at `http://127.0.0.1:8081` and debug dashboard at `http://127.0.0.1:8081/debug`.
+Open:
+
+- assistant UI: `http://127.0.0.1:8081`
+- memory review: `http://127.0.0.1:8081/memory`
+- runtime debug: `http://127.0.0.1:8081/debug`
+
+The memory dashboard works with only Terminal 1 running. Existing facts, episodes, and insights migrate automatically the first time `main.py` starts.
+
+For an isolated dashboard database:
+
+```bash
+AMTAVLA_CATALOG_DB=/tmp/amtavla-memory.db venv/bin/python server/phone_server.py
+```
 
 ## Raw Trace Run
 
-Run the full raw terminal trace script:
+Run the scripted trace through the same `TurnOrchestrator` used by the live app:
 
 ```bash
 python3 raw_full_trace.py
@@ -140,15 +200,16 @@ Artifacts are written to:
 
 ## Tests
 
-Run focused tests for the new JSON/vector/LTM components:
+Install development dependencies and run the complete offline suite:
 
 ```bash
-python3 -m pytest tests/test_json_utils.py tests/test_vector_store.py tests/test_memory_ltm_knn.py
+pip install -r requirements-dev.txt
+python3 -m pytest tests
 ```
 
-`pytest` is not pinned in `requirements.txt`; install it separately if needed.
+The suite uses fake inference, embedding, and search clients. It does not require llama.cpp, Ollama, or network access.
 
 ## What Is Still In Progress
 
 - Proactive insight quality still needs calibration in long sessions.
-- Intent routing is still config-heavy and can be simplified further.
+- Phase 3 (tagging, capture, snapshots, contradiction/staleness, source-backed answers) and the pragmatic cores of Phase 4 (commitments, reminders, focus, brief) and Phase 5 (style profile, idea revival, review drills) are implemented; next up is project cockpit views, richer reminder triggers, and learning-item generation.
