@@ -54,3 +54,10 @@ def test_memory_service_recall_uses_vector_ltm(tmp_path, monkeypatch):
     recall = service.recall_context("python scripting", include_web=False, top_k=3)
     assert recall["insights"]
     assert recall["insights"][0]["id"] == insight_id
+
+    catalog_item = service.catalog.get_by_external_key(f"insight:{insight_id}")
+    service.set_memory_review_state(catalog_item["id"], "deleted")
+    recall_after_delete = service.recall_context(
+        "python scripting", include_web=False, top_k=3
+    )
+    assert recall_after_delete["insights"] == []

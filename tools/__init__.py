@@ -1,3 +1,3 @@
-from tools.websearch import tool_websearch
+from tools.websearch import SearchResult, WebSearchClient, search_web, tool_websearch
 
-__all__ = ["tool_websearch"]
+__all__ = ["SearchResult", "WebSearchClient", "search_web", "tool_websearch"]

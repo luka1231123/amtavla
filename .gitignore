@@ -21,12 +21,16 @@ brain/ltm_tree.json.lock
 brain/working_memory.txt
 brain/working_memory.txt.lock
 brain/db/*.db
+brain/db/*.db-*
 brain/db/*.sqlite
 !brain/db/.gitkeep
 
 # Test artifacts
 tests/*.lock
 logs/*.log
+logs/*.log.*
+logs/raw_runs/**
+exports/**
 logs/system_runs/**
 logs/abilities_runs/**
 !logs/.gitkeep

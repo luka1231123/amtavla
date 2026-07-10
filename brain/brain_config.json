@@ -7,7 +7,8 @@
     "intent_model": "default",
     "intent_model_threshold": 1,
     "intent_embedding_enabled": true,
-    "intent_low_confidence_fallback": "planner_full"
+    "intent_low_confidence_fallback": "planner_full",
+    "show_sources": true
   },
   "idle_memory": {
     "enabled": true,
@@ -16,6 +17,7 @@
   },
   "memory": {
     "db_dir": "brain/db",
+    "catalog_db_path": "brain/db/memory_catalog.db",
     "vector_db_path": "brain/db/ltm_vectors.db",
     "embedding_dim": 768,
     "vector_top_k": 5,
@@ -26,7 +28,18 @@
     "proactive_turn_gap": 8,
     "proactive_seconds_gap": 600,
     "proactive_max_asks": 2,
-    "proactive_snooze_seconds": 900
+    "proactive_snooze_seconds": 900,
+    "reminder_gap_seconds": 21600,
+    "tagging": {
+      "min_confidence": 0.3,
+      "max_tags_per_item": 6,
+      "feedback_reject_penalty": 0.15,
+      "feedback_accept_boost": 0.1
+    },
+    "context": {
+      "snapshot_max_age_seconds": 21600,
+      "recent_item_window": 25
+    }
   },
   "search": {
     "enabled": true,
@@ -106,12 +119,15 @@
         "where is my car",
         "where did i park",
         "what did i say",
+        "what do you know about",
+        "what do you remember about",
+        "do you remember",
         "remind me",
         "where is it parked",
         "my memory"
       ],
       "regex": [
-        "\\b(where (is|did) (my|the) (car|keys|wallet)|where did i park|what did i say|remind me where)\\b"
+        "\\b(where (is|did) (my|the) (car|keys|wallet)|where did i park|what did i say|what do you (know|remember) about|do you remember|remind me where)\\b"
       ]
     },
     {

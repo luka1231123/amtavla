@@ -4,8 +4,10 @@
 {
   "steps": [
     {"action": "SEARCH", "detail": "short query"},
-    {"action": "TOOL", "detail": "bash"},
-    {"action": "THINK", "detail": ""}
+    {"action": "CALCULATE", "detail": "arithmetic expression"},
+    {"action": "MEMORY_SEARCH", "detail": "memory query"},
+    {"action": "MEMORY_WRITE", "detail": "durable fact"},
+    {"action": "THINK", "detail": "reasoning instruction"}
   ],
   "thinking": "brief reasoning about approach"
 }
