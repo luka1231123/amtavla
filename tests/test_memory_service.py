@@ -1,8 +1,16 @@
 import json
+import os
+import queue
 import sqlite3
+import threading
 import time
 
 import brain.memory.service as memory_service_module
+import brain.memory_controller as memory_controller_module
+import pytest
+from brain.memory.catalog import MemoryCatalog
+from brain.memory.catalog import resolve_repo_path
+from brain.memory.vector_store import SQLiteVecStore
 
 
 def _config(vector_db):
@@ -42,6 +50,116 @@ def _facts(service):
                 "SELECT statement, confidence, provenance_json FROM facts ORDER BY id"
             ).fetchall()
         ]
+
+
+def test_resolve_repo_path_anchors_relative_paths_to_repo_root():
+    resolved = resolve_repo_path("brain/db")
+    assert os.path.isabs(resolved)
+    assert resolved.endswith(os.path.join("brain", "db"))
+    # An absolute path is returned unchanged.
+    assert resolve_repo_path("/tmp/amtavla-x.db") == "/tmp/amtavla-x.db"
+
+
+def test_sqlite_contexts_close_connections(tmp_path, monkeypatch):
+    service = _service(tmp_path, monkeypatch)
+    catalog = MemoryCatalog(str(tmp_path / "standalone-catalog.db"))
+    vectors = SQLiteVecStore(str(tmp_path / "standalone-vectors.db"), embedding_dim=8)
+
+    connections = []
+    for manager in (
+        service._connect(service._semantic_db),
+        catalog._connect(),
+        vectors._connect(),
+    ):
+        with manager as conn:
+            conn.execute("SELECT 1").fetchone()
+            connections.append(conn)
+
+    for conn in connections:
+        with pytest.raises(sqlite3.ProgrammingError, match="closed database"):
+            conn.execute("SELECT 1")
+
+
+def test_recall_drops_stopword_matches_and_zero_score_vectors(tmp_path, monkeypatch):
+    service = _service(tmp_path, monkeypatch)
+    service.write_memory("Remember this: my bicycle is beside the garage")
+    monkeypatch.setattr(
+        memory_service_module.llama_client,
+        "embed",
+        lambda text: {"embedding": [0.0] * 8},
+    )
+
+    recall = service.recall_context(
+        "what should you possess", include_web=False, top_k=5
+    )
+
+    assert recall["memory_items"] == []
+    assert recall["semantic"] == []
+
+
+class _RaiseOnceMemory:
+    def __init__(self):
+        self.committed = []
+        self.calls = 0
+
+    def commit_turn(self, user_input, response, trace=None):
+        self.calls += 1
+        if self.calls == 1:
+            raise sqlite3.OperationalError("unable to open database file")
+        self.committed.append((user_input, response))
+
+
+class _FailingIdleMemory:
+    def __init__(self):
+        self.calls = 0
+
+    def run_idle_jobs(self):
+        self.calls += 1
+        raise sqlite3.OperationalError("unable to open database file")
+
+
+def test_worker_survives_a_raising_commit_turn():
+    # A single failing commit must not kill the worker: the next good commit
+    # still lands. Build the controller without __init__ to avoid a real
+    # MemoryService, and drive its worker loop directly.
+    controller = object.__new__(memory_controller_module.MemoryController)
+    controller.memory = _RaiseOnceMemory()
+    controller._turn_queue = queue.Queue()
+    controller._stop_event = threading.Event()
+
+    thread = threading.Thread(target=controller._worker_loop, daemon=True)
+    thread.start()
+    try:
+        controller._turn_queue.put(("bad", "r1", {}))
+        controller._turn_queue.put(("good", "r2", {}))
+        controller._turn_queue.join()
+    finally:
+        controller._stop_event.set()
+        controller._turn_queue.put(None)
+        thread.join(timeout=1.0)
+
+    assert controller.memory.calls == 2
+    assert controller.memory.committed == [("good", "r2")]
+
+
+def test_failed_idle_run_still_obeys_minimum_interval(monkeypatch):
+    controller = object.__new__(memory_controller_module.MemoryController)
+    controller.memory = _FailingIdleMemory()
+    controller._turn_queue = queue.Queue()
+    controller._foreground_lock = threading.Lock()
+    controller._foreground_active = 0
+    controller._last_activity_ts = 0.0
+    controller._last_idle_run_ts = 0.0
+    controller._idle_seconds = 4.0
+    controller._idle_min_interval_seconds = 5.0
+    monkeypatch.setattr(memory_controller_module.time, "time", lambda: 100.0)
+
+    with pytest.raises(sqlite3.OperationalError):
+        controller._run_idle_memory_maintenance()
+    controller._run_idle_memory_maintenance()
+
+    assert controller.memory.calls == 1
+    assert controller._last_idle_run_ts == 100.0
 
 
 def test_explicit_remember_stores_non_first_person_fact(tmp_path, monkeypatch):
@@ -234,7 +352,7 @@ def test_deleted_derived_episode_does_not_leak_from_raw_event_adapter(
     assert episode["id"] not in {item["id"] for item in context["memory_items"]}
 
 
-def test_tool_sources_become_provenanced_source_excerpts(tmp_path, monkeypatch):
+def test_transient_tool_sources_do_not_become_recallable_memory(tmp_path, monkeypatch):
     service = _service(tmp_path, monkeypatch)
     service.commit_turn(
         "Find the current release date.",
@@ -261,15 +379,13 @@ def test_tool_sources_become_provenanced_source_excerpts(tmp_path, monkeypatch):
         },
     )
 
-    excerpt = next(
+    excerpts = [
         item
         for item in service.list_memory_items(include_deleted=True)
         if item["item_type"] == "source_excerpt"
-    )
-    inspected = service.inspect_memory_item(excerpt["id"])
-
-    assert excerpt["metadata"]["action"] == "SEARCH"
-    assert inspected["sources"][0]["source_id"] == "web:abc"
+    ]
+    assert excerpts == []
+    assert service.recall_memory_items("release Monday") == []
 
 
 def test_existing_facts_and_insights_migrate_into_catalog(tmp_path, monkeypatch):
@@ -345,3 +461,81 @@ def test_existing_facts_and_insights_migrate_into_catalog(tmp_path, monkeypatch)
     assert preference["sources"][0]["source_type"] == "legacy_fact_provenance"
     assert insight["item_type"] == "insight"
     assert insight["review_state"] == "confirmed"
+
+
+def _insert_candidate_insight(service, thesis="Focus improves after planning."):
+    now = time.time()
+    with service._connect(service._insight_db) as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO insights(thesis, rationale, evidence_json, novelty_score, confidence, status, feedback_state, ask_count, quality_score, created_at)
+            VALUES(?, 'test', '{}', 0.8, 0.8, 'candidate', 'asked', 0, 0.8, ?)
+            """,
+            (thesis, now),
+        )
+        return int(cursor.lastrowid)
+
+
+def test_apply_insight_feedback_keep_and_discard(tmp_path, monkeypatch):
+    service = _service(tmp_path, monkeypatch)
+    kept_id = _insert_candidate_insight(service, "Kept thesis about planning.")
+    dropped_id = _insert_candidate_insight(service, "Dropped thesis about noise.")
+
+    assert service.apply_insight_feedback(kept_id, True)["kept"] is True
+    assert service.apply_insight_feedback(dropped_id, False)["kept"] is False
+
+    with service._connect(service._insight_db) as conn:
+        kept = conn.execute(
+            "SELECT status, feedback_state FROM insights WHERE id = ?", (kept_id,)
+        ).fetchone()
+        dropped = conn.execute(
+            "SELECT status, feedback_state FROM insights WHERE id = ?", (dropped_id,)
+        ).fetchone()
+    assert (kept["status"], kept["feedback_state"]) == ("promoted", "confirmed")
+    assert (dropped["status"], dropped["feedback_state"]) == (
+        "candidate",
+        "rejected",
+    )
+
+
+def test_incidental_yes_no_words_do_not_resolve_memory_check(tmp_path, monkeypatch):
+    """"no" or "right" buried in an unrelated sentence must not count as an
+    answer to the pending keep/discard question."""
+    service = _service(tmp_path, monkeypatch)
+    insight_id = _insert_candidate_insight(service)
+    service._active_asked_insight_id = insight_id
+
+    service.commit_turn(
+        "I parked the car on the right side of the street, there is no garage there",
+        "Noted.",
+        {"intent": "default"},
+    )
+
+    with service._connect(service._insight_db) as conn:
+        row = conn.execute(
+            "SELECT status, feedback_state FROM insights WHERE id = ?",
+            (insight_id,),
+        ).fetchone()
+    # Neither promoted nor rejected — just snoozed for later.
+    assert row["status"] == "candidate"
+    assert row["feedback_state"] == "snoozed"
+
+
+def test_recall_context_separates_memory_check_from_reminder_nudge(
+    tmp_path, monkeypatch
+):
+    service = _service(tmp_path, monkeypatch)
+    recall = service.recall_context("what should I do today", include_web=False)
+
+    assert "reminder_nudge" in recall
+    # The keep/discard question never rides inside the reminder nudge.
+    assert "should I keep this insight" not in (recall["reminder_nudge"] or "")
+
+
+def test_embedding_health_is_cheap_and_reflects_state(tmp_path, monkeypatch):
+    service = _service(tmp_path, monkeypatch)
+    service._embed_text("warm up")
+
+    health = service.embedding_health()
+    assert health["embedding_available"] is True
+    assert health["embedding_last_error"] == ""

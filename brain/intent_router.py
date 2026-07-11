@@ -42,6 +42,40 @@ class IntentRouter:
         self._intents.sort(key=lambda i: i["priority"], reverse=True)
         self._intent_vectors = self._build_intent_vectors()
 
+    def _knowledge_question_route(self, text: str) -> dict | None:
+        """Prefer grounded lookup for ordinary external-knowledge questions.
+
+        Explicit personal-memory, reminder, and other rule routes are evaluated
+        first. This is only a deterministic fallback before asking the small
+        local model to classify an otherwise unknown question.
+        """
+        prompt = (text or "").strip()
+        patterns = (
+            r"^(?:what|who|when|where|which)\s+(?:is|are|was|were|do|does|did|can|will)\b",
+            r"^(?:how|why)\s+(?:is|are|was|were|do|does|did|can|will)\b",
+            r"^(?:explain|define|compare)\b",
+        )
+        if not any(re.search(pattern, prompt, re.IGNORECASE) for pattern in patterns):
+            return None
+        social_or_self = re.search(
+            r"\b(?:how are you|what do you think|what should (?:i|you|we)|"
+            r"what can you|who are you)\b",
+            prompt,
+            re.IGNORECASE,
+        )
+        if social_or_self:
+            return None
+        intent = next((item for item in self._intents if item["name"] == "web_factual"), None)
+        if intent is None:
+            return None
+        return {
+            "intent": intent["name"],
+            "pathway": intent["pathway"],
+            "score": 2,
+            "confidence": 0.75,
+            "source": "knowledge_question",
+        }
+
     def _embed(self, text: str) -> list[float] | None:
         try:
             import llama_client
@@ -184,6 +218,9 @@ class IntentRouter:
                 best = candidate
 
         if best is None:
+            knowledge_route = self._knowledge_question_route(prompt)
+            if knowledge_route is not None:
+                return knowledge_route
             fallback = {
                 "intent": "default",
                 "pathway": self.low_confidence_fallback,

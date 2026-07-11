@@ -1,8 +1,20 @@
 {
+  "llm": {
+    "model_filename": "Qwen2.5-Coder-7B-Instruct-Q6_K_L.gguf",
+    "gpu_layers": 99,
+    "context_size": 4096,
+    "use_jinja": false,
+    "max_tokens": 512,
+    "structured_output_enabled": false,
+    "sampling": {
+      "default": {"temperature": 0.7, "top_p": 0.8},
+      "thinking": {"temperature": 0.6, "top_p": 0.95}
+    },
+    "_swap_note": "To adopt Qwen3.5-9B: set model_filename to the new .gguf, use_jinja true, context_size 16384, structured_output_enabled true."
+  },
   "routing": {
     "default_pathway": "planner_full",
     "max_plan_steps": 4,
-    "max_search_chars": 2200,
     "intent_model_enabled": true,
     "intent_model": "default",
     "intent_model_threshold": 1,
@@ -13,7 +25,9 @@
   "idle_memory": {
     "enabled": true,
     "idle_seconds": 4.0,
-    "poll_seconds": 0.5
+    "poll_seconds": 0.5,
+    "min_interval_seconds": 30.0,
+    "reminder_tick_seconds": 2.0
   },
   "memory": {
     "db_dir": "brain/db",
@@ -21,6 +35,7 @@
     "vector_db_path": "brain/db/ltm_vectors.db",
     "embedding_dim": 768,
     "vector_top_k": 5,
+    "min_recall_score": 0.35,
     "episodic_ttl_seconds": 604800,
     "episodic_recall_extension_seconds": 172800,
     "episodic_strength_alpha": 0.25,
@@ -44,15 +59,16 @@
   "search": {
     "enabled": true,
     "top_k": 3,
-    "max_chars": 2200
+    "max_chars": 2200,
+    "timeout_seconds": 6
   },
-  "salience": {
-    "max_facts_per_turn": 3,
-    "min_score": 3,
-    "max_fact_length": 140,
-    "ignore_regex": [
-      "^(hi|hello|hey|yo|sup|wazzup|thanks|thank you|ok|okay|cool|nice|great)[!. ]*$"
-    ]
+  "reasoning": {
+    "enabled": true,
+    "min_sources": 2,
+    "max_context_chars": 6500
+  },
+  "local_files": {
+    "root": "sandbox"
   },
   "intents": [
     {
@@ -108,7 +124,36 @@
         "keep this in mind",
         "memorize"
       ],
-      "regex": []
+      "regex": [
+        "^\\s*(please\\s+)?(remember|memori[sz]e|note)\\b",
+        "\\bremember (this|that)\\b"
+      ]
+    },
+    {
+      "name": "reminder",
+      "priority": 94,
+      "pathway": "reminder_reply",
+      "min_score": 1,
+      "keywords": [
+        "set a reminder",
+        "don't let me forget",
+        "dont let me forget"
+      ],
+      "regex": [
+        "\\bremind me (to|about|at|in|that|tomorrow|tonight|later|next|this|on)\\b",
+        "\\bset an? reminder\\b",
+        "\\bdon'?t let me forget\\b"
+      ]
+    },
+    {
+      "name": "reminder_question",
+      "priority": 93,
+      "pathway": "reminder_reply",
+      "min_score": 1,
+      "keywords": [],
+      "regex": [
+        "\\b(would|could|can|will) you remind me\\b"
+      ]
     },
     {
       "name": "memory_recall",
@@ -127,7 +172,10 @@
         "my memory"
       ],
       "regex": [
-        "\\b(where (is|did) (my|the) (car|keys|wallet)|where did i park|what did i say|what do you (know|remember) about|do you remember|remind me where)\\b"
+        "\\b(where (is|did) (my|the) (car|keys|wallet)|where did i park|what did i say|what do you (know|remember) about|do you remember|remind me where)\\b",
+        "\\bwhat(?:'s| is) my\\b",
+        "\\bwhat (colou?r|size|kind|type|brand) (is|are|was) my\\b",
+        "\\bwhere (is|are) my\\b"
       ]
     },
     {
@@ -146,6 +194,70 @@
         "tagline"
       ],
       "regex": []
+    },
+    {
+      "name": "arithmetic",
+      "priority": 89,
+      "pathway": "planner_full",
+      "min_score": 1,
+      "keywords": [],
+      "regex": [
+        "\\d+(?:\\.\\d+)?\\s*[*x\u00d7+/-]\\s*\\d+(?:\\.\\d+)?",
+        "\\b\\d+(?:\\.\\d+)?\\s*(?:percent|%)\\s*of\\s*\\d+",
+        "\\bwhat(?:'s| is) \\d+.*(?:times|plus|minus|multiplied by|divided by)\\s*\\d+"
+      ]
+    },
+    {
+      "name": "summarize",
+      "priority": 88,
+      "pathway": "summarize_reply",
+      "min_score": 1,
+      "keywords": [
+        "summarize my notes",
+        "summary of my notes",
+        "checklist from my notes",
+        "make a checklist",
+        "recap my notes"
+      ],
+      "regex": [
+        "\\b(summari[sz]e|recap|checklist)\\b.*\\b(my |the )?(notes?|memory|memories|week|day)\\b",
+        "\\bmake (me )?a (checklist|summary)\\b"
+      ]
+    },
+    {
+      "name": "local_notes",
+      "priority": 86,
+      "pathway": "notes_reply",
+      "min_score": 1,
+      "keywords": [
+        "list files",
+        "list my files",
+        "read the file",
+        "open the file",
+        "find the file"
+      ],
+      "regex": [
+        "\\b(list|show)\\b.*\\bfiles\\b",
+        "\\b(read|open|cat)\\b.*\\.(md|txt|py|json|csv|log|yaml|yml|toml)\\b",
+        "\\bfind\\b.*\\b(file|note|doc|document)\\b"
+      ]
+    },
+    {
+      "name": "research",
+      "priority": 84,
+      "pathway": "research_reply",
+      "min_score": 1,
+      "keywords": [
+        "research this",
+        "deep dive",
+        "look into",
+        "investigate",
+        "research for me"
+      ],
+      "regex": [
+        "\\b(deep dive|research|investigate|look into)\\b.*\\b(on|about|into|for)\\b",
+        "\\bdo (some )?research\\b"
+      ]
     },
     {
       "name": "web_factual",

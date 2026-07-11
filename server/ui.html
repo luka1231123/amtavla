@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>amtavla</title>
+    <style>
+        * { box-sizing: border-box; }
+        html, body { margin: 0; height: 100%; }
+        body {
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #101214;
+            color: #e7eaed;
+            display: flex;
+            flex-direction: column;
+            height: 100dvh;
+            overflow: hidden;
+        }
+        button, input, select, textarea { font: inherit; }
+        button { cursor: pointer; }
+        input, select, textarea {
+            width: 100%;
+            color: #e7eaed;
+            background: #15181b;
+            border: 1px solid #3a4249;
+            border-radius: 6px;
+            padding: 8px 10px;
+        }
+        input:focus, select:focus, textarea:focus { outline: 2px solid #287e9a; outline-offset: 0; }
+        .button {
+            width: auto;
+            min-height: 34px;
+            padding: 6px 12px;
+            border: 1px solid #3a4249;
+            border-radius: 6px;
+            background: #24292e;
+            color: #e7eaed;
+        }
+        .button:hover { background: #30363c; }
+        .button.primary { background: #176b87; border-color: #2389aa; }
+        .button.good { background: #245a3b; border-color: #337d52; }
+        .button.warn { background: #654c1f; border-color: #8a692d; }
+        .button.danger { background: #682e35; border-color: #923f49; }
+        .button:disabled { opacity: 0.45; cursor: default; }
+
+        /* ---- Top bar with tabs ---- */
+        header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 9px 16px;
+            border-bottom: 1px solid #2c3136;
+            background: #171a1d;
+            flex: 0 0 auto;
+        }
+        h1 { margin: 0; font-size: 16px; font-weight: 700; white-space: nowrap; letter-spacing: 0.3px; }
+        .tabs { display: flex; gap: 4px; }
+        .tab {
+            border: 1px solid transparent;
+            background: transparent;
+            color: #9da6ad;
+            border-radius: 7px;
+            padding: 7px 15px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .tab:hover { background: #1f2429; color: #cdd3d8; }
+        .tab.active { background: #202a2f; color: #e7eaed; border-color: #2f9dba55; }
+        .tab .count { color: #6f7a82; font-weight: 500; margin-left: 5px; font-size: 12px; }
+        .spacer { flex: 1; }
+        .conn { display: flex; align-items: center; gap: 7px; color: #9da6ad; font-size: 12px; white-space: nowrap; }
+        .dot { width: 9px; height: 9px; border-radius: 50%; background: #6f7a82; }
+        .dot.ok { background: #40b46f; box-shadow: 0 0 6px #40b46f88; }
+        .dot.bad { background: #d05561; }
+
+        main { flex: 1; min-height: 0; position: relative; }
+        .pane { position: absolute; inset: 0; display: none; flex-direction: column; min-height: 0; }
+        .pane.active { display: flex; }
+
+        /* ---- Chat pane ---- */
+        .chat-log { flex: 1; overflow-y: auto; padding: 20px 18px; display: flex; flex-direction: column; gap: 12px; }
+        .msg { max-width: 760px; padding: 11px 14px; border-radius: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; }
+        .msg.user { align-self: flex-end; background: #23343d; border: 1px solid #2f9dba44; }
+        .msg.assistant { align-self: flex-start; background: #1b2024; border: 1px solid #2c3136; }
+        .msg.system { align-self: center; background: transparent; color: #818a91; font-size: 13px; font-style: italic; padding: 4px; }
+        .msg .who { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #7f8a92; margin-bottom: 4px; }
+        .msg.memcheck { align-self: flex-start; background: #241f16; border: 1px solid #b98a2f66; }
+        .memcheck-actions { display: flex; gap: 8px; margin-top: 9px; }
+        .memcheck-actions button { padding: 6px 18px; border-radius: 8px; border: 1px solid #3a4046; background: #262c31; color: #dfe5e9; font-size: 14px; cursor: pointer; }
+        .memcheck-actions button:hover { background: #313840; }
+        .memcheck-actions button:disabled { opacity: 0.45; cursor: default; }
+        .memcheck-actions button.yes { border-color: #2f9dba88; }
+        .memcheck-actions button.no { border-color: #ba5f2f88; }
+        .chat-empty { color: #6f7a82; text-align: center; margin: auto; }
+        .composer { flex: 0 0 auto; display: flex; gap: 9px; padding: 12px 16px; border-top: 1px solid #2c3136; background: #15181b; align-items: flex-end; }
+        .composer textarea { min-height: 44px; max-height: 160px; resize: none; line-height: 1.45; }
+        #dictateBtn { flex: 0 0 auto; width: 46px; height: 44px; font-size: 18px; padding: 0; background: #24292e; }
+        #dictateBtn.listening { background: #8b2a2a; border-color: #b04242; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.65;} }
+        #sendBtn { flex: 0 0 auto; height: 44px; }
+
+        /* ---- Memory pane ---- */
+        .mem-toolbar {
+            flex: 0 0 auto;
+            display: grid;
+            grid-template-columns: minmax(200px, 1fr) 150px 150px auto auto auto;
+            gap: 8px;
+            align-items: center;
+            padding: 10px 14px;
+            border-bottom: 1px solid #2c3136;
+        }
+        .mem-overview { display: flex; gap: 16px; flex-wrap: wrap; padding: 8px 14px; color: #9da6ad; font-size: 13px; border-bottom: 1px solid #2c3136; background: #14181b; }
+        .mem-overview strong { color: #e7eaed; }
+        .toggle { display: flex; align-items: center; gap: 6px; color: #aeb6bd; font-size: 13px; white-space: nowrap; }
+        .toggle input { width: 16px; height: 16px; }
+        .mem-body { flex: 1; display: grid; grid-template-columns: minmax(300px, 38%) minmax(0, 1fr); min-height: 0; }
+        .list-panel { border-right: 1px solid #2c3136; overflow: auto; }
+        .memory-row { display: grid; grid-template-columns: 28px minmax(0, 1fr); border-bottom: 1px solid #23282c; }
+        .memory-row.active { background: #202a2f; box-shadow: inset 3px 0 #2f9dba; }
+        .memory-row input { width: 15px; height: 15px; align-self: start; margin: 16px 0 0 9px; }
+        .row-button { min-width: 0; text-align: left; padding: 10px 12px 11px 4px; color: inherit; background: transparent; border: 0; width: 100%; }
+        .row-button:hover { background: #1b2024; }
+        .row-meta { display: flex; gap: 7px; align-items: center; margin-bottom: 6px; color: #9da6ad; font-size: 11px; flex-wrap: wrap; }
+        .row-content { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-height: 1.4; font-size: 14px; }
+        .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; background: #30363c; color: #cbd1d6; font-size: 11px; }
+        .badge.confirmed, .badge.corrected { color: #8fe0aa; background: #203c2b; }
+        .badge.candidate { color: #f0cd78; background: #493b1d; }
+        .badge.rejected, .badge.deleted { color: #f0a0a8; background: #492429; }
+        .badge.archived { color: #aeb6bd; background: #30353a; }
+        .badge.stale { color: #f0cd78; background: #493b1d; }
+        .badge.conflict { color: #f0a0a8; background: #492429; }
+        .tag-chip { display: inline-block; padding: 1px 7px; border-radius: 9px; background: #24303c; color: #9ec7e8; font-size: 11px; margin-right: 4px; margin-top: 4px; }
+        .tag-chip.suggested { opacity: 0.65; border: 1px dashed #46606f; }
+        .tag-chip.accepted { border: 1px solid #35576d; }
+        .tag-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #252a2e; font-size: 13px; }
+        .tag-row:last-child { border-bottom: 0; }
+        .tag-row .grow { flex: 1; }
+        .tag-actions button { padding: 2px 8px; font-size: 11px; }
+        .detail-panel { min-width: 0; overflow: auto; padding: 18px 20px 40px; }
+        .empty { color: #818a91; padding: 24px; }
+        .detail-head { display: flex; align-items: start; gap: 12px; margin-bottom: 14px; }
+        .detail-head h2 { margin: 0; font-size: 17px; flex: 1; overflow-wrap: anywhere; }
+        .field-label { display: block; margin: 15px 0 6px; color: #9da6ad; font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.4px; }
+        textarea#contentEditor { min-height: 110px; resize: vertical; line-height: 1.45; }
+        .actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+        .section { border-top: 1px solid #2c3136; margin-top: 19px; padding-top: 13px; }
+        .section h3 { margin: 0 0 10px; font-size: 13px; color: #c8ced3; }
+        .record { padding: 9px 0; border-bottom: 1px solid #252a2e; font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+        .record:last-child { border-bottom: 0; }
+        .record-meta { color: #818b92; font-size: 11px; margin-bottom: 3px; }
+
+        /* ---- Logs pane ---- */
+        .logs-toolbar { flex: 0 0 auto; display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid #2c3136; flex-wrap: wrap; }
+        .logs-toolbar select { width: auto; min-width: 150px; }
+        .log-stream { flex: 1; overflow-y: auto; padding: 12px 14px; }
+        .log-event { border: 1px solid #23282c; border-left-width: 3px; border-radius: 7px; margin-bottom: 8px; background: #15181b; overflow: hidden; }
+        .log-head { display: flex; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer; }
+        .log-head:hover { background: #1a1f23; }
+        .log-type { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
+        .log-summary { flex: 1; font-size: 13.5px; overflow-wrap: anywhere; }
+        .log-time { color: #6f7a82; font-size: 11px; white-space: nowrap; }
+        .log-id { color: #55606a; font-size: 11px; }
+        .log-body { display: none; padding: 0 12px 12px; }
+        .log-event.open .log-body { display: block; }
+        .log-body pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 12px; line-height: 1.4; color: #c4ccd2; background: #0d0f11; padding: 10px; border-radius: 6px; overflow-x: auto; }
+        .chevron { color: #6f7a82; font-size: 11px; transition: transform 0.15s; }
+        .log-event.open .chevron { transform: rotate(90deg); }
+
+        .status-line { flex: 0 0 auto; min-height: 24px; padding: 5px 14px; color: #9da6ad; font-size: 12px; border-top: 1px solid #2c3136; background: #14181b; }
+
+        @media (max-width: 820px) {
+            .mem-toolbar { grid-template-columns: 1fr 1fr; }
+            .mem-toolbar input[type="search"] { grid-column: 1 / -1; }
+            .mem-body { grid-template-columns: 1fr; }
+            .list-panel { border-right: 0; max-height: 40vh; border-bottom: 1px solid #2c3136; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>amtavla</h1>
+        <nav class="tabs">
+            <button class="tab active" data-tab="chat">Chat</button>
+            <button class="tab" data-tab="memory">Memory<span class="count" id="memCount"></span></button>
+            <button class="tab" data-tab="logs">Logs<span class="count" id="logCount"></span></button>
+        </nav>
+        <div class="spacer"></div>
+        <div class="conn"><span class="dot" id="connDot"></span><span id="connText">connecting…</span></div>
+    </header>
+
+    <main>
+        <!-- ============ CHAT ============ -->
+        <section class="pane active" data-pane="chat">
+            <div class="chat-log" id="chatLog"><div class="chat-empty">Say something to start. Messages route through the live turn loop.</div></div>
+            <div class="composer">
+                <button id="dictateBtn" title="Hold to dictate">🎤</button>
+                <textarea id="chatInput" rows="1" placeholder="Type a message, Enter to send (Shift+Enter for newline)"></textarea>
+                <button class="button primary" id="sendBtn">Send</button>
+            </div>
+        </section>
+
+        <!-- ============ MEMORY ============ -->
+        <section class="pane" data-pane="memory">
+            <div class="mem-overview" id="overview"></div>
+            <div class="mem-toolbar">
+                <input id="search" type="search" placeholder="Search memory" autocomplete="off">
+                <select id="typeFilter" aria-label="Memory type">
+                    <option value="">All types</option>
+                    <option value="fact">Facts</option>
+                    <option value="episode">Episodes</option>
+                    <option value="decision">Decisions</option>
+                    <option value="commitment">Commitments</option>
+                    <option value="preference">Preferences</option>
+                    <option value="idea">Ideas</option>
+                    <option value="insight">Insights</option>
+                    <option value="source_excerpt">Source excerpts</option>
+                </select>
+                <select id="stateFilter" aria-label="Review state">
+                    <option value="">All states</option>
+                    <option value="candidate">Candidate</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="corrected">Corrected</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="archived">Archived</option>
+                    <option value="deleted">Deleted</option>
+                </select>
+                <label class="toggle"><input id="includeDeleted" type="checkbox">Deleted</label>
+                <button class="button" id="mergeButton" disabled>Merge</button>
+                <button class="button" id="exportButton">Export</button>
+            </div>
+            <div class="mem-body">
+                <section class="list-panel" id="memoryList"></section>
+                <section class="detail-panel" id="detail"><div class="empty">Select a memory.</div></section>
+            </div>
+        </section>
+
+        <!-- ============ LOGS ============ -->
+        <section class="pane" data-pane="logs">
+            <div class="logs-toolbar">
+                <select id="logFilter" aria-label="Filter log type">
+                    <option value="">All event types</option>
+                    <option value="user_prompt">User prompt</option>
+                    <option value="intent_decision">Intent decision</option>
+                    <option value="route_pathway">Route pathway</option>
+                    <option value="context">Context</option>
+                    <option value="plan">Plan</option>
+                    <option value="action_result">Action result</option>
+                    <option value="assistant_response">Assistant response</option>
+                    <option value="health">Health</option>
+                </select>
+                <label class="toggle"><input id="autoscroll" type="checkbox" checked>Auto-scroll</label>
+                <label class="toggle"><input id="expandAll" type="checkbox">Expand all</label>
+                <div class="spacer"></div>
+                <button class="button" id="clearLogs">Clear log</button>
+            </div>
+            <div class="log-stream" id="logStream"></div>
+        </section>
+    </main>
+
+    <div class="status-line" id="status"></div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+    // ---------------------------------------------------------------- shared
+    const socket = io({ transports: ['websocket', 'polling'] });
+    const statusEl = document.getElementById('status');
+    const setStatus = (t) => { statusEl.textContent = t || ''; };
+    const esc = (v) => String(v ?? '')
+        .replaceAll('&', '&amp;').replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+
+    async function api(path, options = {}) {
+        const r = await fetch(path, options);
+        if (!r.ok) {
+            const body = await r.json().catch(() => ({}));
+            throw new Error(body.error || `Request failed (${r.status})`);
+        }
+        return r;
+    }
+    const showError = (e) => setStatus(`Error: ${e.message}`);
+
+    // ---------------------------------------------------------------- tabs
+    const panes = document.querySelectorAll('.pane');
+    const tabs = document.querySelectorAll('.tab');
+    let activeTab = 'chat';
+    function activateTab(name) {
+        activeTab = name;
+        tabs.forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
+        panes.forEach((p) => p.classList.toggle('active', p.dataset.pane === name));
+        if (name === 'memory' && !Memory.loaded) Memory.refresh().catch(showError);
+        if (name === 'logs') Logs.scrollToEndIfAuto();
+        if (location.hash.slice(1) !== name) history.replaceState(null, '', '#' + name);
+    }
+    tabs.forEach((t) => t.addEventListener('click', () => activateTab(t.dataset.tab)));
+
+    // ---------------------------------------------------------------- connection
+    const connDot = document.getElementById('connDot');
+    const connText = document.getElementById('connText');
+    socket.on('connect', () => { connDot.className = 'dot ok'; connText.textContent = 'connected'; });
+    socket.on('disconnect', () => { connDot.className = 'dot bad'; connText.textContent = 'disconnected'; });
+
+    // ================================================================ CHAT
+    const Chat = (() => {
+        const logEl = document.getElementById('chatLog');
+        const input = document.getElementById('chatInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const dictateBtn = document.getElementById('dictateBtn');
+        let empty = true;
+
+        function add(role, text) {
+            if (empty) { logEl.innerHTML = ''; empty = false; }
+            const div = document.createElement('div');
+            div.className = 'msg ' + role;
+            if (role === 'system') { div.textContent = text; }
+            else {
+                const who = document.createElement('span');
+                who.className = 'who';
+                who.textContent = role === 'user' ? 'You' : 'amtavla';
+                const body = document.createElement('span');
+                body.textContent = text;
+                div.append(who, body);
+            }
+            logEl.appendChild(div);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function send(text) {
+            const t = (text || '').trim();
+            if (!t) return;
+            add('user', t);
+            setStatus('Processing…');
+            try { socket.emit('submit_command', { text: t }); }
+            catch (e) { setStatus('Failed to send: ' + e.message); }
+        }
+
+        socket.on('assistant_response', (data) => {
+            const text = (data && data.text) || '';
+            if (!text) return;
+            add('assistant', text);
+            setStatus('');
+        });
+        // Memory checks arrive as their own message with yes/no buttons,
+        // separate from ordinary replies.
+        socket.on('memory_check', (data) => {
+            const text = (data && data.text) || '';
+            const insightId = data && data.insight_id;
+            if (!text || insightId == null) return;
+            if (empty) { logEl.innerHTML = ''; empty = false; }
+            const div = document.createElement('div');
+            div.className = 'msg memcheck';
+            const who = document.createElement('span');
+            who.className = 'who';
+            who.textContent = 'memory check';
+            const body = document.createElement('span');
+            body.textContent = text;
+            const actions = document.createElement('div');
+            actions.className = 'memcheck-actions';
+            const answer = (keep) => {
+                try { socket.emit('insight_feedback', { insight_id: insightId, keep }); }
+                catch (e) { setStatus('Failed to send: ' + e.message); return; }
+                actions.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+                body.textContent = text + (keep ? '  — kept' : '  — discarded');
+            };
+            const yesBtn = document.createElement('button');
+            yesBtn.className = 'yes'; yesBtn.textContent = 'Yes, keep';
+            yesBtn.addEventListener('click', () => answer(true));
+            const noBtn = document.createElement('button');
+            noBtn.className = 'no'; noBtn.textContent = 'No, discard';
+            noBtn.addEventListener('click', () => answer(false));
+            actions.append(yesBtn, noBtn);
+            div.append(who, body, actions);
+            logEl.appendChild(div);
+            logEl.scrollTop = logEl.scrollHeight;
+        });
+        // Echo commands submitted from other surfaces (CLI, another tab).
+        socket.on('command_submitted', (data) => {
+            if ((data || {}).source === 'socket') return; // our own echo
+            const text = ((data || {}).text || '').trim();
+            if (text) add('user', text);
+        });
+
+        sendBtn.addEventListener('click', () => { send(input.value); input.value = ''; autosize(); });
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); }
+        });
+        function autosize() { input.style.height = 'auto'; input.style.height = Math.min(160, input.scrollHeight) + 'px'; }
+        input.addEventListener('input', autosize);
+
+        // Dictation (webkitSpeechRecognition), hold-to-talk.
+        let recog = null, listening = false;
+        if ('webkitSpeechRecognition' in window) {
+            recog = new webkitSpeechRecognition();
+            recog.continuous = true; recog.interimResults = true; recog.lang = 'en-US';
+            let transcript = '';
+            recog.onresult = (ev) => {
+                let finalT = '';
+                for (let i = ev.resultIndex; i < ev.results.length; i++) {
+                    if (ev.results[i].isFinal) finalT += ev.results[i][0].transcript;
+                }
+                if (finalT) { transcript = finalT; input.value = finalT; autosize(); }
+            };
+            recog.onend = () => {
+                listening = false; dictateBtn.classList.remove('listening');
+                const t = (transcript || input.value).trim();
+                transcript = '';
+                if (t) { send(t); input.value = ''; autosize(); }
+            };
+            recog.onerror = (ev) => { setStatus('Speech error: ' + ev.error); };
+            const start = () => { if (recog && !listening) { input.value = ''; listening = true; dictateBtn.classList.add('listening'); setStatus('Listening…'); recog.start(); } };
+            const stop = () => { if (recog && listening) { recog.stop(); } };
+            dictateBtn.addEventListener('mousedown', start);
+            dictateBtn.addEventListener('mouseup', stop);
+            dictateBtn.addEventListener('mouseleave', stop);
+            dictateBtn.addEventListener('touchstart', (e) => { e.preventDefault(); start(); });
+            dictateBtn.addEventListener('touchend', (e) => { e.preventDefault(); stop(); });
+        } else {
+            dictateBtn.disabled = true; dictateBtn.title = 'Speech recognition not supported';
+        }
+
+        return { add };
+    })();
+
+    // ================================================================ LOGS
+    const Logs = (() => {
+        const streamEl = document.getElementById('logStream');
+        const filterEl = document.getElementById('logFilter');
+        const autoscrollEl = document.getElementById('autoscroll');
+        const expandAllEl = document.getElementById('expandAll');
+        const countEl = document.getElementById('logCount');
+        const MAX = 500;
+        let events = [];
+
+        const TYPE_COLOR = {
+            user_prompt:        ['#8cc7ff', '#1c2c3a'],
+            intent_decision:    ['#c9a6ff', '#2a2340'],
+            route_pathway:      ['#c9a6ff', '#2a2340'],
+            context:            ['#7fd7c4', '#1b322d'],
+            plan:               ['#f0cd78', '#3a2f16'],
+            action_result:      ['#8fe0aa', '#1c3325'],
+            assistant_response: ['#6fd4e8', '#183038'],
+            health:             ['#aeb6bd', '#2a2f33'],
+        };
+
+        function matchesFilter(ev) {
+            const f = filterEl.value;
+            return !f || ev.type === f;
+        }
+        function scrollToEndIfAuto() {
+            if (autoscrollEl.checked) streamEl.scrollTop = streamEl.scrollHeight;
+        }
+        function eventHtml(ev) {
+            const [fg, bg] = TYPE_COLOR[ev.type] || ['#cbd1d6', '#30363c'];
+            const p = ev.payload || {};
+            const summary = p.summary || '(no summary)';
+            const data = p.data !== undefined ? p.data : p;
+            const time = ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString() : '';
+            const open = expandAllEl.checked ? ' open' : '';
+            return `<div class="log-event${open}" data-id="${ev.id}" style="border-left-color:${fg}">
+                <div class="log-head">
+                    <span class="chevron">▶</span>
+                    <span class="log-type" style="color:${fg};background:${bg}">${esc(ev.type)}</span>
+                    <span class="log-summary">${esc(summary)}</span>
+                    <span class="log-time">${esc(time)}</span>
+                    <span class="log-id">#${ev.id}</span>
+                </div>
+                <div class="log-body"><pre>${esc(JSON.stringify(data, null, 2))}</pre></div>
+            </div>`;
+        }
+        function render() {
+            const visible = events.filter(matchesFilter);
+            countEl.textContent = events.length ? `(${events.length})` : '';
+            if (!visible.length) {
+                streamEl.innerHTML = '<div class="empty">No events yet. Send a message in Chat to see the turn loop.</div>';
+                return;
+            }
+            streamEl.innerHTML = visible.map(eventHtml).join('');
+            streamEl.querySelectorAll('.log-head').forEach((h) => {
+                h.addEventListener('click', () => h.parentElement.classList.toggle('open'));
+            });
+            scrollToEndIfAuto();
+        }
+        function append(ev) {
+            if (!ev || typeof ev !== 'object') return;
+            events.push(ev);
+            if (events.length > MAX) events = events.slice(events.length - MAX);
+            // Cheap incremental append when no filter narrows the view.
+            if (matchesFilter(ev) && streamEl.querySelector('.log-event')) {
+                streamEl.insertAdjacentHTML('beforeend', eventHtml(ev));
+                const el = streamEl.lastElementChild;
+                el.querySelector('.log-head').addEventListener('click', () => el.classList.toggle('open'));
+                countEl.textContent = `(${events.length})`;
+                scrollToEndIfAuto();
+            } else {
+                render();
+            }
+        }
+
+        async function bootstrap() {
+            try {
+                const data = await (await api('/debug/events?limit=200')).json();
+                events = Array.isArray(data.events) ? data.events : [];
+                render();
+            } catch (e) { showError(e); }
+        }
+
+        filterEl.addEventListener('change', render);
+        expandAllEl.addEventListener('change', render);
+        document.getElementById('clearLogs').addEventListener('click', async () => {
+            try { await api('/debug/events/clear', { method: 'POST' }); events = []; render(); setStatus('Log cleared'); }
+            catch (e) { showError(e); }
+        });
+        socket.on('debug_event', append);
+
+        return { bootstrap, scrollToEndIfAuto, append };
+    })();
+
+    // ================================================================ MEMORY
+    const Memory = (() => {
+        const state = { items: [], selectedId: null, mergeIds: new Set(), selected: null };
+        const listEl = document.getElementById('memoryList');
+        const detailEl = document.getElementById('detail');
+        const mergeButton = document.getElementById('mergeButton');
+        const memCount = document.getElementById('memCount');
+        let loaded = false;
+
+        async function loadOverview() {
+            const data = await (await api('/api/memory/overview')).json();
+            const total = Object.values(data.by_state || {}).reduce((s, v) => s + v, 0);
+            memCount.textContent = total ? `(${total})` : '';
+            document.getElementById('overview').innerHTML =
+                `<span><strong>${total}</strong> items</span>` +
+                `<span><strong>${data.entity_count || 0}</strong> entities</span>` +
+                `<span><strong>${data.relation_count || 0}</strong> relations</span>` +
+                `<span><strong>${data.suggested_tag_count || 0}</strong> tags to review</span>` +
+                (data.contradiction_count ? `<span class="badge conflict"><strong>${data.contradiction_count}</strong> conflicts</span>` : '');
+        }
+
+        async function loadItems() {
+            const params = new URLSearchParams();
+            const query = document.getElementById('search').value.trim();
+            const type = document.getElementById('typeFilter').value;
+            const reviewState = document.getElementById('stateFilter').value;
+            if (query) params.set('q', query);
+            if (type) params.set('type', type);
+            if (reviewState) params.set('state', reviewState);
+            if (document.getElementById('includeDeleted').checked || reviewState === 'deleted') params.set('include_deleted', '1');
+            const data = await (await api(`/api/memory/items?${params}`)).json();
+            state.items = data.items || [];
+            renderList();
+            setStatus(`${state.items.length} memories`);
+        }
+
+        function renderList() {
+            if (!state.items.length) { listEl.innerHTML = '<div class="empty">No memories found.</div>'; return; }
+            listEl.innerHTML = state.items.map((item) => `
+                <div class="memory-row ${item.id === state.selectedId ? 'active' : ''}">
+                    <input type="checkbox" data-merge-id="${item.id}" ${state.mergeIds.has(item.id) ? 'checked' : ''} aria-label="Select memory ${item.id} for merge">
+                    <button class="row-button" data-item-id="${item.id}">
+                        <div class="row-meta">
+                            <span>#${item.id}</span>
+                            <span>${esc(item.item_type)}</span>
+                            <span class="badge ${esc(item.review_state)}">${esc(item.review_state)}</span>
+                            ${(item.metadata || {}).stale ? '<span class="badge stale">stale</span>' : ''}
+                            ${((item.metadata || {}).contradicts || []).length ? '<span class="badge conflict">conflict</span>' : ''}
+                        </div>
+                        <div class="row-content">${esc(item.content)}</div>
+                        ${(item.tags || []).length ? `<div>${item.tags.map((tag) =>
+                            `<span class="tag-chip ${esc(tag.status)}">${esc(tag.tag_type)}:${esc(tag.name)}</span>`).join('')}</div>` : ''}
+                    </button>
+                </div>`).join('');
+            listEl.querySelectorAll('[data-item-id]').forEach((b) => b.addEventListener('click', () => selectItem(Number(b.dataset.itemId))));
+            listEl.querySelectorAll('[data-merge-id]').forEach((cb) => cb.addEventListener('change', () => {
+                const id = Number(cb.dataset.mergeId);
+                cb.checked ? state.mergeIds.add(id) : state.mergeIds.delete(id);
+                mergeButton.disabled = !state.selectedId || [...state.mergeIds].filter((v) => v !== state.selectedId).length === 0;
+            }));
+        }
+
+        async function selectItem(itemId) {
+            state.selectedId = itemId;
+            state.selected = await (await api(`/api/memory/items/${itemId}`)).json();
+            renderList();
+            renderDetail();
+            mergeButton.disabled = [...state.mergeIds].filter((v) => v !== itemId).length === 0;
+        }
+
+        const renderRecords = (rows, r) => (!rows || !rows.length) ? '<div class="record-meta">None</div>' : rows.map(r).join('');
+
+        function renderDetail() {
+            const item = state.selected;
+            if (!item) { detailEl.innerHTML = '<div class="empty">Select a memory.</div>'; return; }
+            detailEl.innerHTML = `
+                <div class="detail-head">
+                    <h2>#${item.id} ${esc(item.item_type)}</h2>
+                    <span class="badge ${esc(item.review_state)}">${esc(item.review_state)}</span>
+                </div>
+                <label class="field-label" for="contentEditor">Content</label>
+                <textarea id="contentEditor">${esc(item.content)}</textarea>
+                <div class="actions">
+                    <button class="button primary" id="saveCorrection">Save correction</button>
+                    <button class="button good" data-state="confirmed">Confirm</button>
+                    <button class="button" data-state="rejected">Reject</button>
+                    <button class="button warn" data-state="archived">Archive</button>
+                    <button class="button danger" data-state="deleted">Delete</button>
+                </div>
+                <div class="section">
+                    <h3>Tags</h3>
+                    ${renderRecords((item.tags || []).filter((t) => t.status !== 'corrected'), (tag) => `
+                        <div class="tag-row">
+                            <span class="tag-chip ${esc(tag.status)}">${esc(tag.tag_type)}:${esc(tag.name)}</span>
+                            <span class="record-meta grow">${esc(tag.status)} (${Number(tag.confidence).toFixed(2)})</span>
+                            <span class="tag-actions">
+                                ${tag.status !== 'accepted' ? `<button class="button good" data-tag-action="accept" data-tag-id="${tag.tag_id}">✓</button>` : ''}
+                                ${tag.status !== 'rejected' ? `<button class="button danger" data-tag-action="reject" data-tag-id="${tag.tag_id}">✗</button>` : ''}
+                                <button class="button" data-tag-action="correct" data-tag-id="${tag.tag_id}">✎</button>
+                            </span>
+                        </div>`)}
+                    <div class="actions" style="margin-top:8px"><button class="button" id="addTagButton">Add tag</button></div>
+                </div>
+                <div class="section"><h3>Provenance</h3>
+                    ${renderRecords(item.sources, (s) => `<div class="record"><div class="record-meta">${esc(s.source_type)} | ${esc(s.source_id)}</div><div>${esc(s.excerpt || '(no excerpt)')}</div></div>`)}
+                </div>
+                <div class="section"><h3>Entities</h3>
+                    ${renderRecords(item.entities, (e) => `<div class="record"><div class="record-meta">${esc(e.entity_type)} | ${esc(e.role)}</div><div>${esc(e.name)}</div></div>`)}
+                </div>
+                <div class="section"><h3>Relations</h3>
+                    ${renderRecords(item.relations, (r) => `<div class="record">${esc(r.source_name)} ${esc(r.relation_type)} ${esc(r.target_name)}</div>`)}
+                </div>
+                <div class="section"><h3>History</h3>
+                    ${renderRecords(item.history, (h) => `<div class="record"><div class="record-meta">${esc(h.operation)} | ${new Date(h.created_at * 1000).toLocaleString()}</div><div>${esc(h.note || '')}</div></div>`)}
+                </div>`;
+            document.getElementById('saveCorrection').addEventListener('click', () => saveCorrection().catch(showError));
+            detailEl.querySelectorAll('[data-state]').forEach((b) => b.addEventListener('click', () => changeState(b.dataset.state).catch(showError)));
+            detailEl.querySelectorAll('[data-tag-action]').forEach((b) => b.addEventListener('click', () => reviewTag(b.dataset.tagAction, Number(b.dataset.tagId)).catch(showError)));
+            document.getElementById('addTagButton').addEventListener('click', () => addTag().catch(showError));
+        }
+
+        async function reviewTag(action, tagId) {
+            const body = { action };
+            if (action === 'correct') {
+                const replacement = prompt('Correct tag as "type:name" (project/person/location/time/topic):');
+                if (!replacement || !replacement.includes(':')) return;
+                const [tagType, ...rest] = replacement.split(':');
+                body.tag_type = tagType.trim(); body.name = rest.join(':').trim();
+            }
+            setStatus(`Tag ${action}…`);
+            await api(`/api/memory/items/${state.selectedId}/tags/${tagId}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            await selectItem(state.selectedId);
+            setStatus(`Tag ${action}ed`);
+        }
+        async function addTag() {
+            const value = prompt('New tag as "type:name" (project/person/location/time/topic):');
+            if (!value || !value.includes(':')) return;
+            const [tagType, ...rest] = value.split(':');
+            setStatus('Adding tag…');
+            await api(`/api/memory/items/${state.selectedId}/tags`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tag_type: tagType.trim(), name: rest.join(':').trim() }) });
+            await selectItem(state.selectedId);
+            setStatus('Tag added');
+        }
+        async function saveCorrection() {
+            const content = document.getElementById('contentEditor').value.trim();
+            if (!content) return;
+            setStatus('Saving correction…');
+            state.selected = await (await api(`/api/memory/items/${state.selectedId}/correct`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) })).json();
+            await refresh(); setStatus('Correction saved');
+        }
+        async function changeState(reviewState) {
+            if (reviewState === 'deleted' && !confirm('Delete this memory from active recall?')) return;
+            setStatus(`Setting ${reviewState}…`);
+            state.selected = await (await api(`/api/memory/items/${state.selectedId}/state`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ review_state: reviewState }) })).json();
+            await refresh(); setStatus(`Memory ${reviewState}`);
+        }
+        async function mergeSelected() {
+            const sourceIds = [...state.mergeIds].filter((id) => id !== state.selectedId);
+            if (!state.selectedId || !sourceIds.length) return;
+            if (!confirm(`Merge ${sourceIds.length} selected memories into #${state.selectedId}?`)) return;
+            setStatus('Merging…');
+            state.selected = await (await api('/api/memory/merge', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ target_id: state.selectedId, source_ids: sourceIds }) })).json();
+            state.mergeIds.clear();
+            await refresh(); setStatus('Memories merged');
+        }
+        async function exportMemory() {
+            setStatus('Preparing export…');
+            const response = await api('/api/memory/export', { method: 'POST' });
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url; link.download = 'amtavla-memory.zip'; link.click();
+            URL.revokeObjectURL(url);
+            setStatus(`Exported ${response.headers.get('X-Memory-Item-Count') || 0} memories`);
+        }
+        async function refresh() {
+            loaded = true;
+            await Promise.all([loadOverview(), loadItems()]);
+            if (state.selectedId) {
+                try { state.selected = await (await api(`/api/memory/items/${state.selectedId}`)).json(); renderDetail(); }
+                catch (_) { state.selected = null; state.selectedId = null; renderDetail(); }
+            }
+        }
+
+        let searchTimer = null;
+        document.getElementById('search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => loadItems().catch(showError), 180); });
+        document.getElementById('typeFilter').addEventListener('change', () => loadItems().catch(showError));
+        document.getElementById('stateFilter').addEventListener('change', () => loadItems().catch(showError));
+        document.getElementById('includeDeleted').addEventListener('change', () => loadItems().catch(showError));
+        mergeButton.addEventListener('click', () => mergeSelected().catch(showError));
+        document.getElementById('exportButton').addEventListener('click', () => exportMemory().catch(showError));
+
+        return { refresh, get loaded() { return loaded; } };
+    })();
+
+    // ---------------------------------------------------------------- boot
+    Logs.bootstrap();
+    const initial = location.hash.slice(1);
+    if (['chat', 'memory', 'logs'].includes(initial)) activateTab(initial);
+    </script>
+</body>
+</html>

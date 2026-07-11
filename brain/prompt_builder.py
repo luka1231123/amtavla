@@ -17,6 +17,9 @@ class PromptBuilder:
         "remember_reply": ("skills/memory_ops.md",),
         "memory_recall_reply": ("skills/memory_ops.md",),
         "creative_reply": ("skills/creative.md",),
+        "summarize_reply": ("skills/summarize.md",),
+        "notes_reply": ("skills/tool_use.md",),
+        "research_reply": ("skills/research.md",),
     }
 
     def __init__(
@@ -91,6 +94,24 @@ class PromptBuilder:
             variables={"assembled_context": assembled_context.strip()},
             intent=intent,
             pathway=pathway,
+        )
+
+    def build_reasoner_prompt(
+        self,
+        *,
+        user_input: str,
+        evidence_context: str,
+    ) -> str:
+        return self.build(
+            task_file="tasks/reasoner.md",
+            variables={
+                "user_input": user_input.strip(),
+                "evidence_context": evidence_context.strip(),
+            },
+            extra_files=[
+                "policies/internal_usage.md",
+                "policies/caveman_internal.md",
+            ],
         )
 
     def build_intent_router_prompt(

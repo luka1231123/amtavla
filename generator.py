@@ -8,6 +8,7 @@ from brain.contracts import (
     ActionType,
     ContextPack,
     Plan,
+    ReasoningResult,
     RouteDecision,
     SearchResult,
     SourceRef,
@@ -26,7 +27,12 @@ def _source_for_kind(sources: list[SourceRef], kind: str, index: int) -> str:
 
 def _render_action_output(result: ActionResult) -> str:
     if not result.ok:
-        return f"Action failed: {result.error}"
+        return (
+            f"ACTION FAILED — {result.action_type.value} did NOT happen: "
+            f"{result.error}\n"
+            "Nothing was stored or executed for this action. Tell the user "
+            "plainly that it failed and why. Do not claim or imply success."
+        )
     if isinstance(result.output, str):
         return result.output
     if result.action_type == ActionType.SEARCH:
@@ -61,6 +67,7 @@ def build_response_context(
     plan: Plan,
     action_results: list[ActionResult],
     context: ContextPack,
+    reasoning: ReasoningResult | None = None,
 ) -> str:
     parts = []
 
@@ -165,6 +172,26 @@ def build_response_context(
             + context.style_context
         )
 
+    if reasoning and reasoning.applied:
+        lines = []
+        if reasoning.answer_outline:
+            lines.append(f"Answer outline: {reasoning.answer_outline}")
+        for claim in reasoning.claims:
+            citations = " ".join(f"[{source_id}]" for source_id in claim.get("source_ids", []))
+            suffix = f" {citations}" if citations else ""
+            lines.append(f"Claim: {claim.get('text', '')}{suffix}")
+        for uncertainty in reasoning.uncertainties:
+            lines.append(f"Uncertainty: {uncertainty}")
+        if reasoning.warnings:
+            lines.extend(f"Warning: {warning}" for warning in reasoning.warnings)
+        if lines:
+            parts.append(
+                "--- Grounded Reasoning Pass ---\n"
+                "Use this synthesis to write the answer. Preserve its source IDs "
+                "beside the claims they support. Do not add unsupported facts.\n"
+                + "\n".join(lines)
+            )
+
     sources = collect_response_sources(context, action_results)
     if sources:
         lines = []
@@ -178,13 +205,18 @@ def build_response_context(
 
 def render_source_summary(response: str, sources: list[SourceRef]) -> str:
     """Readable user-facing footer for the sources the answer actually cited.
-
-    Falls back to the top available sources when the model cited none.
     """
     if not sources:
         return ""
-    cited = [s for s in sources if s.source_id in (response or "")]
-    shown = cited or sources[:3]
+    # Match the bracketed citation form the generator prompt requires
+    # ([memory:item:12]) so a prefix like memory:item:1 does not falsely match
+    # inside memory:item:12. Never display merely available sources as if the
+    # answer used them.
+    text = response or ""
+    cited = [s for s in sources if f"[{s.source_id}]" in text]
+    if not cited:
+        return ""
+    shown = cited
     lines = []
     for source in shown:
         if source.kind == "web":
@@ -228,8 +260,11 @@ class ResponseGenerator:
         action_results: list[ActionResult],
         context: ContextPack,
         route: RouteDecision,
+        reasoning: ReasoningResult | None = None,
     ) -> str:
-        context_str = build_response_context(plan, action_results, context)
+        context_str = build_response_context(
+            plan, action_results, context, reasoning=reasoning
+        )
         system_message = self.prompt_builder.build_generator_prompt(
             assembled_context=context_str,
             intent=route.intent,

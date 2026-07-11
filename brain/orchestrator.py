@@ -5,7 +5,7 @@ import logging
 import time
 from typing import Any, Callable
 
-from brain.action_runner import ActionRunner
+from brain.action_runner import ActionRunner, reminder_request_supported
 from brain.config import load_brain_config
 from brain.contracts import (
     Action,
@@ -19,6 +19,7 @@ from brain.contracts import (
 )
 from brain.health import HealthReporter
 from brain.planner import Planner
+from brain.reasoner import GroundedReasoner
 from generator import (
     ResponseGenerator,
     collect_response_sources,
@@ -34,6 +35,16 @@ DIRECT_PATHWAYS = {
     "memory_recall_reply",
 }
 
+# Pathways that deterministically map to one known action; the planner is not
+# consulted, so routing stays debuggable and the small model can't drop the tool.
+SINGLE_ACTION_PATHWAYS = {
+    "search_then_reply": ActionType.SEARCH,
+    "summarize_reply": ActionType.SUMMARIZE,
+    "reminder_reply": ActionType.REMINDER,
+    "notes_reply": ActionType.NOTE_READ,
+    "research_reply": ActionType.RESEARCH,
+}
+
 
 class TurnOrchestrator:
     def __init__(
@@ -44,6 +55,7 @@ class TurnOrchestrator:
         planner: Any | None = None,
         action_runner: ActionRunner | Any | None = None,
         response_generator: Any | None = None,
+        reasoner: Any | None = None,
         health_reporter: Any | None = None,
         debug_hook: Callable[[str, dict[str, Any]], None] | None = None,
         config: dict[str, Any] | None = None,
@@ -56,6 +68,7 @@ class TurnOrchestrator:
         self.planner = planner or Planner(max_steps=self.max_plan_steps)
         self.action_runner = action_runner or ActionRunner(memory_client=memory)
         self.response_generator = response_generator or ResponseGenerator()
+        self.reasoner = reasoner or GroundedReasoner(config=self.config)
         self.health_reporter = health_reporter or HealthReporter(
             memory,
             search_client=getattr(self.action_runner, "search_client", None),
@@ -118,9 +131,23 @@ class TurnOrchestrator:
         route = turn.route or RouteDecision("default", "planner_full")
         if route.pathway in DIRECT_PATHWAYS:
             return Plan()
-        if route.pathway == "search_then_reply":
+        if route.pathway in SINGLE_ACTION_PATHWAYS:
+            action_type = SINGLE_ACTION_PATHWAYS[route.pathway]
+            if action_type == ActionType.REMINDER and not reminder_request_supported(
+                turn.user_input
+            ):
+                # A fuzzy route picked reminder_reply but the REMINDER gate
+                # would refuse it; let the planner choose instead of running
+                # an action that is guaranteed to fail.
+                return await asyncio.to_thread(
+                    self.planner.create_plan,
+                    turn.user_input,
+                    turn.context.combined_context,
+                    route.intent,
+                    route.pathway,
+                )
             return Plan(
-                actions=[Action(action_type=ActionType.SEARCH, detail=turn.user_input)]
+                actions=[Action(action_type=action_type, detail=turn.user_input)]
             )
         return await asyncio.to_thread(
             self.planner.create_plan,
@@ -261,20 +288,63 @@ class TurnOrchestrator:
                     turn.context,
                     turn.action_results,
                 )
-                turn.response_source_ids = [
-                    source.source_id for source in response_sources
-                ]
+
+                reasoning_started = time.perf_counter()
+                turn.reasoning = await asyncio.to_thread(
+                    self.reasoner.reason,
+                    turn.user_input,
+                    turn.plan,
+                    turn.action_results,
+                    turn.context,
+                    turn.route,
+                )
+                if turn.reasoning.applied:
+                    self._record(
+                        turn,
+                        "reasoning",
+                        started=reasoning_started,
+                        inputs={
+                            "available_source_ids": [
+                                source.source_id for source in response_sources
+                            ]
+                        },
+                        outputs=turn.reasoning.to_dict(),
+                        source_ids=turn.reasoning.source_ids,
+                    )
 
                 started = time.perf_counter()
-                if turn.route.intent == "memory_recall" and not turn.context.has_context():
-                    has_memory_action_context = any(
-                        result.ok
-                        and result.action_type == ActionType.MEMORY_SEARCH
-                        and result.sources
+                clarify_question = next(
+                    (
+                        str((result.output or {}).get("question", "")).strip()
                         for result in turn.action_results
-                    )
-                    base_response = (
-                        await asyncio.to_thread(
+                        if result.ok
+                        and result.action_type == ActionType.CLARIFY
+                        and isinstance(result.output, dict)
+                    ),
+                    "",
+                )
+                if clarify_question:
+                    # The application, not the model, owns clarification: the
+                    # planned question IS the reply, verbatim.
+                    base_response = clarify_question
+                elif turn.route.intent == "memory_recall" and not turn.context.has_context():
+                    # memory_recall_reply is a direct pathway (no planned
+                    # actions), so with no recalled context there is nothing
+                    # to answer from.
+                    base_response = "IDK"
+                else:
+                    if turn.reasoning.applied:
+                        base_response = await asyncio.to_thread(
+                            self.response_generator.generate,
+                            turn.user_input,
+                            turn.plan,
+                            turn.action_results,
+                            turn.context,
+                            turn.route,
+                            turn.reasoning,
+                        )
+                    else:
+                        base_response = await asyncio.to_thread(
                             self.response_generator.generate,
                             turn.user_input,
                             turn.plan,
@@ -282,33 +352,33 @@ class TurnOrchestrator:
                             turn.context,
                             turn.route,
                         )
-                        if has_memory_action_context
-                        else "IDK"
-                    )
-                else:
-                    base_response = await asyncio.to_thread(
-                        self.response_generator.generate,
-                        turn.user_input,
-                        turn.plan,
-                        turn.action_results,
-                        turn.context,
-                        turn.route,
-                    )
                 turn.response = base_response
                 memory_response = base_response
+                cited_sources = [
+                    source
+                    for source in response_sources
+                    if f"[{source.source_id}]" in base_response
+                ]
+                turn.response_source_ids = [
+                    source.source_id for source in cited_sources
+                ]
                 show_sources = bool(
                     self.config.get("routing", {}).get("show_sources", True)
                 )
                 if (
                     show_sources
                     and base_response != "IDK"
+                    and not clarify_question
                     and turn.route.pathway not in {"direct_reply", "creative_reply"}
                 ):
-                    summary = render_source_summary(base_response, response_sources)
+                    summary = render_source_summary(base_response, cited_sources)
                     if summary:
                         turn.response += "\n\n" + summary
-                if turn.context.pending_feedback_prompt:
-                    turn.response += "\n\n" + turn.context.pending_feedback_prompt
+                if turn.context.reminder_nudge:
+                    turn.response += "\n\n" + turn.context.reminder_nudge
+                # pending_feedback_prompt is NOT appended: the memory-check
+                # question is delivered as its own message (with yes/no
+                # buttons in the UI) by the transport layer.
                 self._record(
                     turn,
                     "assistant_response",

@@ -17,7 +17,7 @@ pip install -r requirements-dev.txt   # adds pytest
 venv/bin/python server/phone_server.py   # phone UI, debug UI, memory review API on :8081
 venv/bin/python main.py                  # assistant CLI loop
 
-# Or both at once (also starts/stops llama-server)
+# Or both at once (main.py starts llama-server on launch; ./run kills it on exit)
 ./run
 
 # Tests (fully offline — fakes model/embedding/search clients, no llama.cpp/Ollama/network needed)
@@ -25,9 +25,10 @@ venv/bin/python -m pytest tests
 venv/bin/python -m pytest tests/test_orchestrator.py
 venv/bin/python -m pytest tests/test_orchestrator.py::test_name -v
 
-# Scripted end-to-end trace through the same TurnOrchestrator the live app uses
+# Live conversation probe: scenario suites through the same TurnOrchestrator the
+# live app uses, with per-turn gap annotation (needs llama.cpp + Ollama; wipes memory)
 python3 raw_full_trace.py
-# writes to logs/raw_runs/<timestamp>/{session_transcript,brain_timeline,memory_chronological,web_searches,idle_processes,thoughts}.txt
+# writes logs/raw_runs/<timestamp>/gap_report.md plus {session_transcript,brain_timeline,memory_chronological,web_searches,idle_processes,thoughts}.txt
 ```
 
 Isolated memory DB for a scratch dashboard run: `AMTAVLA_CATALOG_DB=/tmp/amtavla-memory.db venv/bin/python server/phone_server.py`.
@@ -43,11 +44,12 @@ External runtime deps (not installed via pip): a locally-built `llama.cpp` serve
 1. Create a typed `Turn` (`brain/contracts.py`) with a stable ID; sample subsystem health.
 2. `IntentRouter` (`brain/intent_router.py`) returns a `RouteDecision` — hybrid rules/regex + embedding retrieval + LLM rerank, with low-confidence fallback to `planner_full`.
 3. `MemoryController` (`brain/memory_controller.py`) returns a source-aware `ContextPack` (semantic + episodic + insight context) without doing implicit web work.
-4. Pathway determines planning: `DIRECT_PATHWAYS` (`direct_reply`, `creative_reply`, `remember_reply`, `memory_recall_reply`) skip planning; `search_then_reply` gets one deterministic search action; everything else goes through `Planner` (`brain/planner.py`), bounded by `max_plan_steps`.
+4. Pathway determines planning: `DIRECT_PATHWAYS` (`direct_reply`, `creative_reply`, `remember_reply`, `memory_recall_reply`) skip planning; `SINGLE_ACTION_PATHWAYS` (`search_then_reply`, `summarize_reply`, `reminder_reply`, `notes_reply`, `research_reply`) get one deterministic action; everything else goes through `Planner` (`brain/planner.py`), bounded by `max_plan_steps`.
 5. `ActionRunner` (`brain/action_runner.py`) executes each `Action` in order, always returning an `ActionResult` (even on failure — failures are structured, not exceptions).
-6. `ResponseGenerator` (`generator.py`) builds a source-aware prompt from the plan, action results, and context, and generates the response.
-7. The completed `Turn` + its `TraceEvent` list are queued for memory commit.
-8. Idle workers run background synthesis, promote strong discoveries to insight LTM, and decay/expire episodic memory.
+6. `GroundedReasoner` (`brain/reasoner.py`) optionally runs one bounded evidence-synthesis pass between tools and generation — only for question-like, non-direct-pathway turns with at least one successful evidence action or `min_sources` supplied sources (`reasoning.enabled` in config). It emits validated claims tied to real source IDs, which the generator prompt must preserve verbatim rather than re-deriving.
+7. `ResponseGenerator` (`generator.py`) builds a source-aware prompt from the plan, action results, context, and any reasoning pass, and generates the response.
+8. The completed `Turn` + its `TraceEvent` list are queued for memory commit.
+9. Idle workers run background synthesis, promote strong discoveries to insight LTM, and decay/expire episodic memory.
 
 All contracts in `brain/contracts.py` are plain dataclasses that serialize to JSON-safe dicts for persistence/UI (`Turn`, `RouteDecision`, `ContextPack`, `Plan`, `Action`, `ActionResult`, `TraceEvent`, `SourceRef`, `SearchResult`).
 
@@ -60,8 +62,15 @@ All contracts in `brain/contracts.py` are plain dataclasses that serialize to JS
 | `CALCULATE` | Arithmetic via restricted AST | None |
 | `MEMORY_SEARCH` | Recall local semantic/episodic/insight context | Local read |
 | `MEMORY_WRITE` | Store one explicit durable fact with provenance | Local write |
+| `SUMMARIZE` | Collect recent catalog notes as cited material for the generator | Local read |
+| `REMINDER` | Parse "remind me..." into a confirmed commitment with `due_at`; a dedicated ~2s reminder tick fires it via the proactive channel | Local write |
+| `NOTE_READ` | List/read/find local files via `tools/localfiles.py` (sandboxed root, read-only, size-bounded) | Local read |
+| `CLARIFY` | One clarifying question that becomes the reply verbatim (no generation) | None |
+| `RESEARCH` | Queue a bounded background research job (2 searches + 1 synthesis); result arrives proactively | Local write, deferred network |
 
-Unknown planner actions become validation warnings and are never executed.
+Unknown planner actions become validation warnings and are never executed. `MEMORY_WRITE` and `REMINDER` are permission-gated: they refuse to run unless the user's own words asked for them (`REMINDER` also accepts self-declared commitments like "I promised X by Friday" — the same phrasing commit-time extraction stores anyway, and both share one dedup key).
+
+Idle-produced messages (due reminders, finished research) reach the user through `MemoryController.set_proactive_hook` — `main.py` wires it to both the CLI and Socket.IO, buffering for the UI while the socket is down. Reminders and overdue research force-starts run on a dedicated ~2s tick (`_reminder_loop`) so they don't depend on the heavier idle pipeline; idle steps in `run_idle_jobs` are individually isolated so one failing step can't starve the rest. Proactive memory-check questions ("should I keep this insight?") travel as a separate `memory_check` message — rendered with yes/no buttons in the UI (`insight_feedback` event → `apply_insight_feedback`), answered by a short yes/no in the CLI — never appended to answer text.
 
 ### Source/provenance contract
 
@@ -84,7 +93,7 @@ Generated `*.db` files, logs, and raw traces are gitignored — don't expect the
 
 ### Memory review UI
 
-`server/phone_server.py` exposes `/api/memory` endpoints and the dashboard at `/memory` (search, filter, provenance inspection, correct, confirm, reject, archive, delete, merge, export). Exports land in `exports/` as `memory_items.jsonl`, `entities.jsonl`, `relations.jsonl`, `memory.md`, plus a format README; deleted records stay in JSONL for audit history.
+`server/phone_server.py` exposes `/api/memory` endpoints and the dashboard at `/memory` (search, filter, provenance inspection, correct, confirm, reject, archive, delete, merge, export). Exports land in a timestamped `exports/memory/<timestamp>/` directory as `memory_items.jsonl`, `entities.jsonl`, `relations.jsonl`, `memory.md`, plus a format README, then get zipped for download; deleted records stay in JSONL for audit history.
 
 ### Health
 

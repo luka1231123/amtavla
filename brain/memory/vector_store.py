@@ -3,6 +3,7 @@ import logging
 import os
 import sqlite3
 import time
+from contextlib import contextmanager
 
 import numpy as np
 
@@ -26,7 +27,8 @@ class SQLiteVecStore:
         self._sqlite_vec_enabled = False
         self._init_schema()
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self):
         conn = sqlite3.connect(self._db_path, timeout=30)
         conn.row_factory = sqlite3.Row
         try:
@@ -36,7 +38,14 @@ class SQLiteVecStore:
             self._sqlite_vec_enabled = True
         except Exception:
             self._sqlite_vec_enabled = False
-        return conn
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def _init_schema(self):
         with self._connect() as conn:

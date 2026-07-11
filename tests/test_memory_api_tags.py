@@ -62,3 +62,17 @@ def test_capture_endpoint_creates_item_event_and_tags(tmp_path, monkeypatch):
 
     empty = client.post("/api/memory/capture", json={"content": ""})
     assert empty.status_code == 400
+
+
+def test_capture_endpoint_extracts_commitments(tmp_path, monkeypatch):
+    client, catalog = _client(tmp_path, monkeypatch)
+    response = client.post(
+        "/api/memory/capture",
+        json={"content": "remind me to email Sarah tomorrow", "capture_type": "voice"},
+    )
+    assert response.status_code == 201
+    body = response.get_json()
+    assert len(body["commitments"]) == 1
+    assert "email sarah" in body["commitments"][0]["content"].lower()
+    stored = catalog.list_items(item_type="commitment")
+    assert len(stored) == 1

@@ -83,6 +83,48 @@ def test_overdue_commitment_reminder_and_staleness(tmp_path, monkeypatch):
     assert service.catalog.inspect_item(item["id"])["metadata"]["stale"] is True
 
 
+def test_low_confidence_candidate_commitment_does_not_remind(tmp_path, monkeypatch):
+    service = _service(tmp_path, monkeypatch)
+    now = time.time()
+    service.catalog.record_context_snapshot({"active_project": "Amtavla"})
+    # "i'll ..." commitments are stored at confidence 0.5 as unvetted
+    # candidates and carry no due_at unless a deadline phrase was detected.
+    # Without the trust gate, this would still fire a context-match
+    # reminder since it tags with the active project.
+    item = service.catalog.upsert_item(
+        item_type="commitment",
+        content="water the plants for Amtavla",
+        review_state="candidate",
+        confidence=0.5,
+        metadata={"status": "open"},
+    )
+    service.catalog.assign_tag(item["id"], "project", "Amtavla", status="accepted")
+    assert service._due_commitment_reminder(now) == ""
+
+    # A confirmed commitment in the same situation still reminds.
+    confirmed = service.catalog.upsert_item(
+        item_type="commitment",
+        content="water the plants for Amtavla too",
+        review_state="confirmed",
+        confidence=0.5,
+        metadata={"status": "open"},
+    )
+    service.catalog.assign_tag(confirmed["id"], "project", "Amtavla", status="accepted")
+    assert "Amtavla" in service._due_commitment_reminder(now)
+
+
+def test_staleness_catches_resolved_relative_time_tag(tmp_path, monkeypatch):
+    service = _service(tmp_path, monkeypatch)
+    now = time.time()
+    item = service.catalog.upsert_item(item_type="fact", content="follow up next week")
+    service.tag_engine.tag_item(item, now=now)
+
+    # Ten days later "next week" (resolved to an ISO date at tag time) is past.
+    marked = service._apply_staleness_rules(now + 10 * 86400)
+    assert marked == 1
+    assert service.catalog.inspect_item(item["id"])["metadata"]["stale"] is True
+
+
 def test_focus_suppresses_non_urgent_reminders(tmp_path, monkeypatch):
     service = _service(tmp_path, monkeypatch)
     now = time.time()
@@ -110,6 +152,21 @@ def test_contradiction_detected_between_conflicting_facts(tmp_path, monkeypatch)
         if item["metadata"].get("contradicts")
     ]
     assert len(conflicted) == 2
+
+
+def test_contradiction_not_flagged_when_one_value_refines_the_other(
+    tmp_path, monkeypatch
+):
+    service = _service(tmp_path, monkeypatch)
+    service.write_memory("my car is red")
+    service.write_memory("my car is a red Tesla")
+
+    conflicted = [
+        item
+        for item in service.catalog.list_items(limit=100)
+        if item["metadata"].get("contradicts")
+    ]
+    assert conflicted == []
 
 
 def test_daily_brief_lists_overdue_conflict_and_pattern(tmp_path, monkeypatch):

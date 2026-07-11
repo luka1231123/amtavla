@@ -1,18 +1,24 @@
 import json
+import logging
 import os
 import re
 import sqlite3
+import threading
 import time
+from contextlib import contextmanager
 
 import llama_client
 from brain.config import load_brain_config
-from brain.memory.catalog import MemoryCatalog
+from brain.memory.capture import capture_note as _capture_note
+from brain.memory.catalog import MemoryCatalog, resolve_repo_path
 from brain.memory.commitments import extract_commitments
 from brain.memory.context_engine import ContextEngine
 from brain.memory.ltm_repository import LtmRepository
 from brain.memory.tagging import TagEngine
 from brain.memory.vector_store import SQLiteVecStore
-from tools.websearch import render_search_results, search_web, tool_websearch
+from tools.websearch import render_search_results, search_web
+
+logger = logging.getLogger("brain.memory.service")
 
 STYLE_INSTRUCTION_PATTERNS = [
     (re.compile(r"\b(?:be|keep it|make it|keep answers?|answer)\s+(?:shorter|brief|concise|short)\b", re.IGNORECASE), "Keep answers short and concise."),
@@ -146,6 +152,16 @@ IMPERATIVE_VERBS = {
 
 FIRST_PERSON_MARKERS = {"i", "me", "my", "mine", "we", "our", "us"}
 
+RECALL_STOPWORDS = {
+    "a", "an", "and", "are", "as", "at", "be", "been", "but", "by",
+    "can", "could", "did", "do", "does", "for", "from", "had", "has",
+    "have", "how", "i", "if", "in", "is", "it", "its", "me", "my",
+    "of", "on", "or", "our", "should", "that", "the", "their", "them",
+    "then", "there", "these", "they", "this", "those", "to", "us", "was",
+    "we", "were", "what", "when", "where", "which", "who", "why", "will",
+    "with", "would", "you", "your",
+}
+
 UNCERTAIN_LEADS = {"if", "maybe", "might", "perhaps", "possibly"}
 
 MEMORY_DIRECTIVE_PREFIXES = (
@@ -172,6 +188,14 @@ def _now_ts() -> float:
 
 def _tokenize(text: str) -> set[str]:
     return set(re.findall(r"[a-z0-9']+", (text or "").lower()))
+
+
+def _recall_tokens(text: str) -> set[str]:
+    return {
+        token
+        for token in _tokenize(text)
+        if len(token) > 1 and token not in RECALL_STOPWORDS
+    }
 
 
 def _json_load(value: str, default):
@@ -299,7 +323,9 @@ def _should_store_explicit_fact(text: str) -> bool:
 class MemoryService:
     def __init__(self, db_dir: str = "brain/db"):
         self._config = load_brain_config()
-        self._db_dir = db_dir
+        # Anchor relative DB paths to the repo root, not the launch cwd, so the
+        # store opens the same files regardless of where the process started.
+        self._db_dir = resolve_repo_path(os.environ.get("AMTAVLA_DB_DIR") or db_dir)
         os.makedirs(self._db_dir, exist_ok=True)
 
         self._episodic_db = os.path.join(self._db_dir, "episodic.db")
@@ -325,13 +351,20 @@ class MemoryService:
             memory_cfg.get("proactive_snooze_seconds", 900)
         )
         self._embedding_dim = int(memory_cfg.get("embedding_dim", 768))
-        vector_db_path = memory_cfg.get(
-            "vector_db_path", os.path.join(self._db_dir, "ltm_vectors.db")
+        vector_db_path = resolve_repo_path(
+            os.environ.get("AMTAVLA_VECTOR_DB")
+            or memory_cfg.get(
+                "vector_db_path", os.path.join(self._db_dir, "ltm_vectors.db")
+            )
         )
-        catalog_db_path = memory_cfg.get(
-            "catalog_db_path", os.path.join(self._db_dir, "memory_catalog.db")
+        catalog_db_path = resolve_repo_path(
+            os.environ.get("AMTAVLA_CATALOG_DB")
+            or memory_cfg.get(
+                "catalog_db_path", os.path.join(self._db_dir, "memory_catalog.db")
+            )
         )
         self._vector_top_k = int(memory_cfg.get("vector_top_k", 5))
+        self._min_recall_score = float(memory_cfg.get("min_recall_score", 0.35))
 
         self._turn_counter = 0
         self._last_proactive_turn = -99999
@@ -342,6 +375,8 @@ class MemoryService:
         self._embedding_available = None
         self._embedding_last_error = ""
         self._last_catalog_vector_sync = 0.0
+        self._proactive_outbox: list[str] = []
+        self._idle_jobs_lock = threading.Lock()
 
         self.catalog = MemoryCatalog(catalog_db_path)
         self.tag_engine = TagEngine(self.catalog, memory_cfg.get("tagging", {}))
@@ -384,10 +419,25 @@ class MemoryService:
             self._embedding_last_error = str(exc)
         return [0.0] * self._embedding_dim
 
-    def _connect(self, db_path: str) -> sqlite3.Connection:
-        conn = sqlite3.connect(db_path, timeout=30)
+    @contextmanager
+    def _connect(self, db_path: str):
+        try:
+            conn = sqlite3.connect(db_path, timeout=30)
+        except sqlite3.OperationalError:
+            # "unable to open database file" here is almost always transient
+            # resource pressure (fd exhaustion), not a bad path. One short
+            # retry keeps a single spike from failing the whole operation.
+            time.sleep(0.25)
+            conn = sqlite3.connect(db_path, timeout=30)
         conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def _init_schema(self):
         with self._connect(self._episodic_db) as conn:
@@ -631,7 +681,13 @@ class MemoryService:
     def _reconcile_catalog_vectors(self, force: bool = False):
         latest = self._last_catalog_vector_sync
         sync_started = time.time()
-        items = self.catalog.list_items(include_deleted=True, limit=100000)
+        # Incremental sync fetches only rows changed since the last pass —
+        # this runs on every recall and must not scan the whole catalog.
+        items = self.catalog.list_items(
+            include_deleted=True,
+            updated_since=None if force else latest,
+            limit=100000,
+        )
         for item in items:
             if not force and float(item["updated_at"]) <= latest:
                 continue
@@ -678,50 +734,10 @@ class MemoryService:
             )
             self._ltm_repo.upsert_entity_node(entity)
 
-    def _sync_trace_sources(self, trace: dict):
-        turn_id = trace.get("turn_id", "")
-        for action in trace.get("actions", []):
-            if not isinstance(action, dict):
-                continue
-            for source in action.get("sources", []):
-                if not isinstance(source, dict):
-                    continue
-                source_id = str(source.get("source_id") or "").strip()
-                content = str(
-                    source.get("excerpt")
-                    or source.get("title")
-                    or source.get("url")
-                    or ""
-                ).strip()
-                if not source_id or not content:
-                    continue
-                item = self.catalog.upsert_item(
-                    item_type="source_excerpt",
-                    content=content,
-                    summary=str(source.get("title") or ""),
-                    review_state="candidate",
-                    confidence=0.6,
-                    importance=0.35,
-                    external_key=f"turn_source:{turn_id}:{source_id}",
-                    metadata={
-                        "turn_id": turn_id,
-                        "action_id": action.get("action_id", ""),
-                        "action": action.get("action", ""),
-                        "url": source.get("url", ""),
-                    },
-                    sources=[
-                        {
-                            "source_type": source.get("kind", "tool_run"),
-                            "source_id": source_id,
-                            "excerpt": content,
-                            "metadata": source.get("metadata") or {},
-                        }
-                    ],
-                )
-                self._ltm_repo.upsert_memory_item_node(item)
-
     def prefetch_semantic_facts(self, query: str, limit: int = 6) -> list[dict]:
-        q_tokens = _tokenize(query)
+        q_tokens = _recall_tokens(query)
+        if not q_tokens:
+            return []
         with self._connect(self._semantic_db) as conn:
             rows = conn.execute(
                 "SELECT id, statement, confidence, provenance_json, last_seen FROM facts"
@@ -741,7 +757,7 @@ class MemoryService:
             statement = (
                 catalog_item["content"] if catalog_item else row["statement"]
             )
-            overlap = len(_tokenize(statement) & q_tokens)
+            overlap = len(_recall_tokens(statement) & q_tokens)
             if overlap == 0:
                 continue
             confidence = (
@@ -903,38 +919,60 @@ class MemoryService:
     def force_proactive_ask(self) -> dict:
         return self._maybe_get_proactive_prompt(force=True)
 
+    def apply_insight_feedback(self, insight_id: int, keep: bool) -> dict:
+        """Resolve a memory-check question directly (yes/no button or command)."""
+        now = _now_ts()
+        if keep:
+            new_state, new_status, snoozed_until = "confirmed", "promoted", now
+        else:
+            new_state, new_status = "rejected", "candidate"
+            snoozed_until = now + (7 * self._proactive_snooze_seconds)
+        with self._connect(self._insight_db) as conn:
+            conn.execute(
+                "UPDATE insights SET feedback_state = ?, status = ?, snoozed_until = ? WHERE id = ?",
+                (new_state, new_status, snoozed_until, int(insight_id)),
+            )
+        self._sync_insight_vector(int(insight_id))
+        if self._active_asked_insight_id == int(insight_id):
+            self._active_asked_insight_id = None
+        return {"insight_id": int(insight_id), "kept": bool(keep)}
+
     def _handle_feedback_if_any(self, user_input: str):
         if self._active_asked_insight_id is None:
             return
         text = (user_input or "").lower()
         if not text.strip():
             return
-        confirm = any(
-            w in text for w in ["yes", "correct", "right", "keep", "agree", "true"]
-        )
-        reject = any(
-            w in text
-            for w in ["no", "wrong", "reject", "discard", "false", "incorrect"]
-        )
+        # Only a short, direct answer counts as feedback; a passing "no" or
+        # "right" inside an unrelated sentence must not resolve the question.
+        tokens = re.findall(r"[a-z']+", text)
+        head = set(tokens[:4])
+        confirm = bool(
+            head & {"yes", "correct", "right", "keep", "agree", "true"}
+        ) and len(tokens) <= 8
+        reject = bool(
+            head & {"no", "wrong", "reject", "discard", "false", "incorrect"}
+        ) and len(tokens) <= 8
         if "not an insight" in text or "more of a memory" in text:
             reject = True
 
-        now = _now_ts()
-        new_state = "snoozed"
-        new_status = "candidate"
-        snoozed_until = now + self._proactive_snooze_seconds
         if confirm:
-            new_state = "confirmed"
-            new_status = "promoted"
-            snoozed_until = now
-        elif reject:
-            new_state = "rejected"
-            snoozed_until = now + (7 * self._proactive_snooze_seconds)
+            self.apply_insight_feedback(self._active_asked_insight_id, True)
+            return
+        if reject:
+            self.apply_insight_feedback(self._active_asked_insight_id, False)
+            return
 
+        now = _now_ts()
         with self._connect(self._insight_db) as conn:
             conn.execute(
                 "UPDATE insights SET feedback_state = ?, status = ?, snoozed_until = ? WHERE id = ?",
-                (new_state, new_status, snoozed_until, self._active_asked_insight_id),
+                (
+                    "snoozed",
+                    "candidate",
+                    now + self._proactive_snooze_seconds,
+                    self._active_asked_insight_id,
+                ),
             )
         self._sync_insight_vector(self._active_asked_insight_id)
         self._active_asked_insight_id = None
@@ -987,7 +1025,9 @@ class MemoryService:
         scores: dict[int, float] = {}
         items: dict[int, dict] = {}
 
-        query_tokens = _tokenize(text)
+        query_tokens = _recall_tokens(text)
+        if not query_tokens:
+            return []
         since, until = _time_window_from_query(text, _now_ts())
         keyword_items = self.catalog.list_items(
             query=text,
@@ -999,8 +1039,12 @@ class MemoryService:
         for item in keyword_items:
             if item["review_state"] not in active_states:
                 continue
-            overlap = len(_tokenize(item["content"]) & query_tokens)
+            if item["item_type"] in {"episode", "source_excerpt"}:
+                continue
+            overlap = len(_recall_tokens(item["content"]) & query_tokens)
             phrase_bonus = 1.0 if text.lower() in item["content"].lower() else 0.0
+            if overlap == 0 and phrase_bonus == 0.0:
+                continue
             score = overlap + phrase_bonus + float(item["confidence"]) * 0.25
             scores[item["id"]] = max(scores.get(item["id"], 0.0), score)
             items[item["id"]] = item
@@ -1015,11 +1059,15 @@ class MemoryService:
                 continue
             if item["review_state"] not in active_states:
                 continue
+            if item["item_type"] in {"episode", "source_excerpt"}:
+                continue
             if since is not None and float(item["created_at"]) < since:
                 continue
             if until is not None and float(item["created_at"]) > until:
                 continue
             vector_score = max(0.0, float(hit.get("score", 0.0)))
+            if vector_score < self._min_recall_score:
+                continue
             scores[item_id] = max(scores.get(item_id, 0.0), vector_score)
             items[item_id] = item
 
@@ -1046,9 +1094,9 @@ class MemoryService:
         search_cache: dict | None = None,
     ) -> dict:
         now = _now_ts()
-        q_tokens = _tokenize(query)
+        q_tokens = _recall_tokens(query)
         semantic = self.prefetch_semantic_facts(query, limit=top_k)
-        memory_items = self.recall_memory_items(query, top_k=max(top_k, 8))
+        memory_items = self.recall_memory_items(query, top_k=top_k)
 
         with self._connect(self._episodic_db) as conn:
             rows = conn.execute(
@@ -1070,7 +1118,7 @@ class MemoryService:
             }:
                 continue
             overlap = len(
-                _tokenize(f"{row['user_input']} {row['response']}") & q_tokens
+                _recall_tokens(f"{row['user_input']} {row['response']}") & q_tokens
             )
             if overlap == 0:
                 continue
@@ -1133,6 +1181,8 @@ class MemoryService:
 
             for hit in hits:
                 metadata = hit.get("metadata", {})
+                if float(hit.get("score", 0.0)) < self._min_recall_score:
+                    continue
                 insight_id = int(metadata.get("insight_id", -1))
                 row = insight_map.get(insight_id)
                 if row is None:
@@ -1158,32 +1208,6 @@ class MemoryService:
                 if len(insights) >= top_k:
                     break
 
-        if not insights:
-            with self._connect(self._insight_db) as conn:
-                insight_rows = conn.execute(
-                    "SELECT id, thesis, rationale, confidence, novelty_score FROM insights WHERE status = 'promoted' ORDER BY created_at DESC LIMIT ?",
-                    (top_k,),
-                ).fetchall()
-
-            for row in insight_rows:
-                catalog_insight = self.catalog.get_by_external_key(
-                    f"insight:{row['id']}"
-                )
-                if catalog_insight and catalog_insight["review_state"] not in {
-                    "candidate",
-                    "confirmed",
-                }:
-                    continue
-                insights.append(
-                    {
-                        "id": row["id"],
-                        "thesis": row["thesis"],
-                        "rationale": row["rationale"],
-                        "confidence": row["confidence"],
-                        "novelty_score": row["novelty_score"],
-                    }
-                )
-
         web_results = (
             search_web(query, cache=search_cache)
             if include_web and (query or "").strip()
@@ -1201,10 +1225,11 @@ class MemoryService:
                 query=query,
             )
         )
-        reminder = self._due_commitment_reminder(now)
-        feedback_prompt = "\n\n".join(
-            part for part in [proactive.get("prompt", ""), reminder] if part
-        )
+        reminder_nudge = self._due_commitment_reminder(now)
+        # The insight keep/discard question travels separately from the reply
+        # so the UI can render it with yes/no buttons instead of burying it
+        # inside answer text.
+        feedback_prompt = proactive.get("prompt", "")
 
         semantic_lines = [x["statement"] for x in semantic]
         semantic_text = "\n".join(f"- {line}" for line in semantic_lines if line)
@@ -1263,6 +1288,7 @@ class MemoryService:
             "style_context": self._style_context(),
             "pending_feedback_prompt": feedback_prompt,
             "pending_feedback_id": proactive.get("insight_id"),
+            "reminder_nudge": reminder_nudge,
         }
 
     def commit_turn(self, user_input: str, response: str, trace: dict | None = None):
@@ -1323,7 +1349,6 @@ class MemoryService:
             ],
         )
         self._ltm_repo.upsert_memory_item_node(episode)
-        self._sync_trace_sources(trace)
         self._upsert_semantic_facts(
             user_input,
             response,
@@ -1587,6 +1612,15 @@ class MemoryService:
         for commitment in self.open_commitments():
             metadata = commitment["metadata"]
             due_at = metadata.get("due_at")
+            # Unconfirmed low-confidence guesses shouldn't interrupt unless a
+            # deadline was actually stated.
+            trustworthy = (
+                commitment["review_state"] in {"confirmed", "corrected"}
+                or commitment["confidence"] >= 0.7
+                or bool(due_at)
+            )
+            if not trustworthy:
+                continue
             overdue = bool(due_at) and due_at < now
             due_soon = bool(due_at) and now <= due_at <= now + 86400
             if not active_project and not due_at:
@@ -1640,6 +1674,12 @@ class MemoryService:
             if other_extracted is None or other_extracted[0] != prop:
                 continue
             other_tokens = _tokenize(other_extracted[1])
+            if not value_tokens or not other_tokens:
+                continue
+            if value_tokens <= other_tokens or other_tokens <= value_tokens:
+                # One value is a refinement of the other (e.g. "red" vs
+                # "red Tesla"), not a conflict.
+                continue
             union = value_tokens | other_tokens
             overlap = len(value_tokens & other_tokens) / len(union) if union else 1.0
             if overlap < 0.5:
@@ -1801,25 +1841,24 @@ class MemoryService:
     ) -> dict:
         """Direct capture pipeline for typed/pasted/voice input outside a turn."""
         now = _now_ts()
-        item = self.catalog.upsert_item(
-            item_type="episode",
-            content=content,
-            review_state="confirmed",
-            confidence=0.7,
-            importance=0.5,
-            metadata={"captured": True, "session_id": session_id},
-        )
-        self._ltm_repo.upsert_memory_item_node(item)
-        event = self.catalog.record_capture_event(
-            capture_type,
+        result = _capture_note(
+            self.catalog,
+            self.tag_engine,
+            self.context_engine,
             content,
+            item_type="episode",
+            capture_type=capture_type,
             session_id=session_id,
-            memory_item_id=item["id"],
+            now=now,
         )
-        session_context = self.context_engine.current_context(session_id, now=now)
-        tags = self.tag_engine.tag_item(item, session_context=session_context, now=now)
-        self._capture_commitments(content, session_context, now)
-        return {"item": self.catalog.inspect_item(item["id"]), "event": event, "tags": tags}
+        self._ltm_repo.upsert_memory_item_node(result["item"])
+        for commitment_item in result["commitments"]:
+            self._ltm_repo.upsert_memory_item_node(commitment_item)
+        return {
+            "item": result["item"],
+            "event": result["event"],
+            "tags": result["tags"],
+        }
 
     def search_memory(self, query: str, top_k: int = 5) -> dict:
         return self.recall_context(query, include_web=False, top_k=top_k)
@@ -1902,16 +1941,245 @@ class MemoryService:
         )
 
     def run_idle_jobs(self):
-        created, promoted = self._run_synthesis_job()
-        decayed, deleted = self._apply_episodic_decay()
-        stale_marked = self._apply_staleness_rules()
+        # The background idle thread and manual /idle can overlap; reminder
+        # firing and job pickup are check-then-act, so idle work is serialized.
+        # Each step runs isolated: a synthesis failure must never starve the
+        # reminder and research steps behind it (that exact cascade is how
+        # reminders silently stopped firing in live sessions).
+        errors: list[str] = []
+
+        def _step(label, fn, default):
+            try:
+                return fn()
+            except Exception as exc:
+                errors.append(f"{label}: {exc}")
+                logger.warning("Idle step %s failed: %s", label, exc)
+                return default
+
+        with self._idle_jobs_lock:
+            created, promoted = _step("synthesis", self._run_synthesis_job, (0, 0))
+            decayed, deleted = _step("decay", self._apply_episodic_decay, (0, 0))
+            stale_marked = _step("staleness", self._apply_staleness_rules, 0)
+            reminders_fired = _step("reminders", self._fire_due_reminders, 0)
+            research_done = _step("research", self._run_research_jobs, 0)
         return {
             "insight_candidates_created": created,
             "insights_promoted": promoted,
             "episodic_decayed": decayed,
             "episodic_deleted": deleted,
             "stale_marked": stale_marked,
+            "reminders_fired": reminders_fired,
+            "research_jobs_done": research_done,
+            "errors": errors,
         }
+
+    def fire_due_reminders_now(self) -> int:
+        """Fire due reminders outside the heavy idle pipeline.
+
+        Used by the lightweight reminder tick so delivery accuracy does not
+        depend on synthesis, decay, or idle-window gating.
+        """
+        with self._idle_jobs_lock:
+            return self._fire_due_reminders()
+
+    def drain_proactive_messages(self) -> list[str]:
+        """Return and clear messages the idle jobs queued for proactive delivery."""
+        messages = list(self._proactive_outbox)
+        self._proactive_outbox.clear()
+        return messages
+
+    def recent_notes(self, limit: int = 20) -> list[dict]:
+        """Most recently touched reviewable memory items, for SUMMARIZE material."""
+        items = self.catalog.list_items(limit=max(1, min(50, int(limit))))
+        return [
+            item
+            for item in items
+            if item["review_state"] in {"candidate", "confirmed", "corrected"}
+        ]
+
+    def create_reminder(self, content: str, *, due_at: float | None = None) -> dict:
+        """Store an explicit reminder as a confirmed commitment with a due time."""
+        content = " ".join((content or "").split())
+        if not content:
+            raise ValueError("Reminder content is empty")
+        metadata: dict = {"status": "open", "origin": "reminder"}
+        if due_at:
+            metadata["due_at"] = float(due_at)
+        # Same key derivation as extract_commitments so an explicit reminder and
+        # a commit-time-extracted commitment for the same task stay one item.
+        key = " ".join(sorted(re.findall(r"[a-z0-9]+", content.lower())))
+        item = self.catalog.upsert_item(
+            item_type="commitment",
+            content=content,
+            review_state="confirmed",
+            confidence=0.95,
+            importance=0.8,
+            external_key=f"commitment:{key}",
+            metadata=metadata,
+        )
+        self._ltm_repo.upsert_memory_item_node(item)
+        self.tag_engine.tag_item(item, session_context={})
+        return item
+
+    def _fire_due_reminders(self, now: float | None = None) -> int:
+        """Queue proactive messages for reminders whose due time has arrived."""
+        now = now if now is not None else _now_ts()
+        fired = 0
+        for item in self.catalog.list_items(item_type="commitment", limit=200):
+            metadata = item["metadata"]
+            if item["review_state"] in {"rejected", "archived", "deleted"}:
+                continue
+            if metadata.get("status", "open") != "open":
+                continue
+            due_at = metadata.get("due_at")
+            if not due_at or float(due_at) > now:
+                continue
+            if metadata.get("reminder_fired_at"):
+                continue
+            self.catalog.update_item_metadata(item["id"], {"reminder_fired_at": now})
+            due_str = time.strftime("%H:%M", time.localtime(float(due_at)))
+            self._proactive_outbox.append(
+                f"Reminder ({due_str}): {item['content']}"
+            )
+            fired += 1
+        return fired
+
+    def queue_research(self, topic: str) -> dict:
+        """Queue a bounded background research job; the idle worker executes it."""
+        topic = " ".join((topic or "").split())
+        if not topic:
+            raise ValueError("Research topic is empty")
+        payload = json.dumps({"topic": topic})
+        with self._connect(self._jobs_db) as conn:
+            existing = conn.execute(
+                "SELECT id FROM jobs WHERE kind = 'research' "
+                "AND status IN ('pending', 'running') AND payload_json = ?",
+                (payload,),
+            ).fetchone()
+            if existing is not None:
+                # Re-asking must not pile up duplicate jobs behind one topic.
+                return {
+                    "job_id": int(existing["id"]),
+                    "topic": topic,
+                    "status": "pending",
+                }
+            cursor = conn.execute(
+                "INSERT INTO jobs(kind, payload_json, status, attempts, created_at) "
+                "VALUES('research', ?, 'pending', 0, ?)",
+                (payload, _now_ts()),
+            )
+            job_id = int(cursor.lastrowid)
+        return {"job_id": job_id, "topic": topic, "status": "pending"}
+
+    def run_overdue_research(self, min_age_seconds: float = 60.0) -> int:
+        """Start research jobs that have waited too long for a quiet idle window.
+
+        The idle pipeline only runs when the user stops interacting; without
+        this, continuous conversation could delay queued research forever.
+        """
+        with self._idle_jobs_lock:
+            return self._run_research_jobs(min_age_seconds=min_age_seconds)
+
+    def _run_research_jobs(
+        self, max_jobs: int = 1, min_age_seconds: float = 0.0
+    ) -> int:
+        """Execute pending research jobs: bounded search sweep + one synthesis call."""
+        with self._connect(self._jobs_db) as conn:
+            rows = conn.execute(
+                "SELECT id, payload_json, attempts FROM jobs "
+                "WHERE kind = 'research' AND status = 'pending' "
+                "AND created_at <= ? "
+                "ORDER BY created_at LIMIT ?",
+                (_now_ts() - max(0.0, float(min_age_seconds)), max(1, int(max_jobs))),
+            ).fetchall()
+        done = 0
+        for row in rows:
+            job_id = int(row["id"])
+            # Atomic claim: the background idle thread and a manual /idle can
+            # both see the same pending row; only one may execute it.
+            with self._connect(self._jobs_db) as conn:
+                claimed = conn.execute(
+                    "UPDATE jobs SET status = 'running' "
+                    "WHERE id = ? AND status = 'pending'",
+                    (job_id,),
+                ).rowcount
+            if not claimed:
+                continue
+            topic = str((_json_load(row["payload_json"], {}) or {}).get("topic", ""))
+            try:
+                summary, source_urls = self._execute_research(topic)
+                item = self.catalog.upsert_item(
+                    item_type="insight",
+                    content=summary,
+                    review_state="candidate",
+                    confidence=0.6,
+                    importance=0.7,
+                    metadata={"origin": "research", "topic": topic, "urls": source_urls},
+                )
+                self.catalog.add_source(
+                    item["id"], "research_job", f"jobs:{job_id}", excerpt=topic
+                )
+                self._ltm_repo.upsert_memory_item_node(item)
+                self._proactive_outbox.append(
+                    f"Research done — {topic}:\n{summary}"
+                )
+                status, error = "done", None
+                done += 1
+            except Exception as exc:
+                status, error = "failed", str(exc)
+                self._proactive_outbox.append(
+                    f"Research failed — {topic}: {exc}"
+                )
+            with self._connect(self._jobs_db) as conn:
+                conn.execute(
+                    "UPDATE jobs SET status = ?, attempts = attempts + 1, "
+                    "finished_at = ?, error_text = ? WHERE id = ?",
+                    (status, _now_ts(), error, job_id),
+                )
+        return done
+
+    def _execute_research(self, topic: str) -> tuple[str, list[str]]:
+        if not topic:
+            raise ValueError("Research topic is empty")
+        queries = [topic, f"{topic} explained"]
+        seen_urls: list[str] = []
+        evidence_lines: list[str] = []
+        for query in queries[:2]:
+            for result in search_web(query):
+                url = result.url or ""
+                if url and url in seen_urls:
+                    continue
+                if url:
+                    seen_urls.append(url)
+                evidence_lines.append(f"- {result.title}: {result.snippet} ({url})")
+                if len(evidence_lines) >= 6:
+                    break
+            if len(evidence_lines) >= 6:
+                break
+        if not evidence_lines:
+            raise RuntimeError("No search results were available")
+        from brain.prompt_builder import PromptBuilder
+
+        prompt = PromptBuilder().render_file(
+            "tasks/research_synthesis.md",
+            {"topic": topic, "evidence": "\n".join(evidence_lines)},
+        )
+        response = llama_client.chat(
+            [
+                {"role": "system", "content": prompt},
+                {
+                    "role": "user",
+                    "content": (
+                        "Follow the method steps, then write the summary. "
+                        "Output only the final summary text."
+                    ),
+                },
+            ]
+        )
+        summary = (response.get("message", {}) or {}).get("content", "").strip()
+        if not summary:
+            raise RuntimeError("Synthesis produced no output")
+        return summary, seen_urls[:6]
 
     def _run_synthesis_job(self):
         with self._connect(self._semantic_db) as conn:
@@ -1935,19 +2203,11 @@ class MemoryService:
         if quality_score < 0.6:
             return 0, 0
 
-        evidence_query = " ".join(row["statement"] for row in cluster[:2])[:140]
-        web_evidence = tool_websearch(evidence_query)
-        has_web = bool(web_evidence and "failed" not in web_evidence.lower())
         avg_conf = sum(float(row["confidence"]) for row in cluster) / len(cluster)
         novelty_score = min(1.0, 0.45 + 0.05 * len(cluster))
-        confidence = min(0.99, avg_conf + (0.08 if has_web else 0.0))
-
-        status = (
-            "promoted"
-            if has_web and confidence >= 0.78 and novelty_score >= 0.7
-            else "candidate"
-        )
-        feedback_state = "pending" if status == "candidate" else "approved"
+        confidence = min(0.99, avg_conf)
+        status = "candidate"
+        feedback_state = "pending"
 
         with self._connect(self._insight_db) as conn:
             existing = conn.execute(
@@ -1962,13 +2222,8 @@ class MemoryService:
                 """,
                 (
                     thesis,
-                    "Synthesized from reinforced semantic facts with web grounding.",
-                    json.dumps(
-                        {
-                            "facts": [row["id"] for row in cluster],
-                            "web": web_evidence[:2000],
-                        }
-                    ),
+                    "Synthesized from local memory; awaiting user confirmation.",
+                    json.dumps({"facts": [row["id"] for row in cluster]}),
                     novelty_score,
                     confidence,
                     status,
@@ -1982,7 +2237,7 @@ class MemoryService:
         self._ltm_repo.upsert_insight_node(
             insight_id=insight_id,
             thesis=thesis,
-            rationale="Synthesized from reinforced semantic facts with web grounding.",
+            rationale="Synthesized from local memory; awaiting user confirmation.",
             confidence=confidence,
             novelty_score=novelty_score,
             status=status,
@@ -2012,6 +2267,13 @@ class MemoryService:
             )
             after = conn.execute("SELECT COUNT(*) AS c FROM events").fetchone()["c"]
         return decayed, max(0, before - after)
+
+    def embedding_health(self) -> dict:
+        """Cheap embedding state for per-turn health checks — no DB queries."""
+        return {
+            "embedding_available": self._embedding_available,
+            "embedding_last_error": self._embedding_last_error,
+        }
 
     def get_status(self) -> dict:
         with self._connect(self._episodic_db) as econn:
@@ -2067,11 +2329,19 @@ class MemoryService:
                 )
                 deleted_insights = len(bad_ids)
         for item in self.catalog.list_items(include_deleted=False, limit=100000):
-            if _is_polluted_statement(item["content"]):
+            transient_source = (
+                item["item_type"] == "source_excerpt"
+                and str(item.get("external_key") or "").startswith("turn_source:")
+            )
+            if transient_source or _is_polluted_statement(item["content"]):
                 self.catalog.set_review_state(
                     item["id"],
                     "deleted",
-                    "Automatic pollution cleanup",
+                    (
+                        "Transient tool source cleanup"
+                        if transient_source
+                        else "Automatic pollution cleanup"
+                    ),
                 )
                 self._ltm_repo.delete_memory_item_node(item["id"])
                 deleted_catalog_items += 1

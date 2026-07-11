@@ -38,7 +38,10 @@ class HealthReporter:
     def _embedding_health(self) -> dict[str, Any]:
         try:
             service = getattr(self.memory_client, "memory", self.memory_client)
-            status = service.get_status()
+            # Prefer the cheap in-memory state: snapshot() runs on every turn
+            # and must not pay for full DB count aggregation each time.
+            cheap = getattr(service, "embedding_health", None)
+            status = cheap() if callable(cheap) else service.get_status()
             available = status.get("embedding_available")
             return {
                 "available": available,

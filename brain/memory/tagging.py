@@ -6,6 +6,7 @@ import time
 from typing import Any
 
 from brain.memory.catalog import MemoryCatalog, _canonical_name
+from brain.memory.commitments import _resolve_deadline
 
 # Capitalized words that look like names but never are.
 _NAME_STOPWORDS = {
@@ -30,6 +31,12 @@ _WEEKDAYS = (
 def _date_tag(now: float, day_offset: int = 0) -> str:
     day = datetime.date.fromtimestamp(now) + datetime.timedelta(days=day_offset)
     return day.isoformat()
+
+
+def _date_tag_from_ts(ts: float | None) -> str | None:
+    if ts is None:
+        return None
+    return datetime.date.fromtimestamp(ts).isoformat()
 
 
 class TagEngine:
@@ -175,10 +182,12 @@ class TagEngine:
         ):
             add("time", match.group(1), 0.5)
         if re.search(r"\bnext week\b", lowered):
-            add("time", "next week", 0.55)
+            resolved = _resolve_deadline("next week", now)
+            add("time", _date_tag_from_ts(resolved) or "next week", 0.55)
         for weekday in _WEEKDAYS:
             if re.search(rf"\b(?:on|next|this)\s+{weekday}\b", lowered):
-                add("time", weekday, 0.55)
+                resolved = _resolve_deadline(weekday, now)
+                add("time", _date_tag_from_ts(resolved) or weekday, 0.55)
 
     def _match_known_entities(self, content: str, add):
         """Confirmed knowledge improves tagging: known entities matched by name."""

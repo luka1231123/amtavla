@@ -1,12 +1,29 @@
 from __future__ import annotations
 
 import re
+import threading
 from typing import Any
 
 from ddgs import DDGS
 
 from brain.config import load_brain_config
 from brain.contracts import SearchResult
+
+_SLUR_RE = re.compile(
+    r"\b(n[i1]gg[ae3]r[s]?|n[i1]gg[e3]r[s]?|"
+    r"k[i1]k[e3][s]?|"
+    r"f[a4]gg[o0]t[s]?|"
+    r"ch[i1]nk[s]?|"
+    r"sp[i1]c[s]?|"
+    r"tr[a4]nn[yie]+s?|"
+    r"r[e3]t[a4]rd[s]?)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_safe_query(text: str) -> bool:
+    return not bool(_SLUR_RE.search(text))
+
 
 STOP_TOKENS = {
     "the",
@@ -60,17 +77,44 @@ def _format_results(rows: list[dict[str, Any]], max_chars: int) -> str:
     return render_search_results(results, max_chars=max_chars)
 
 
-def _search_rows(query: str, top_k: int) -> list[dict[str, str]]:
+# One shared DDGS instance: it caches per-engine HTTP clients, so reusing it
+# reuses their sockets. A fresh DDGS per call leaked a new client set (and its
+# file descriptors) each search, which eventually starved SQLite of handles.
+_DDGS_LOCK = threading.Lock()
+_DDGS_INSTANCE: DDGS | None = None
+
+
+def _get_ddgs(timeout: int) -> DDGS:
+    global _DDGS_INSTANCE
+    if _DDGS_INSTANCE is None:
+        _DDGS_INSTANCE = DDGS(timeout=timeout)
+    return _DDGS_INSTANCE
+
+
+def _reset_ddgs() -> None:
+    global _DDGS_INSTANCE
+    _DDGS_INSTANCE = None
+
+
+def _search_rows(query: str, top_k: int, timeout: int = 5) -> list[dict[str, str]]:
     rows = []
-    with DDGS() as ddgs:
-        for item in ddgs.text(query, max_results=max(1, top_k)):
-            rows.append(
-                {
-                    "title": item.get("title", ""),
-                    "url": item.get("href", ""),
-                    "snippet": item.get("body", ""),
-                }
-            )
+    with _DDGS_LOCK:
+        try:
+            ddgs = _get_ddgs(timeout)
+            items = ddgs.text(query, max_results=max(1, top_k))
+        except Exception:
+            # Drop the shared instance so a wedged client set is rebuilt on
+            # the next call instead of failing forever.
+            _reset_ddgs()
+            raise
+    for item in items:
+        rows.append(
+            {
+                "title": item.get("title", ""),
+                "url": item.get("href", ""),
+                "snippet": item.get("body", ""),
+            }
+        )
     return rows
 
 
@@ -119,6 +163,10 @@ class WebSearchClient:
         text = (query or "").strip()
         if not text:
             return []
+        if not _is_safe_query(text):
+            self._last_error = "query rejected: contains blocked terms"
+            self._checked = True
+            return []
 
         cfg = self._settings()
         if not bool(cfg.get("enabled", True)):
@@ -137,15 +185,16 @@ class WebSearchClient:
 
         top_k = int(cfg.get("top_k", 3))
         min_overlap = float(cfg.get("min_overlap_score", 0.2))
+        timeout = int(cfg.get("timeout_seconds", 5))
         self._last_query = text
         self._checked = True
         try:
-            rows = _search_rows(text, top_k=top_k)
+            rows = _search_rows(text, top_k=top_k, timeout=timeout)
             original_score = _avg_overlap_score(text, rows)
             if original_score < min_overlap:
                 rewritten = _rewrite_query(text)
                 if rewritten and rewritten != text:
-                    retry_rows = _search_rows(rewritten, top_k=top_k)
+                    retry_rows = _search_rows(rewritten, top_k=top_k, timeout=timeout)
                     if _avg_overlap_score(rewritten, retry_rows) > original_score:
                         rows = retry_rows
             self._last_error = ""

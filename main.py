@@ -66,6 +66,41 @@ def _send_response_to_ui(response: str):
     _dispatch_socket_emit("assistant_response", {"text": response})
 
 
+# Proactive messages that could not reach the phone UI (socket down) wait here
+# and are flushed on reconnect, so reminders/research results are never lost.
+_PENDING_UI_MESSAGES: list[str] = []
+
+
+def _deliver_proactive(message: str):
+    """Idle-worker deliveries (due reminders, finished research) reach both surfaces."""
+    print(f"\n{message}\n")
+    if SIO_CLIENT is None or not SIO_CLIENT.connected:
+        _PENDING_UI_MESSAGES.append(message)
+        return
+    _send_response_to_ui(message)
+
+
+def _flush_pending_ui_messages():
+    while _PENDING_UI_MESSAGES:
+        _send_response_to_ui(_PENDING_UI_MESSAGES.pop(0))
+
+
+def _send_memory_check(prompt: str, insight_id):
+    """Deliver a keep/discard memory question as its own message.
+
+    The phone UI renders it with yes/no buttons; the CLI explains how to answer.
+    """
+    if not prompt:
+        return
+    print(f"\n{prompt}\n(Answer yes or no in your next message.)\n")
+    _dispatch_socket_emit(
+        "memory_check", {"text": prompt, "insight_id": insight_id}
+    )
+
+
+MEMORY.set_proactive_hook(_deliver_proactive)
+
+
 def _clip_text(value, max_chars: int = 3000):
     if value is None:
         return ""
@@ -129,6 +164,7 @@ async def _connect_realtime(command_queue: asyncio.Queue[tuple[str, str]]):
     @sio.event
     async def connect():
         logger.info("Connected to phone server via Socket.IO")
+        _flush_pending_ui_messages()
 
     @sio.event
     async def disconnect():
@@ -139,6 +175,23 @@ async def _connect_realtime(command_queue: asyncio.Queue[tuple[str, str]]):
         text = ((data or {}).get("text") or "").strip()
         if text:
             await command_queue.put((text, "phone"))
+
+    @sio.on("insight_feedback")
+    async def on_insight_feedback(data):
+        payload = data or {}
+        insight_id = payload.get("insight_id")
+        keep = bool(payload.get("keep"))
+        if insight_id is None:
+            return
+        try:
+            await asyncio.to_thread(
+                MEMORY.apply_insight_feedback, int(insight_id), keep
+            )
+            ack = "Kept that insight." if keep else "Discarded that insight."
+        except Exception as exc:
+            ack = f"Could not record that answer: {exc}"
+        _send_response_to_ui(ack)
+        print(f"\n{ack}\n")
 
     attempts = 0
     while attempts < 10:
@@ -217,14 +270,12 @@ async def run():
 
             if command == "/ask":
                 forced = await asyncio.to_thread(MEMORY.force_proactive_ask)
-                response = (
-                    forced.get("prompt")
-                    or "No pending insight is ready for proactive ask."
-                )
-                if forced.get("insight_id"):
-                    response += f" [insight_id={forced['insight_id']}]"
-                print(f"{response}\n")
-                _send_response_to_ui(response)
+                if forced.get("prompt"):
+                    _send_memory_check(forced["prompt"], forced.get("insight_id"))
+                else:
+                    response = "No pending insight is ready for proactive ask."
+                    print(f"{response}\n")
+                    _send_response_to_ui(response)
                 continue
 
             if command == "/idle":
@@ -255,7 +306,13 @@ async def run():
                             if due
                             else ""
                         )
-                        lines.append(f"#{item['id']}{due_str}: {item['content']}")
+                        unconfirmed = (
+                            item["review_state"] not in {"confirmed", "corrected"}
+                            and item["confidence"] < 0.7
+                            and not due
+                        )
+                        flag = " (unconfirmed)" if unconfirmed else ""
+                        lines.append(f"#{item['id']}{due_str}{flag}: {item['content']}")
                     response = "\n".join(lines)
                 else:
                     response = "No open commitments."
@@ -306,7 +363,8 @@ async def run():
             if command == "/delete":
                 await asyncio.to_thread(MEMORY.clear_all_memory)
                 response = (
-                    "All memory databases cleared (episodic, semantic, insight)."
+                    "All memory cleared (episodic, semantic, insight, catalog, "
+                    "jobs, and vectors)."
                 )
                 print(f"{response}\n")
                 _send_response_to_ui(response)
@@ -319,6 +377,11 @@ async def run():
             )
             print(f"{turn.response}\n")
             _send_response_to_ui(turn.response)
+            if turn.context is not None and turn.context.pending_feedback_prompt:
+                _send_memory_check(
+                    turn.context.pending_feedback_prompt,
+                    turn.context.pending_feedback_id,
+                )
     except (KeyboardInterrupt, EOFError):
         print("\nExiting.")
     finally:

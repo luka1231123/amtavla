@@ -19,7 +19,11 @@ def test_memory_dashboard_and_review_api(tmp_path, monkeypatch):
         sources=[{"source_type": "event", "source_id": "1"}],
     )
 
-    assert client.get("/memory").status_code == 200
+    # The unified UI serves at "/"; /memory deep-links to its memory tab.
+    assert client.get("/").status_code == 200
+    memory_redirect = client.get("/memory")
+    assert memory_redirect.status_code == 302
+    assert memory_redirect.headers["Location"].endswith("#memory")
     listing = client.get("/api/memory/items?q=review").get_json()
     assert listing["items"][0]["id"] == item["id"]
 

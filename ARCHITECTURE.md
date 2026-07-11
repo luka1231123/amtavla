@@ -11,9 +11,10 @@ Amtavla is a local-first cognitive assistant. It accepts already-parsed text and
 5. `MemoryController` returns a source-aware `ContextPack` without doing implicit web work.
 6. Direct pathways skip planning; search pathways get one deterministic search action; other pathways use `Planner`.
 7. `ActionRunner` executes each bounded `Action` in order and returns an `ActionResult` even when the action fails.
-8. `ResponseGenerator` receives the plan, action results, context, and source catalog.
-9. The completed turn and its `TraceEvent` list are queued for memory commit.
-10. Idle workers consolidate memory, synthesize insights, and apply episodic decay.
+8. `GroundedReasoner` optionally runs one bounded evidence-synthesis pass (question-like input, non-direct pathway, sufficient sources) and hands the generator validated claims tied to real source IDs.
+9. `ResponseGenerator` receives the plan, action results, context, reasoning pass, and source catalog.
+10. The completed turn and its `TraceEvent` list are queued for memory commit.
+11. Idle workers consolidate memory, synthesize insights, and apply episodic decay.
 
 `main.py` owns transport and operator commands. `brain/orchestrator.py` owns cognitive control flow.
 
@@ -41,8 +42,15 @@ All contracts serialize to JSON-safe dictionaries before persistence or UI emiss
 | `CALCULATE` | Evaluate arithmetic through a restricted AST | None |
 | `MEMORY_SEARCH` | Recall local semantic, episodic, and insight context | Local read |
 | `MEMORY_WRITE` | Store one explicit durable fact with provenance | Local write |
+| `SUMMARIZE` | Collect recent catalog notes as cited material for generation | Local read |
+| `REMINDER` | Store an explicit reminder as a commitment with a resolved due time | Local write |
+| `NOTE_READ` | List, read, or find local files under a sandboxed read-only root | Local read |
+| `CLARIFY` | Ask one clarifying question; the question is the reply verbatim | None |
+| `RESEARCH` | Queue a bounded background research job executed by the idle worker | Local write, deferred network |
 
-Unknown planner actions become validation warnings and are never executed. Action failures remain structured results so generation and traces can represent partial failure honestly.
+Unknown planner actions become validation warnings and are never executed. Action failures remain structured results so generation and traces can represent partial failure honestly. `MEMORY_WRITE` and `REMINDER` require the user's own words to contain an explicit request before they will run; `REMINDER` also accepts a self-declared commitment ("I promised X by Friday"), which the memory layer would capture at commit time regardless.
+
+Due reminders and finished research reach the user through a proactive hook on `MemoryController`: jobs queue messages in a service outbox, and the hook (wired in `main.py`) delivers them to the CLI and the phone UI, buffering for the UI while the socket is down. A dedicated ~2s reminder tick (`_reminder_loop`) fires due reminders and force-starts research jobs that have waited over a minute, independent of the heavier idle pipeline; each `run_idle_jobs` step is isolated so one failing step cannot starve the others. Memory-check questions ("should I keep this insight?") are delivered as a separate `memory_check` message — yes/no buttons in the UI feed `apply_insight_feedback` — instead of being appended to answer text.
 
 ## Source Contract
 
@@ -138,7 +146,11 @@ New catalog tables: `tags`, `tag_assignments`, `tag_feedback`,
 
 `server/phone_server.py` exposes local endpoints under `/api/memory` and serves the review dashboard at `/memory`. The dashboard supports search, filtering, provenance inspection, correction, confirmation, rejection, archive, deletion, merge, and export.
 
-Exports contain `memory_items.jsonl`, `entities.jsonl`, `relations.jsonl`, `memory.md`, and a format README. Deleted records remain in JSONL to preserve audit history.
+`/api/memory/export` writes a timestamped `exports/memory/<timestamp>/` directory containing `memory_items.jsonl`, `entities.jsonl`, `relations.jsonl`, `memory.md`, and a format README, then zips it for download. Deleted records remain in JSONL to preserve audit history.
+
+## Phone Bridge
+
+`server/phone_server.py` also relays operator commands over plain HTTP polling for clients that can't hold a Socket.IO connection: `/command` (POST to enqueue, GET to poll) and `/response` (POST to enqueue, GET to poll) each pair with a `/command/ack` or `/response/ack` endpoint that clears the entry once the other side has consumed it.
 
 ## Phase 1 Verification
 

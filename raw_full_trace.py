@@ -1,7 +1,17 @@
 #!/usr/bin/env python3
+"""Live conversation probe for the full turn loop.
+
+Drives the real TurnOrchestrator through scenario suites grouped by capability
+area, annotates each turn with likely capability gaps (wrong routing, missing
+tool use, IDK on answerable prompts, "I can't" phrasing, failed actions), and
+writes a ranked gap_report.md next to the usual raw trace logs. Requires
+llama.cpp + Ollama running; there is no offline mode.
+"""
 
 import asyncio
 import json
+import os
+import re
 import sys
 import time
 import traceback
@@ -21,41 +31,126 @@ from brain.planner import Planner
 from generator import ResponseGenerator
 from tools.websearch import DEFAULT_SEARCH_CLIENT
 
-
-PROMPTS = [
-    "hi there",
-    "I like concise answers with bullet points.",
-    "Remember this: my name is Mira.",
-    "Remember this: my bike is blue and parked in garage B2.",
-    "What do you remember about me so far?",
-    "Give me a 3-step morning routine for focus.",
-    "What are two differences between RAM and storage?",
-    "What is 17 * 19?",
-    "Who wrote Pride and Prejudice?",
-    "What is the capital of Japan?",
-    "Can you explain recursion simply?",
-    "Give one Python example of recursion.",
-    "I have a meeting Tuesday 14:00, remind me tomorrow morning.",
-    "Based on my notes, make a compact checklist.",
-    "Where is my bike parked?",
-    "What color is my bike?",
-    "What is my name?",
-    "Tell me one memory trivia question about what I told you.",
-    "Ask me a quick quiz from our conversation.",
-    "Now answer that quiz yourself briefly.",
-    "List files in current directory and explain the command.",
-    "/brain status",
-    "/brain full",
-    "/ask",
-    "/idle",
-    "Summarize everything in 5 bullets.",
-    "If I forget, where is my bike?",
-    "/delete",
-    "What do you remember about my bike now?",
-    "/brain status",
-    "thanks",
-    "exit",
+# Scenario turn keys:
+#   prompt          — what the user says ("/..." runs an operator command)
+#   expect_pathway  — routed pathway must match exactly
+#   expect_action   — this action type must appear in the executed plan
+#   answerable      — an "IDK" reply counts as a gap (context was stored earlier)
+#   expect_clarify  — the reply itself must be one clarifying question
+SCENARIOS = [
+    {
+        "area": "memory_recall",
+        "turns": [
+            {"prompt": "hi there"},
+            {"prompt": "Remember this: my name is Mira."},
+            {"prompt": "Remember this: my bike is blue and parked in garage B2."},
+            {"prompt": "What is my name?", "answerable": True},
+            {"prompt": "Where is my bike parked?", "answerable": True},
+            {"prompt": "What color is my bike?", "answerable": True},
+        ],
+    },
+    {
+        "area": "general_knowledge",
+        "turns": [
+            {"prompt": "What is 17 * 19?", "expect_action": "CALCULATE"},
+            {"prompt": "Who wrote Pride and Prejudice?"},
+            {"prompt": "Can you explain recursion simply?"},
+        ],
+    },
+    {
+        "area": "web_factual",
+        "turns": [
+            {
+                "prompt": "What's the latest Python release?",
+                "expect_action": "SEARCH",
+            },
+        ],
+    },
+    {
+        "area": "summarize",
+        "turns": [
+            {"prompt": "Remember this: I need to renew my passport."},
+            {"prompt": "Remember this: the flat viewing is in Vake on Saturday."},
+            {
+                "prompt": "Make a compact checklist from my notes.",
+                "expect_pathway": "summarize_reply",
+                "expect_action": "SUMMARIZE",
+                "answerable": True,
+            },
+            {
+                "prompt": "Summarize what you know about my week in 3 bullets.",
+                "expect_action": "SUMMARIZE",
+                "answerable": True,
+            },
+        ],
+    },
+    {
+        "area": "reminders",
+        "turns": [
+            {
+                "prompt": "Remind me to stretch in 1 minute.",
+                "expect_pathway": "reminder_reply",
+                "expect_action": "REMINDER",
+            },
+            {
+                "prompt": "Remind me to call the dentist tomorrow morning.",
+                "expect_pathway": "reminder_reply",
+                "expect_action": "REMINDER",
+            },
+            {"prompt": "Remind me where my bike is.", "answerable": True},
+        ],
+    },
+    {
+        "area": "notes_files",
+        "turns": [
+            {
+                "prompt": "List files in the current directory.",
+                "expect_pathway": "notes_reply",
+                "expect_action": "NOTE_READ",
+            },
+            {
+                "prompt": "Read README.md and tell me what this project is.",
+                "expect_action": "NOTE_READ",
+            },
+        ],
+    },
+    {
+        "area": "clarify",
+        "turns": [
+            {"prompt": "Fix it.", "expect_clarify": True},
+            {"prompt": "Can you make that thing better?", "expect_clarify": True},
+        ],
+    },
+    {
+        "area": "research",
+        "turns": [
+            {
+                "prompt": "Do a deep dive on local-first sync engines for me.",
+                "expect_pathway": "research_reply",
+                "expect_action": "RESEARCH",
+            },
+        ],
+    },
+    {
+        "area": "creativity",
+        "turns": [
+            {"prompt": "Brainstorm three name ideas for a note-taking app."},
+        ],
+    },
+    {
+        "area": "executive",
+        "turns": [
+            {"prompt": "I promised Nino I'll send the invoice by Friday."},
+            {"prompt": "/idle"},
+            {"prompt": "/brief"},
+        ],
+    },
 ]
+
+_CANT_RE = re.compile(
+    r"\b(i can'?t|i cannot|i'?m unable|i am unable|i don'?t have (?:the ability|access)|as an ai)\b",
+    re.IGNORECASE,
+)
 
 
 def timestamp() -> str:
@@ -116,6 +211,115 @@ class TracedSearchClient:
         return DEFAULT_SEARCH_CLIENT.health()
 
 
+def annotate_gaps(area: str, spec: dict, turn) -> list[dict]:
+    """Heuristic per-turn gap detection; each gap is one dict for the report."""
+    gaps = []
+    prompt = spec["prompt"]
+    response = turn.response or ""
+    pathway = turn.route.pathway if turn.route else ""
+    plan_actions = [action.action_type.value for action in turn.plan.actions]
+    result_errors = [
+        f"{result.action_type.value}: {result.error}"
+        for result in turn.action_results
+        if not result.ok
+    ]
+
+    def gap(kind: str, severity: str, detail: str):
+        gaps.append(
+            {
+                "area": area,
+                "kind": kind,
+                "severity": severity,
+                "prompt": prompt,
+                "detail": detail,
+                "pathway": pathway,
+                "plan": plan_actions,
+                "response": response[:200],
+            }
+        )
+
+    if turn.status != "completed":
+        gap("turn_failed", "high", f"status={turn.status} error={turn.error}")
+    expected_pathway = spec.get("expect_pathway")
+    if expected_pathway and pathway != expected_pathway:
+        gap(
+            "routing_miss",
+            "high",
+            f"expected pathway {expected_pathway}, got {pathway}",
+        )
+    expected_action = spec.get("expect_action")
+    if expected_action and expected_action not in plan_actions:
+        gap(
+            "missing_tool_use",
+            "high",
+            f"expected {expected_action} in plan, got {plan_actions or 'no actions'}",
+        )
+    if spec.get("answerable") and response.strip().startswith("IDK"):
+        gap("idk_on_answerable", "high", "answerable prompt got IDK")
+    if spec.get("expect_clarify"):
+        if "?" not in response or response.strip().startswith("IDK"):
+            gap(
+                "no_clarifying_question",
+                "medium",
+                "vague prompt did not yield a clarifying question",
+            )
+    if expected_action and plan_actions and set(plan_actions) == {"THINK"}:
+        gap("bare_think_fallback", "medium", "plan degraded to THINK only")
+    for warning in turn.plan.warnings:
+        if "Unsupported" in warning:
+            gap("unsupported_action", "medium", warning)
+    if _CANT_RE.search(response):
+        gap("claims_no_capability", "medium", "reply claims it cannot do the task")
+    for error in result_errors:
+        gap("action_error", "medium", error)
+    return gaps
+
+
+def write_gap_report(run_dir: Path, gaps: list[dict], turn_log: list[dict]):
+    path = run_dir / "gap_report.md"
+    counts: dict[str, int] = {}
+    for item in gaps:
+        counts[item["kind"]] = counts.get(item["kind"], 0) + 1
+    lines = [
+        "# Gap Report",
+        "",
+        f"Run: {run_dir.name} — {len(turn_log)} probed turns, "
+        f"{len(gaps)} gaps flagged.",
+        "",
+        "## Gaps by kind",
+        "",
+    ]
+    if counts:
+        lines.append("| kind | count |")
+        lines.append("| --- | --- |")
+        for kind, count in sorted(counts.items(), key=lambda kv: -kv[1]):
+            lines.append(f"| {kind} | {count} |")
+    else:
+        lines.append("No gaps flagged.")
+    severity_order = {"high": 0, "medium": 1, "low": 2}
+    lines += ["", "## Flagged turns", ""]
+    for item in sorted(gaps, key=lambda g: severity_order.get(g["severity"], 3)):
+        lines += [
+            f"### [{item['severity']}] {item['kind']} — {item['area']}",
+            "",
+            f"- Prompt: {item['prompt']}",
+            f"- Detail: {item['detail']}",
+            f"- Pathway: {item['pathway']} | Plan: {item['plan']}",
+            f"- Response: {item['response']}",
+            "",
+        ]
+    lines += ["## All probed turns", ""]
+    lines.append("| # | area | pathway | plan | gaps |")
+    lines.append("| --- | --- | --- | --- | --- |")
+    for entry in turn_log:
+        lines.append(
+            f"| {entry['index']} | {entry['area']} | {entry['pathway']} "
+            f"| {', '.join(entry['plan']) or '-'} | {entry['gap_count']} |"
+        )
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
 def _write_turn(writer: TraceWriter, turn, turn_index: int, elapsed_ms: int):
     writer.block(
         "session",
@@ -148,16 +352,55 @@ def _write_turn(writer: TraceWriter, turn, turn_index: int, elapsed_ms: int):
         )
 
 
+async def _run_command(memory, orchestrator, prompt: str, writer, turn_index: int):
+    if prompt.startswith("/brain"):
+        parts = prompt.split()
+        mode = parts[1] if len(parts) > 1 else "status"
+        return await asyncio.to_thread(memory.get_debug_info, mode)
+    if prompt.startswith("/health"):
+        health = await asyncio.to_thread(orchestrator.health_reporter.snapshot)
+        return render_health(health)
+    if prompt.startswith("/ask"):
+        forced = await asyncio.to_thread(memory.force_proactive_ask)
+        return forced.get("prompt") or "No pending insight is ready."
+    if prompt.startswith("/idle"):
+        result = await asyncio.to_thread(memory.run_idle_now)
+        writer.block("idle", f"TURN {turn_index} MANUAL IDLE", result)
+        return "Idle maintenance run complete.\n" + render(result)
+    if prompt.startswith("/brief"):
+        return await asyncio.to_thread(memory.daily_brief)
+    if prompt.startswith("/delete"):
+        await asyncio.to_thread(memory.clear_all_memory)
+        return "All memory databases cleared."
+    return f"Unknown command: {prompt}"
+
+
 async def run_trace():
     run_dir = Path("logs") / "raw_runs" / datetime.now().strftime("%Y%m%d_%H%M%S")
     run_dir.mkdir(parents=True, exist_ok=True)
+    # The probe clears memory by design. Pin every store to this run directory
+    # before constructing MemoryController so live user memory is never touched.
+    probe_db_dir = (run_dir / "db").resolve()
+    probe_db_dir.mkdir(parents=True, exist_ok=True)
+    os.environ["AMTAVLA_DB_DIR"] = str(probe_db_dir)
+    os.environ["AMTAVLA_CATALOG_DB"] = str(probe_db_dir / "memory_catalog.db")
+    os.environ["AMTAVLA_VECTOR_DB"] = str(probe_db_dir / "ltm_vectors.db")
     writer = TraceWriter(run_dir)
-    print(f"Raw full trace started: {run_dir}")
+    print(f"Conversation probe started: {run_dir}")
 
     config = load_brain_config()
     memory = MemoryController()
     search_client = TracedSearchClient(writer)
     action_runner = ActionRunner(search_client=search_client, memory_client=memory)
+
+    proactive_messages: list[str] = []
+
+    def proactive_hook(message: str):
+        proactive_messages.append(message)
+        print(f"\n[PROACTIVE] {message}\n")
+        writer.line("idle", f"PROACTIVE PUSH: {message}")
+
+    memory.set_proactive_hook(proactive_hook)
 
     def debug_hook(event_type: str, event: dict):
         writer.block("brain", f"TRACE {event_type}", event)
@@ -175,6 +418,10 @@ async def run_trace():
         config=config,
     )
 
+    gaps: list[dict] = []
+    turn_log: list[dict] = []
+    short_reminder_set_at: float | None = None
+
     try:
         print("Starting llama-server...")
         await asyncio.to_thread(llama_client._ensure_server_running)
@@ -182,65 +429,112 @@ async def run_trace():
         await asyncio.to_thread(memory.clear_all_memory)
         writer.line("brain", "Memory cleared at start")
 
-        for turn_index, prompt in enumerate(PROMPTS, 1):
-            print(f"\n[{turn_index:02d}] > {prompt}")
-            writer.line("session", f"TURN {turn_index} USER: {prompt}")
-            lowered = prompt.strip().lower()
+        turn_index = 0
+        for scenario in SCENARIOS:
+            area = scenario["area"]
+            print(f"\n=== SCENARIO: {area} ===")
+            writer.line("session", f"=== SCENARIO: {area} ===")
+            for spec in scenario["turns"]:
+                turn_index += 1
+                prompt = spec["prompt"]
+                print(f"\n[{turn_index:02d}] > {prompt}")
+                writer.line("session", f"TURN {turn_index} USER: {prompt}")
 
-            if lowered in {"exit", "quit", "q"}:
-                print("Goodbye.")
-                writer.line("session", "ASSISTANT: Goodbye.")
-                break
+                if prompt.startswith("/"):
+                    response = await _run_command(
+                        memory, orchestrator, prompt, writer, turn_index
+                    )
+                    print(response)
+                    writer.block("session", f"TURN {turn_index} ASSISTANT", response)
+                    writer.block("brain", f"TURN {turn_index} COMMAND", response)
+                    turn_log.append(
+                        {
+                            "index": turn_index,
+                            "area": area,
+                            "pathway": "(command)",
+                            "plan": [],
+                            "gap_count": 0,
+                        }
+                    )
+                    continue
 
-            if prompt.startswith("/brain"):
-                parts = prompt.split()
-                mode = parts[1] if len(parts) > 1 else "status"
-                response = await asyncio.to_thread(memory.get_debug_info, mode)
-            elif prompt.startswith("/health"):
-                health = await asyncio.to_thread(orchestrator.health_reporter.snapshot)
-                response = render_health(health)
-            elif prompt.startswith("/ask"):
-                forced = await asyncio.to_thread(memory.force_proactive_ask)
-                response = forced.get("prompt") or "No pending insight is ready."
-            elif prompt.startswith("/idle"):
-                result = await asyncio.to_thread(memory.run_idle_now)
-                response = "Idle maintenance run complete.\n" + render(result)
-                writer.block("idle", f"TURN {turn_index} MANUAL IDLE", result)
-            elif prompt.startswith("/delete"):
-                await asyncio.to_thread(memory.clear_all_memory)
-                response = "All memory databases cleared."
-            else:
                 started = time.perf_counter()
                 turn = await orchestrator.process(
                     prompt,
-                    session_id="raw_full_trace",
+                    session_id="probe",
                     input_source="script",
                 )
                 await asyncio.to_thread(memory.wait_for_idle, 30.0)
                 elapsed_ms = int((time.perf_counter() - started) * 1000)
-                response = turn.response
+                print(turn.response)
                 _write_turn(writer, turn, turn_index, elapsed_ms)
 
-            print(response)
-            if prompt.startswith("/"):
-                writer.block("session", f"TURN {turn_index} ASSISTANT", response)
-                writer.block("brain", f"TURN {turn_index} COMMAND", response)
+                if "in 1 minute" in prompt.lower():
+                    short_reminder_set_at = time.time()
 
-            if turn_index % 4 == 0:
-                idle_result = await asyncio.to_thread(memory.run_idle_now)
-                writer.block(
-                    "idle",
-                    f"PERIODIC IDLE AFTER TURN {turn_index}",
-                    idle_result,
+                turn_gaps = annotate_gaps(area, spec, turn)
+                gaps.extend(turn_gaps)
+                for item in turn_gaps:
+                    print(f"  [GAP:{item['severity']}] {item['kind']}: {item['detail']}")
+                turn_log.append(
+                    {
+                        "index": turn_index,
+                        "area": area,
+                        "pathway": turn.route.pathway if turn.route else "?",
+                        "plan": [a.action_type.value for a in turn.plan.actions],
+                        "gap_count": len(turn_gaps),
+                    }
                 )
+
+        # End-to-end reminder firing: wait out the 1-minute reminder, then let
+        # the idle worker fire it through the proactive channel.
+        if short_reminder_set_at is not None:
+            wait_for = max(0.0, short_reminder_set_at + 65 - time.time())
+            print(f"\nWaiting {wait_for:.0f}s for the 1-minute reminder to come due...")
+            await asyncio.sleep(wait_for)
+            await asyncio.to_thread(memory.run_idle_now)
+            if not any(m.startswith("Reminder") for m in proactive_messages):
+                gaps.append(
+                    {
+                        "area": "reminders",
+                        "kind": "reminder_never_fired",
+                        "severity": "high",
+                        "prompt": "Remind me to stretch in 1 minute.",
+                        "detail": "due reminder did not arrive via proactive push",
+                        "pathway": "reminder_reply",
+                        "plan": ["REMINDER"],
+                        "response": "",
+                    }
+                )
+
+        # Give queued research a chance to run and report back.
+        await asyncio.to_thread(memory.run_idle_now)
+        if not any(m.startswith("Research") for m in proactive_messages):
+            gaps.append(
+                {
+                    "area": "research",
+                    "kind": "research_never_reported",
+                    "severity": "medium",
+                    "prompt": "Do a deep dive on local-first sync engines for me.",
+                    "detail": "queued research produced no proactive result message",
+                    "pathway": "research_reply",
+                    "plan": ["RESEARCH"],
+                    "response": "",
+                }
+            )
 
         final_dump = await asyncio.to_thread(memory.get_brain_dump, "full", 200)
         writer.block("brain", "FINAL BRAIN DUMP", final_dump)
         writer.block("memory", "FINAL BRAIN DUMP", final_dump)
-        print(f"\nRaw trace complete. Logs saved in {run_dir}")
+
+        report_path = write_gap_report(run_dir, gaps, turn_log)
+        print(f"\nProbe complete: {len(turn_log)} turns, {len(gaps)} gaps flagged.")
+        print(f"Gap report: {report_path}")
+        print(f"Logs saved in {run_dir}")
     except Exception as exc:
         print(f"FATAL ERROR: {exc}")
         writer.block("brain", "FATAL", traceback.format_exc())
+        write_gap_report(run_dir, gaps, turn_log)
         raise
     finally:
         await asyncio.to_thread(memory.wait_for_idle, 3.0)

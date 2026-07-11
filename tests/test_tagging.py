@@ -1,3 +1,4 @@
+import re
 import time
 
 from brain.memory.catalog import MemoryCatalog
@@ -94,6 +95,21 @@ def test_engine_learns_from_rejections(tmp_path):
 
     suggestions = engine.suggest_tags("Dinner with Anna next week", now=now)
     assert not any(tag["name"] == "Anna" for tag in suggestions)
+
+
+def test_engine_resolves_relative_time_tags_to_iso_dates(tmp_path):
+    engine = TagEngine(_catalog(tmp_path))
+    now = time.time()
+
+    week_suggestions = engine.suggest_tags("Follow up next week", now=now)
+    week_tags = [t["name"] for t in week_suggestions if t["tag_type"] == "time"]
+    assert week_tags and all(re.fullmatch(r"\d{4}-\d{2}-\d{2}", name) for name in week_tags)
+
+    weekday_suggestions = engine.suggest_tags("Meeting on friday", now=now)
+    weekday_tags = [t["name"] for t in weekday_suggestions if t["tag_type"] == "time"]
+    assert weekday_tags and all(
+        re.fullmatch(r"\d{4}-\d{2}-\d{2}", name) for name in weekday_tags
+    )
 
 
 def test_engine_matches_known_entities(tmp_path):

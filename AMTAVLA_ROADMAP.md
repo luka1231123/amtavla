@@ -571,7 +571,7 @@ Exit criteria:
 
 Goal: make capture and recall accurate enough for the final memory features.
 
-Status: implemented on 2026-07-11 (heuristic TagEngine/ContextEngine, capture_events, context_snapshots, tag feedback loop, contradiction/staleness flags, source-backed answer footers, tag/entity/time retrieval filters).
+Status: implemented on 2026-07-11 (heuristic TagEngine/ContextEngine, capture_events, context_snapshots, tag feedback loop, contradiction/staleness flags, source-backed answer footers). Remaining: tag/entity retrieval filters are live only on the dashboard API (`/api/memory/items`); live-turn recall (`recall_memory_items`) currently filters by time window only, not tag or entity.
 
 Build:
 
@@ -695,6 +695,8 @@ Delivered:
 ## Phase 0: Current Stabilization
 
 Goal: protect the current project while the architecture is being prepared.
+
+Status: implemented and superseded by Phase 1 (2026-07-10) — retained here as historical grounding for the phases below.
 
 Current strengths:
 

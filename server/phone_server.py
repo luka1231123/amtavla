@@ -13,6 +13,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from brain.config import load_brain_config
+from brain.memory.capture import capture_note
 from brain.memory.catalog import MemoryCatalog
 from brain.memory.context_engine import ContextEngine
 from brain.memory.tagging import TagEngine
@@ -20,8 +21,7 @@ from brain.memory.tagging import TagEngine
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
-UI_FILE = os.path.join(os.path.dirname(__file__), "phone_ui.html")
-MEMORY_UI_FILE = os.path.join(os.path.dirname(__file__), "memory_ui.html")
+UI_FILE = os.path.join(os.path.dirname(__file__), "ui.html")
 EXPORT_ROOT = REPO_ROOT / "exports" / "memory"
 MEMORY_CATALOG = None
 MEMORY_CATALOG_LOCK = threading.Lock()
@@ -123,9 +123,20 @@ def index():
     return send_file(UI_FILE)
 
 
+# /memory and /debug are kept as deep-links into the unified UI (they open the
+# matching tab via the URL hash) so old bookmarks keep working.
 @app.route("/memory")
 def memory_view():
-    return send_file(MEMORY_UI_FILE)
+    return _tab_redirect("memory")
+
+
+@app.route("/debug")
+def debug_view():
+    return _tab_redirect("logs")
+
+
+def _tab_redirect(tab: str):
+    return make_response("", 302, {"Location": f"/#{tab}"})
 
 
 @app.route("/api/memory/overview", methods=["GET"])
@@ -315,33 +326,24 @@ def memory_tags():
 
 @app.route("/api/memory/capture", methods=["POST"])
 def capture_memory():
-    """Direct capture pipeline: store a note, auto-tag it, log the capture event."""
+    """Direct capture pipeline: store a note, auto-tag it, extract commitments,
+    log the capture event. Shares brain.memory.capture.capture_note with the
+    in-process MemoryService so both entry points stay in sync."""
     data = request.get_json(silent=True) or {}
     catalog = _get_memory_catalog()
     try:
         content = (data.get("content") or "").strip()
-        item = catalog.upsert_item(
-            item_type=data.get("item_type", "episode"),
-            content=content,
-            review_state="confirmed",
-            confidence=0.7,
-            importance=0.5,
-            metadata={"captured": True, "session_id": data.get("session_id", "capture")},
-        )
-        event = catalog.record_capture_event(
-            data.get("capture_type", "pasted"),
+        session_id = data.get("session_id", "capture")
+        result = capture_note(
+            catalog,
+            TagEngine(catalog),
+            ContextEngine(catalog),
             content,
-            session_id=data.get("session_id", "capture"),
-            memory_item_id=item["id"],
+            item_type=data.get("item_type", "episode"),
+            capture_type=data.get("capture_type", "pasted"),
+            session_id=session_id,
         )
-        engine = TagEngine(catalog)
-        context = ContextEngine(catalog).current_context(
-            data.get("session_id", "capture")
-        )
-        tags = engine.tag_item(item, session_context=context)
-        return jsonify(
-            {"item": catalog.inspect_item(item["id"]), "event": event, "tags": tags}
-        ), 201
+        return jsonify(result), 201
     except Exception as exc:
         return _memory_api_error(exc)
 
@@ -471,306 +473,6 @@ def clear_debug_events():
     return jsonify({"status": "ok"})
 
 
-@app.route("/debug")
-def debug_view():
-    html = """<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Debug - amtavla</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, monospace;
-            background: #1a1a1a; color: #e0e0e0; padding: 16px;
-        }
-        h1 { color: #4fc3f7; margin-bottom: 16px; }
-        .card { 
-            background: #2a2a2a; border-radius: 8px; padding: 16px; margin-bottom: 16px;
-        }
-        .label { color: #888; font-size: 12px; margin-bottom: 4px; }
-        .value { font-size: 16px; white-space: pre-wrap; }
-        .ok { color: #4caf50; font-weight: 700; }
-        .warn { color: #ff9800; font-weight: 700; }
-        .bad { color: #ef5350; font-weight: 700; }
-        .empty { color: #666; font-style: italic; }
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 12px;
-        }
-        .toolbar {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 12px;
-        }
-        button {
-            border: none;
-            background: #1565c0;
-            color: #fff;
-            border-radius: 6px;
-            padding: 8px 12px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-        .log {
-            max-height: 45vh;
-            overflow-y: auto;
-            border: 1px solid #3a3a3a;
-            border-radius: 8px;
-            background: #111;
-            padding: 8px;
-        }
-        .event {
-            border-bottom: 1px solid #2a2a2a;
-            padding: 10px;
-        }
-        .event:last-child {
-            border-bottom: none;
-        }
-        .event-meta {
-            color: #8cc7ff;
-            font-size: 12px;
-            margin-bottom: 6px;
-        }
-        .event pre {
-            white-space: pre-wrap;
-            word-break: break-word;
-            font-size: 12px;
-            line-height: 1.35;
-            color: #d6d6d6;
-        }
-    </style>
-</head>
-<body>
-    <h1>amtavla Debug</h1>
-    <div class="toolbar">
-        <button id="clearEvents">Clear Brain Log</button>
-    </div>
-    <div class="card">
-        <div class="label">Overall Health</div>
-        <div class="value" id="health"></div>
-    </div>
-    <div class="grid">
-        <div class="card">
-            <div class="label">Command Store</div>
-            <div class="value" id="command"></div>
-        </div>
-        <div class="card">
-            <div class="label">Response Store</div>
-            <div class="value" id="response"></div>
-        </div>
-        <div class="card">
-            <div class="label">Command Age (s)</div>
-            <div class="value" id="commandAge"></div>
-        </div>
-        <div class="card">
-            <div class="label">Response Age (s)</div>
-            <div class="value" id="responseAge"></div>
-        </div>
-        <div class="card">
-            <div class="label">Server Uptime (s)</div>
-            <div class="value" id="uptime"></div>
-        </div>
-        <div class="card">
-            <div class="label">Last Command Update</div>
-            <div class="value" id="commandUpdated"></div>
-        </div>
-        <div class="card">
-            <div class="label">Last Response Update</div>
-            <div class="value" id="responseUpdated"></div>
-        </div>
-        <div class="card">
-            <div class="label">Brain Event Count</div>
-            <div class="value" id="eventCount"></div>
-        </div>
-    </div>
-    <div class="card">
-        <div class="label">Brain Events (prompt/context/plan/search/answer)</div>
-        <div id="eventLog" class="log"></div>
-    </div>
-    <div class="card">
-        <div class="label">Status</div>
-        <div class="value" id="status">Waiting...</div>
-    </div>
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const STALE_SECONDS = 30;
-        const MAX_EVENTS = 500;
-        const state = {
-            command: null,
-            response: null,
-            command_updated_at: null,
-            response_updated_at: null,
-            command_age_seconds: null,
-            response_age_seconds: null,
-            uptime_seconds: null,
-            debug_event_count: 0,
-            pending: { command: false, response: false },
-        };
-        let events = [];
-
-        function setValue(id, value, emptyText = '(empty)') {
-            const el = document.getElementById(id);
-            const hasValue = value !== null && value !== undefined && value !== '';
-            el.textContent = hasValue ? value : emptyText;
-            el.className = hasValue ? 'value' : 'value empty';
-        }
-
-        function escapeHtml(value) {
-            const text = String(value ?? '');
-            return text
-                .replaceAll('&', '&amp;')
-                .replaceAll('<', '&lt;')
-                .replaceAll('>', '&gt;');
-        }
-
-        function secondsSince(isoTs) {
-            if (!isoTs) return null;
-            const ms = Date.parse(isoTs);
-            if (Number.isNaN(ms)) return null;
-            return Math.max(0, ((Date.now() - ms) / 1000));
-        }
-
-        function recomputeDerived() {
-            const commandAge = secondsSince(state.command_updated_at);
-            const responseAge = secondsSince(state.response_updated_at);
-            state.command_age_seconds = commandAge === null ? null : Number(commandAge.toFixed(2));
-            state.response_age_seconds = responseAge === null ? null : Number(responseAge.toFixed(2));
-            if (state.uptime_seconds !== null) {
-                state.uptime_seconds = Number((state.uptime_seconds + 1).toFixed(2));
-            }
-        }
-
-        function renderState() {
-            setValue('command', state.command);
-            setValue('response', state.response);
-            setValue('commandAge', state.command_age_seconds, 'n/a');
-            setValue('responseAge', state.response_age_seconds, 'n/a');
-            setValue('uptime', state.uptime_seconds, 'n/a');
-            setValue('commandUpdated', state.command_updated_at, 'n/a');
-            setValue('responseUpdated', state.response_updated_at, 'n/a');
-            setValue('eventCount', state.debug_event_count, '0');
-
-            const commandStale = state.pending.command && state.command_age_seconds !== null && state.command_age_seconds > STALE_SECONDS;
-            const responseStale = state.pending.response && state.response_age_seconds !== null && state.response_age_seconds > STALE_SECONDS;
-            const health = document.getElementById('health');
-            if (commandStale || responseStale) {
-                health.textContent = 'STALE';
-                health.className = 'value warn';
-            } else {
-                health.textContent = 'OK';
-                health.className = 'value ok';
-            }
-        }
-
-        function renderEvents() {
-            const log = document.getElementById('eventLog');
-            if (!events.length) {
-                log.innerHTML = '<div class="event"><div class="value empty">No events yet.</div></div>';
-                return;
-            }
-            log.innerHTML = events.map((event) => {
-                const payload = event.payload || {};
-                const summary = payload.summary || '(no summary)';
-                const details = JSON.stringify(payload.data || payload, null, 2);
-                return `
-                    <div class="event">
-                        <div class="event-meta">#${event.id} | ${event.timestamp} | ${event.type}</div>
-                        <div class="value" style="margin-bottom:8px; font-size:13px; color:#9fe3a7;">${escapeHtml(summary)}</div>
-                        <pre>${escapeHtml(details)}</pre>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function applyStatePatch(data) {
-            if (!data || typeof data !== 'object') return;
-            Object.assign(state, data);
-            if (!state.pending) {
-                state.pending = { command: Boolean(state.command), response: Boolean(state.response) };
-            }
-            state.debug_event_count = Number(state.debug_event_count || events.length || 0);
-            renderState();
-        }
-
-        function appendEvent(event) {
-            if (!event || typeof event !== 'object') return;
-            events.push(event);
-            if (events.length > MAX_EVENTS) {
-                events = events.slice(events.length - MAX_EVENTS);
-            }
-            state.debug_event_count = events.length;
-            renderState();
-            renderEvents();
-        }
-
-        function setStatus(text) {
-            document.getElementById('status').textContent = text;
-        }
-
-        async function bootstrap() {
-            const stateResp = await fetch('/debug/state');
-            applyStatePatch(await stateResp.json());
-
-            const eventsResp = await fetch('/debug/events?limit=200');
-            const eventsData = await eventsResp.json();
-            events = Array.isArray(eventsData.events) ? eventsData.events : [];
-            state.debug_event_count = Number(eventsData.total || events.length || 0);
-            renderState();
-            renderEvents();
-            setStatus('Connected (snapshot loaded)');
-        }
-
-        const socket = io({ transports: ['websocket', 'polling'] });
-        socket.on('connect', () => setStatus('Realtime connected'));
-        socket.on('disconnect', () => setStatus('Realtime disconnected'));
-        socket.on('debug_event', appendEvent);
-        socket.on('command_submitted', (data) => {
-            const text = ((data || {}).text || '').trim();
-            state.command = text || state.command;
-            state.command_updated_at = new Date().toISOString();
-            state.pending = { ...(state.pending || {}), command: Boolean(text) };
-            renderState();
-        });
-        socket.on('assistant_response', (data) => {
-            const text = ((data || {}).text || '').trim();
-            state.response = text || state.response;
-            state.response_updated_at = new Date().toISOString();
-            state.pending = { ...(state.pending || {}), response: Boolean(text) };
-            renderState();
-        });
-
-        document.getElementById('clearEvents').addEventListener('click', async () => {
-            try {
-                await fetch('/debug/events/clear', { method: 'POST' });
-                events = [];
-                state.debug_event_count = 0;
-                renderEvents();
-                renderState();
-                setStatus('Brain log cleared');
-            } catch (e) {
-                setStatus('Clear failed: ' + e.message);
-            }
-        });
-
-        setInterval(() => {
-            recomputeDerived();
-            renderState();
-        }, 1000);
-
-        bootstrap().catch((e) => {
-            const health = document.getElementById('health');
-            health.textContent = 'UNREACHABLE';
-            health.className = 'value bad';
-            setStatus('Error: ' + e.message);
-        });
-    </script>
-</body>
-</html>"""
-    return make_response(html, 200, {"Content-Type": "text/html"})
-
 
 @socketio.on("submit_command")
 def ws_submit_command(data):
@@ -789,6 +491,35 @@ def ws_assistant_response(data):
         return {"status": "error", "message": "No text provided"}
     _store_response(text)
     socketio.emit("assistant_response", {"text": text, "source": "socket"})
+    return {"status": "ok"}
+
+
+@socketio.on("memory_check")
+def ws_memory_check(data):
+    payload = data or {}
+    text = (payload.get("text") or "").strip()
+    if not text:
+        return {"status": "error", "message": "No text provided"}
+    socketio.emit(
+        "memory_check",
+        {"text": text, "insight_id": payload.get("insight_id"), "source": "socket"},
+    )
+    return {"status": "ok"}
+
+
+@socketio.on("insight_feedback")
+def ws_insight_feedback(data):
+    payload = data or {}
+    if payload.get("insight_id") is None:
+        return {"status": "error", "message": "No insight_id provided"}
+    socketio.emit(
+        "insight_feedback",
+        {
+            "insight_id": payload.get("insight_id"),
+            "keep": bool(payload.get("keep")),
+            "source": "socket",
+        },
+    )
     return {"status": "ok"}
 
 

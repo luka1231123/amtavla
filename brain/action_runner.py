@@ -16,6 +16,7 @@ from brain.contracts import (
     stable_source_id,
     utc_now,
 )
+from brain.memory.commitments import extract_commitments, parse_reminder
 from tools.websearch import DEFAULT_SEARCH_CLIENT, WebSearchClient
 
 
@@ -43,10 +44,59 @@ _EXPLICIT_MEMORY_WRITE = re.compile(
     r"\b(remember|save|store|memorize|note that|don't forget|dont forget|keep (?:this|that|it) in mind)\b",
     re.IGNORECASE,
 )
+_EXPLICIT_REMINDER = re.compile(
+    r"\b(remind me|set a reminder|don'?t let me forget|would you remind|can you remind|could you remind|will you remind)\b",
+    re.IGNORECASE,
+)
+
+
+def reminder_request_supported(user_input: str) -> bool:
+    """True when REMINDER's permission gate would allow the action to run.
+
+    Routing uses this so a fuzzy (embedding/LLM) route to reminder_reply can't
+    schedule an action that is guaranteed to fail its own gate.
+    """
+    if _EXPLICIT_REMINDER.search(user_input or ""):
+        return True
+    return bool(extract_commitments(user_input or "", time.time()))
+
+
+_CALC_LEADING_PHRASE = re.compile(
+    r"^\s*(?:what(?:'?s| is)|calculate|compute|solve|evaluate|=)\s*",
+    re.IGNORECASE,
+)
+_CALC_PERCENT_OF = re.compile(
+    r"(\d+(?:\.\d+)?)\s*(?:%|percent)\s*of\s+", re.IGNORECASE
+)
+_CALC_WORD_OPERATORS = [
+    (re.compile(r"\bmultiplied by\b", re.IGNORECASE), "*"),
+    (re.compile(r"\bdivided by\b", re.IGNORECASE), "/"),
+    (re.compile(r"\btimes\b", re.IGNORECASE), "*"),
+    (re.compile(r"\bplus\b", re.IGNORECASE), "+"),
+    (re.compile(r"\bminus\b", re.IGNORECASE), "-"),
+]
+
+
+def _normalize_expression(text: str) -> str:
+    """Rewrite common natural-language arithmetic into the allowed grammar.
+
+    Only produces pure-arithmetic strings; anything it cannot turn into
+    arithmetic is left for ast.parse/the AST whitelist to reject cleanly.
+    """
+    value = (text or "").strip()
+    if not value:
+        return value
+    value = value.rstrip("?").strip()
+    value = _CALC_LEADING_PHRASE.sub("", value)
+    # "15% of 200" / "15 percent of 200" -> "(15/100)*200"
+    value = _CALC_PERCENT_OF.sub(lambda m: f"({m.group(1)}/100)*", value)
+    for pattern, symbol in _CALC_WORD_OPERATORS:
+        value = pattern.sub(symbol, value)
+    return value.strip()
 
 
 def calculate(expression: str) -> int | float:
-    text = (expression or "").strip()
+    text = _normalize_expression(expression)
     if not text or len(text) > 200:
         raise ValueError("Calculation must be a non-empty expression under 200 chars")
 
@@ -85,9 +135,25 @@ class ActionRunner:
         *,
         search_client: WebSearchClient | Any | None = None,
         memory_client: MemoryActionClient | None = None,
+        files_client: Any | None = None,
     ) -> None:
         self.search_client = search_client or DEFAULT_SEARCH_CLIENT
         self.memory_client = memory_client
+        self._files_client = files_client
+
+    @property
+    def files_client(self):
+        # Lazy so tests and setups that never touch NOTE_READ skip config/root resolution.
+        if self._files_client is None:
+            from tools.localfiles import LocalFilesClient
+
+            self._files_client = LocalFilesClient()
+        return self._files_client
+
+    def _require_memory(self) -> MemoryActionClient:
+        if self.memory_client is None:
+            raise RuntimeError("Memory actions are unavailable")
+        return self.memory_client
 
     def run(
         self,
@@ -129,13 +195,121 @@ class ActionRunner:
                     "value": calculate(expression),
                 }
             elif action.action_type == ActionType.MEMORY_SEARCH:
-                if self.memory_client is None:
-                    raise RuntimeError("Memory actions are unavailable")
                 query = action.detail or user_input
-                memory_context = self.memory_client.search_memory(query)
+                memory_context = self._require_memory().search_memory(query)
                 pack = ContextPack.from_memory(memory_context)
                 output = pack.to_dict()
                 sources = list(pack.sources)
+            elif action.action_type == ActionType.SUMMARIZE:
+                memory = self._require_memory()
+                scope = action.detail or user_input
+                notes_getter = getattr(memory, "recent_notes", None)
+                items = notes_getter(limit=20) if callable(notes_getter) else []
+                lines = []
+                for item in items:
+                    lines.append(
+                        f"[memory:item:{item.get('id')}] "
+                        f"({item.get('item_type', 'note')}) {item.get('content', '')}"
+                    )
+                    sources.append(
+                        SourceRef(
+                            source_id=f"memory:item:{item.get('id')}",
+                            kind="memory_item",
+                            title=str(item.get("content", ""))[:80],
+                            excerpt=str(item.get("content", "")),
+                        )
+                    )
+                output = {
+                    "scope": scope,
+                    "material": lines,
+                    "instruction": (
+                        "Summarize ONLY the material above into what the user asked for "
+                        "(summary, checklist, or bullets). Cite item IDs."
+                        if lines
+                        else "No stored notes matched. Say so plainly; do not invent notes."
+                    ),
+                }
+            elif action.action_type == ActionType.REMINDER:
+                memory = self._require_memory()
+                now = time.time()
+                if _EXPLICIT_REMINDER.search(user_input or ""):
+                    parsed = parse_reminder(action.detail or user_input, now)
+                    if parsed is None:
+                        parsed = parse_reminder(user_input, now)
+                else:
+                    # Self-declared commitments ("I promised X by Friday") may
+                    # be tracked too — memory capture would store them anyway.
+                    commitments = extract_commitments(user_input or "", now)
+                    parsed = commitments[0] if commitments else None
+                    if parsed is None:
+                        raise PermissionError(
+                            "REMINDER requires an explicit user request to be reminded"
+                        )
+                if parsed is None or not parsed["content"]:
+                    raise ValueError("Could not parse what to be reminded about")
+                if parsed["due_at"] is None:
+                    raise ValueError(
+                        "A reminder needs an exact time, such as 'in 20 minutes', "
+                        "'tomorrow morning', or 'at 2pm'. Nothing was stored."
+                    )
+                creator = getattr(memory, "create_reminder", None)
+                if not callable(creator):
+                    raise RuntimeError("Reminder storage is unavailable")
+                item = creator(parsed["content"], due_at=parsed["due_at"])
+                # upsert_item may match a locked (corrected/archived) item and
+                # keep its existing content while returning the correct id, so
+                # cite the stored content, not what we tried to write.
+                stored_content = item.get("content") or parsed["content"]
+                due_at = parsed["due_at"]
+                output = {
+                    "content": parsed["content"],
+                    "due_at": due_at,
+                    "due_at_human": (
+                        time.strftime("%Y-%m-%d %H:%M", time.localtime(due_at))
+                        if due_at
+                        else "no specific time"
+                    ),
+                    "stored": True,
+                }
+                sources = [
+                    SourceRef(
+                        source_id=f"memory:item:{item['id']}",
+                        kind="memory_item",
+                        title=f"Reminder: {stored_content}",
+                        excerpt=stored_content,
+                    )
+                ]
+            elif action.action_type == ActionType.NOTE_READ:
+                result = self.files_client.run(action.detail or user_input)
+                output = result
+                if not result.get("error"):
+                    identity = result.get("path") or result.get("directory") or result.get("term", "")
+                    sources = [
+                        SourceRef(
+                            source_id=stable_source_id("file", str(identity)),
+                            kind="local_file",
+                            title=str(identity) or "local files",
+                            excerpt=str(result.get("content", ""))[:200],
+                        )
+                    ]
+            elif action.action_type == ActionType.CLARIFY:
+                question = (action.detail or "").strip()
+                if not question:
+                    raise ValueError("CLARIFY requires the question to ask")
+                output = {"question": question}
+            elif action.action_type == ActionType.RESEARCH:
+                memory = self._require_memory()
+                topic = (action.detail or user_input).strip()
+                queuer = getattr(memory, "queue_research", None)
+                if not callable(queuer):
+                    raise RuntimeError("Background research is unavailable")
+                job = queuer(topic)
+                output = {
+                    "status": "queued",
+                    "topic": topic,
+                    "job_id": job.get("job_id"),
+                    "note": "Research runs in the background; results arrive as a proactive message.",
+                }
             elif action.action_type == ActionType.MEMORY_WRITE:
                 if self.memory_client is None:
                     raise RuntimeError("Memory actions are unavailable")

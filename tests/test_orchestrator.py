@@ -129,8 +129,9 @@ def test_full_search_turn_has_structured_actions_sources_trace_and_commit():
     assert turn.plan.to_pairs() == [("SEARCH", "what is current?")]
     assert turn.action_results[0].ok is True
     assert turn.action_results[0].to_dict()["output"][0]["title"] == "Current source"
-    assert "memory:semantic:4" in turn.response_source_ids
-    assert any(source_id.startswith("web:") for source_id in turn.response_source_ids)
+    # Available context and tool evidence are traced separately; the response
+    # records only sources the final text actually cited.
+    assert turn.response_source_ids == []
     assert [event.event_type for event in turn.trace] == [
         "user_prompt",
         "health",
@@ -189,6 +190,79 @@ def test_empty_memory_recall_returns_idk_without_generator_guessing():
     assert memory.commits[0][1] == "IDK"
 
 
+def test_clarify_result_is_the_response_verbatim_without_generation():
+    memory = _FakeMemory()
+    generator = _FakeGenerator()
+    action = Action.create(ActionType.CLARIFY, "Which project do you mean?")
+    orchestrator = TurnOrchestrator(
+        router=_FakeRouter("default", "planner_full"),
+        memory=memory,
+        planner=_FakePlanner(Plan(actions=[action])),
+        action_runner=ActionRunner(search_client=_FakeSearch(), memory_client=memory),
+        response_generator=generator,
+        health_reporter=_FakeHealth(),
+        config={"routing": {"max_plan_steps": 5, "show_sources": True}},
+    )
+
+    turn = _run(orchestrator, "fix it")
+
+    assert turn.status == "completed"
+    assert turn.response == "Which project do you mean?"
+    assert generator.calls == []
+    assert "Sources:" not in turn.response
+
+
+def test_reminder_pathway_plans_one_deterministic_reminder_action():
+    memory = _FakeMemory()
+    memory.reminders = []
+    memory.create_reminder = lambda content, *, due_at=None: (
+        memory.reminders.append((content, due_at)) or {"id": 21, "content": content}
+    )
+    generator = _FakeGenerator()
+    orchestrator = TurnOrchestrator(
+        router=_FakeRouter("reminder", "reminder_reply"),
+        memory=memory,
+        planner=_FakePlanner(),
+        action_runner=ActionRunner(search_client=_FakeSearch(), memory_client=memory),
+        response_generator=generator,
+        health_reporter=_FakeHealth(),
+        config={"routing": {"max_plan_steps": 5}},
+    )
+
+    turn = _run(orchestrator, "remind me to stretch in 1 hour")
+
+    assert turn.plan.to_pairs() == [("REMINDER", "remind me to stretch in 1 hour")]
+    assert turn.action_results[0].ok is True
+    assert memory.reminders[0][0] == "stretch in 1 hour"
+    assert turn.response_source_ids == []
+
+
+def test_summarize_pathway_plans_one_summarize_action():
+    memory = _FakeMemory()
+    memory.recent_notes = lambda limit=20: [
+        {"id": 3, "item_type": "fact", "content": "Buy milk."}
+    ]
+    generator = _FakeGenerator()
+    orchestrator = TurnOrchestrator(
+        router=_FakeRouter("summarize", "summarize_reply"),
+        memory=memory,
+        planner=_FakePlanner(),
+        action_runner=ActionRunner(search_client=_FakeSearch(), memory_client=memory),
+        response_generator=generator,
+        health_reporter=_FakeHealth(),
+        config={"routing": {"max_plan_steps": 5}},
+    )
+
+    turn = _run(orchestrator, "make a checklist from my notes")
+
+    assert turn.plan.to_pairs() == [
+        ("SUMMARIZE", "make a checklist from my notes")
+    ]
+    assert turn.action_results[0].ok is True
+    assert turn.response_source_ids == []
+    assert len(generator.calls) == 1
+
+
 def test_action_errors_remain_visible_in_completed_turn():
     memory = _FakeMemory()
     action = Action.create(ActionType.CALCULATE, "2 ** 999")
@@ -209,3 +283,76 @@ def test_action_errors_remain_visible_in_completed_turn():
     assert "Exponent" in turn.action_results[0].error
     action_trace = next(event for event in turn.trace if event.event_type == "action_result")
     assert action_trace.outputs["ok"] is False
+
+
+def test_fuzzy_reminder_route_falls_back_to_planner_when_gate_would_refuse():
+    """An embedding/LLM route to reminder_reply for text with no reminder
+    request must not schedule a REMINDER that is guaranteed to fail."""
+    memory = _FakeMemory()
+    fallback_plan = Plan(actions=[Action.create(ActionType.CLARIFY, "What thing?")])
+    orchestrator = TurnOrchestrator(
+        router=_FakeRouter("clarify", "reminder_reply"),
+        memory=memory,
+        planner=_FakePlanner(fallback_plan),
+        action_runner=ActionRunner(search_client=_FakeSearch(), memory_client=memory),
+        response_generator=_FakeGenerator(),
+        health_reporter=_FakeHealth(),
+        config={"routing": {"max_plan_steps": 5}},
+    )
+
+    turn = _run(orchestrator, "Can you make that thing better?")
+
+    assert turn.plan.to_pairs() == [("CLARIFY", "What thing?")]
+    assert turn.response == "What thing?"
+    assert all(result.ok for result in turn.action_results)
+
+
+def test_explicit_reminder_still_uses_deterministic_action():
+    memory = _FakeMemory()
+    memory.reminders = []
+    memory.create_reminder = lambda content, *, due_at=None: (
+        memory.reminders.append((content, due_at)) or {"id": 5, "content": content}
+    )
+    orchestrator = TurnOrchestrator(
+        router=_FakeRouter("reminder", "reminder_reply"),
+        memory=memory,
+        planner=_FakePlanner(),
+        action_runner=ActionRunner(search_client=_FakeSearch(), memory_client=memory),
+        response_generator=_FakeGenerator(),
+        health_reporter=_FakeHealth(),
+        config={"routing": {"max_plan_steps": 5}},
+    )
+
+    turn = _run(orchestrator, "remind me to stretch in 1 hour")
+
+    assert turn.plan.to_pairs() == [("REMINDER", "remind me to stretch in 1 hour")]
+    assert turn.action_results[0].ok is True
+
+
+def test_memory_check_stays_out_of_reply_and_reminder_nudge_is_appended():
+    memory = _FakeMemory(
+        {
+            "combined_context": "",
+            "pending_feedback_prompt": 'Quick memory check: should I keep this insight — "X"?',
+            "pending_feedback_id": 7,
+            "reminder_nudge": "Overdue: send the invoice.",
+        }
+    )
+    orchestrator = TurnOrchestrator(
+        router=_FakeRouter("default", "planner_full"),
+        memory=memory,
+        planner=_FakePlanner(),
+        action_runner=ActionRunner(search_client=_FakeSearch(), memory_client=memory),
+        response_generator=_FakeGenerator(),
+        health_reporter=_FakeHealth(),
+        config={"routing": {"max_plan_steps": 5}},
+    )
+
+    turn = _run(orchestrator, "plan my afternoon around the invoice work")
+
+    assert "memory check" not in turn.response
+    assert "Overdue: send the invoice." in turn.response
+    # The question still travels on the turn for the transport layer to send
+    # as its own yes/no message.
+    assert turn.context.pending_feedback_prompt.startswith("Quick memory check")
+    assert turn.context.pending_feedback_id == 7

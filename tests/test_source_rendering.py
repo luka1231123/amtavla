@@ -56,8 +56,18 @@ def test_render_source_summary_prefers_cited_sources():
     assert "car at level 3" in cited
     assert "example.com" not in cited
 
-    fallback = render_source_summary("No citations here.", sources)
-    assert "car at level 3" in fallback
-    assert "example.com" in fallback
+    assert render_source_summary("No citations here.", sources) == ""
 
     assert render_source_summary("anything", []) == ""
+
+
+def test_render_source_summary_ignores_id_prefix_collision():
+    # memory:item:1 is a prefix of memory:item:12; a plain substring match would
+    # wrongly show item 1 when only item 12 was cited.
+    sources = [
+        SourceRef("memory:item:1", "memory_item", "fact", "wrong item one"),
+        SourceRef("memory:item:12", "memory_item", "fact", "right item twelve"),
+    ]
+    summary = render_source_summary("The answer is [memory:item:12].", sources)
+    assert "right item twelve" in summary
+    assert "wrong item one" not in summary

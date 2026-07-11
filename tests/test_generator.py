@@ -96,3 +96,23 @@ def test_unified_memory_item_replaces_duplicate_legacy_prompt_context():
     assert "[memory:item:12]" in rendered
     assert "May 13" in rendered
     assert "May 12" not in rendered
+
+
+def test_failed_action_renders_loud_failure_instruction():
+    action = Action.create(ActionType.REMINDER, "remind me friday")
+    result = ActionResult(
+        action_id=action.action_id,
+        action_type=action.action_type,
+        detail=action.detail,
+        ok=False,
+        output=None,
+        error="A reminder needs an exact time",
+        completed_at=utc_now(),
+    )
+    rendered = build_response_context(
+        Plan([action]), [result], ContextPack.from_memory({})
+    )
+
+    assert "ACTION FAILED" in rendered
+    assert "did NOT happen" in rendered
+    assert "Do not claim or imply success" in rendered

@@ -27,6 +27,11 @@ class ActionType(str, Enum):
     CALCULATE = "CALCULATE"
     MEMORY_SEARCH = "MEMORY_SEARCH"
     MEMORY_WRITE = "MEMORY_WRITE"
+    SUMMARIZE = "SUMMARIZE"
+    REMINDER = "REMINDER"
+    NOTE_READ = "NOTE_READ"
+    CLARIFY = "CLARIFY"
+    RESEARCH = "RESEARCH"
 
     @classmethod
     def parse(cls, value: str) -> ActionType | None:
@@ -206,6 +211,26 @@ class Plan:
 
 
 @dataclass
+class ReasoningResult:
+    applied: bool = False
+    answer_outline: str = ""
+    claims: list[dict[str, Any]] = field(default_factory=list)
+    uncertainties: list[str] = field(default_factory=list)
+    source_ids: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "applied": self.applied,
+            "answer_outline": self.answer_outline,
+            "claims": [dict(claim) for claim in self.claims],
+            "uncertainties": list(self.uncertainties),
+            "source_ids": list(self.source_ids),
+            "warnings": list(self.warnings),
+        }
+
+
+@dataclass
 class ActionResult:
     action_id: str
     action_type: ActionType
@@ -257,6 +282,7 @@ class ContextPack:
     style_context: str = ""
     pending_feedback_prompt: str = ""
     pending_feedback_id: int | None = None
+    reminder_nudge: str = ""
     sources: list[SourceRef] = field(default_factory=list)
 
     @classmethod
@@ -366,6 +392,7 @@ class ContextPack:
             style_context=str(value.get("style_context") or ""),
             pending_feedback_prompt=str(value.get("pending_feedback_prompt") or ""),
             pending_feedback_id=value.get("pending_feedback_id"),
+            reminder_nudge=str(value.get("reminder_nudge") or ""),
             sources=sources,
         )
 
@@ -393,6 +420,7 @@ class ContextPack:
             "style_context": self.style_context,
             "pending_feedback_prompt": self.pending_feedback_prompt,
             "pending_feedback_id": self.pending_feedback_id,
+            "reminder_nudge": self.reminder_nudge,
             "sources": [source.to_dict() for source in self.sources],
             "source_ids": self.source_ids,
         }
@@ -434,6 +462,7 @@ class Turn:
     context: ContextPack = field(default_factory=ContextPack)
     plan: Plan = field(default_factory=Plan)
     action_results: list[ActionResult] = field(default_factory=list)
+    reasoning: ReasoningResult = field(default_factory=ReasoningResult)
     response: str = ""
     response_source_ids: list[str] = field(default_factory=list)
     trace: list[TraceEvent] = field(default_factory=list)
@@ -453,6 +482,7 @@ class Turn:
             "todo": [action.to_dict() for action in self.plan.actions],
             "context": self.context.to_dict(),
             "actions": [result.to_dict() for result in self.action_results],
+            "reasoning": self.reasoning.to_dict(),
             "source_ids": list(self.response_source_ids),
             "trace": [event.to_dict() for event in self.trace],
             "error": self.error,
@@ -470,6 +500,7 @@ class Turn:
             "context": self.context.to_dict(),
             "plan": self.plan.to_dict(),
             "action_results": [item.to_dict() for item in self.action_results],
+            "reasoning": self.reasoning.to_dict(),
             "response": self.response,
             "response_source_ids": list(self.response_source_ids),
             "trace": [event.to_dict() for event in self.trace],

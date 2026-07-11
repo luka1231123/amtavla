@@ -54,3 +54,25 @@ def test_what_do_you_know_routes_to_memory_recall():
 
     assert route["intent"] == "memory_recall"
     assert route["pathway"] == "memory_recall_reply"
+
+
+def test_external_knowledge_question_prefers_search_without_model():
+    config = deepcopy(load_brain_config())
+    config["routing"]["intent_model_enabled"] = False
+    config["routing"]["intent_embedding_enabled"] = False
+
+    route = IntentRouter(config).route("How does a heat pump work?")
+
+    assert route["intent"] == "web_factual"
+    assert route["pathway"] == "search_then_reply"
+    assert route["source"] == "knowledge_question"
+
+
+def test_ambiguous_assistant_question_does_not_force_web_search():
+    config = deepcopy(load_brain_config())
+    config["routing"]["intent_model_enabled"] = False
+    config["routing"]["intent_embedding_enabled"] = False
+
+    route = IntentRouter(config).route("What should you possess?")
+
+    assert route["pathway"] == "planner_full"

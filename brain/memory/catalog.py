@@ -5,6 +5,7 @@ import os
 import re
 import sqlite3
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +38,24 @@ ENTITY_TYPES = {
     "organization",
     "other",
 }
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+
+
+def resolve_repo_path(path: str) -> str:
+    """Resolve a possibly-relative DB path against the repo root, not cwd.
+
+    Absolute paths are returned unchanged. This keeps main.py and
+    phone_server.py agreeing on DB locations regardless of the directory the
+    process was launched from (a LaunchAgent or IDE run config launches from a
+    different cwd, which otherwise breaks the default "brain/db" relative path
+    with "unable to open database file").
+    """
+    p = Path(path)
+    if p.is_absolute():
+        return str(p)
+    return str((_REPO_ROOT / p).resolve())
+
+
 TAG_TYPES = {
     "project",
     "person",
@@ -74,17 +93,25 @@ def _canonical_name(value: str) -> str:
 
 class MemoryCatalog:
     def __init__(self, db_path: str):
-        self.db_path = db_path
-        parent = os.path.dirname(db_path)
+        self.db_path = resolve_repo_path(db_path)
+        parent = os.path.dirname(self.db_path)
         if parent:
             os.makedirs(parent, exist_ok=True)
         self._init_schema()
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self):
         conn = sqlite3.connect(self.db_path, timeout=30)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
-        return conn
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def _init_schema(self):
         with self._connect() as conn:
@@ -583,6 +610,7 @@ class MemoryCatalog:
         tag: str | None = None,
         since: float | None = None,
         until: float | None = None,
+        updated_since: float | None = None,
         limit: int = 100,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
@@ -622,6 +650,9 @@ class MemoryCatalog:
         if until is not None:
             clauses.append("created_at <= ?")
             params.append(float(until))
+        if updated_since is not None:
+            clauses.append("updated_at > ?")
+            params.append(float(updated_since))
         if query.strip():
             tokens = re.findall(r"[a-z0-9]+", query.lower())[:8]
             if tokens:

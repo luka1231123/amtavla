@@ -24,15 +24,18 @@ Each turn runs in this order:
 2. Select an intent pathway (`brain/intent_router.py`)
 3. Recall source-aware semantic, episodic, and insight context
 4. Build a validated plan (`brain/planner.py`)
-5. Execute bounded actions (`brain/action_runner.py`)
-6. Generate against structured results and source IDs (`generator.py`)
-7. Commit the response, action results, and complete trace
+5. Execute bounded actions (`brain/action_runner.py`) — search, calculate, memory search/write, summarize, set a reminder, list/read/find local files (`tools/localfiles.py`, sandboxed under `sandbox/`), queue background research, or ask one clarifying question
+6. Optionally run one bounded grounded-reasoning pass over the evidence (`brain/reasoner.py`)
+7. Generate against structured results, source IDs, and any reasoning pass (`generator.py`)
+8. Commit the response, action results, and complete trace
 
 When idle:
 
 - background synthesis jobs run
 - strong discoveries are promoted to insight LTM
 - episodic strength decays and expired low-strength events are deleted
+- due reminders fire and overdue research jobs force-start on a dedicated ~2s tick, independent of the heavier idle pipeline
+- proactive memory-check questions ("keep this insight?") and reminder/research results reach the CLI and phone UI as their own messages — the UI renders yes/no buttons for memory checks instead of the model narrating them inline
 
 ## Memory Architecture
 
@@ -213,3 +216,4 @@ The suite uses fake inference, embedding, and search clients. It does not requir
 
 - Proactive insight quality still needs calibration in long sessions.
 - Phase 3 (tagging, capture, snapshots, contradiction/staleness, source-backed answers) and the pragmatic cores of Phase 4 (commitments, reminders, focus, brief) and Phase 5 (style profile, idea revival, review drills) are implemented; next up is project cockpit views, richer reminder triggers, and learning-item generation.
+- The local model is being evaluated for a swap to a stronger small instruction-tuned model; `llm` config in `brain/brain_config.json` and the structured-output plumbing in `llama_client.py`/`brain/schemas.py` exist to make that swap config-driven, but are not yet wired into the router/planner/extraction hot paths.

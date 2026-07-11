@@ -32,6 +32,29 @@ def test_parse_plan_accepts_phase_one_actions_and_reports_mixed_unknowns():
     assert plan.warnings == ["Unsupported planner action: SHELL"]
 
 
+def test_parse_plan_accepts_capability_expansion_actions():
+    raw = """
+    {"steps":[
+      {"action":"SUMMARIZE","detail":"checklist from notes"},
+      {"action":"REMINDER","detail":"remind me tomorrow morning"},
+      {"action":"NOTE_READ","detail":"list files"},
+      {"action":"CLARIFY","detail":"Which project do you mean?"},
+      {"action":"RESEARCH","detail":"local-first sync"}
+    ]}
+    """
+
+    plan = parse_plan(raw)
+
+    assert [item.action_type for item in plan.actions] == [
+        ActionType.SUMMARIZE,
+        ActionType.REMINDER,
+        ActionType.NOTE_READ,
+        ActionType.CLARIFY,
+        ActionType.RESEARCH,
+    ]
+    assert plan.warnings == []
+
+
 def test_parse_plan_dedupes_and_limits_steps():
     raw = """
     {"steps":[

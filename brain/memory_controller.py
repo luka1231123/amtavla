@@ -24,6 +24,9 @@ class MemoryController:
         self._idle_min_interval_seconds = float(
             idle_cfg.get("min_interval_seconds", 5.0)
         )
+        self._reminder_tick_seconds = float(
+            idle_cfg.get("reminder_tick_seconds", 2.0)
+        )
 
         self._last_activity_ts = time.time()
         self._last_idle_run_ts = 0.0
@@ -31,6 +34,7 @@ class MemoryController:
         self._stop_event = threading.Event()
         self._closed = False
         self._debug_hook = None
+        self._proactive_hook = None
         self._foreground_lock = threading.Lock()
         self._foreground_active = 0
 
@@ -38,11 +42,36 @@ class MemoryController:
         self._worker_thread.start()
         self._idle_thread = threading.Thread(target=self._idle_loop, daemon=True)
         self._idle_thread.start()
+        # Reminders get their own lightweight tick so a due time fires within
+        # seconds even while the user is chatting or heavy idle work is failing.
+        self._reminder_thread = threading.Thread(
+            target=self._reminder_loop, daemon=True
+        )
+        self._reminder_thread.start()
 
         atexit.register(self._shutdown_on_exit)
 
     def set_debug_hook(self, debug_hook):
         self._debug_hook = debug_hook
+
+    def set_proactive_hook(self, proactive_hook):
+        """Called with each message the idle jobs queue for the user (reminders,
+        finished research). The hook delivers it to whatever UI is attached."""
+        self._proactive_hook = proactive_hook
+
+    def _deliver_proactive_messages(self):
+        messages = self.memory.drain_proactive_messages()
+        if not messages:
+            return
+        if self._proactive_hook is None:
+            # No UI attached yet: keep them queued instead of dropping.
+            self.memory._proactive_outbox[:0] = messages
+            return
+        for message in messages:
+            try:
+                self._proactive_hook(message)
+            except Exception:
+                logger.debug("Proactive hook failed", exc_info=True)
 
     def _emit_debug(self, event_type: str, payload: dict):
         if self._debug_hook is None:
@@ -77,6 +106,8 @@ class MemoryController:
             self._worker_thread.join(timeout=1.0)
         if self._idle_thread.is_alive():
             self._idle_thread.join(timeout=1.0)
+        if self._reminder_thread.is_alive():
+            self._reminder_thread.join(timeout=1.0)
 
     def close(self):
         self._shutdown_on_exit()
@@ -95,8 +126,34 @@ class MemoryController:
             user_input, response, trace = item
             try:
                 self.memory.commit_turn(user_input, response, trace=trace)
+            except Exception:
+                # A single bad commit must never kill the worker: if it did, all
+                # future memory commits would silently stop for the rest of the
+                # process's life. Log and drop this turn, keep consuming.
+                logger.exception("commit_turn failed for a turn; worker continues")
             finally:
                 self._turn_queue.task_done()
+
+    def _reminder_loop(self):
+        while not self._stop_event.is_set():
+            try:
+                fired = self.memory.fire_due_reminders_now()
+                # Research normally waits for a quiet idle window; force-start
+                # jobs that have waited over a minute so continuous chatting
+                # can't delay them forever. Never while a turn is in flight —
+                # research shares the model with the foreground reply.
+                with self._foreground_lock:
+                    foreground_busy = self._foreground_active > 0
+                overdue = (
+                    0
+                    if foreground_busy
+                    else self.memory.run_overdue_research(min_age_seconds=60.0)
+                )
+                if fired or overdue:
+                    self._deliver_proactive_messages()
+            except Exception:
+                logger.debug("Reminder tick failed", exc_info=True)
+            time.sleep(self._reminder_tick_seconds)
 
     def _idle_loop(self):
         while not self._stop_event.is_set():
@@ -122,13 +179,15 @@ class MemoryController:
         if (now - self._last_idle_run_ts) < self._idle_min_interval_seconds:
             return
 
-        metrics = self.memory.run_idle_jobs()
         self._last_idle_run_ts = now
+        metrics = self.memory.run_idle_jobs()
+        self._deliver_proactive_messages()
         logger.debug("Idle memory maintenance metrics: %s", metrics)
 
     def run_idle_now(self) -> dict:
         self.note_user_activity()
         metrics = self.memory.run_idle_jobs()
+        self._deliver_proactive_messages()
         status = self.memory.get_status()
         return {"status": status, "metrics": metrics}
 
@@ -175,7 +234,12 @@ class MemoryController:
             "style_context": recall.get("style_context", ""),
             "pending_feedback_prompt": recall["pending_feedback_prompt"],
             "pending_feedback_id": recall.get("pending_feedback_id"),
+            "reminder_nudge": recall.get("reminder_nudge", ""),
         }
+
+    def apply_insight_feedback(self, insight_id: int, keep: bool) -> dict:
+        self.note_user_activity()
+        return self.memory.apply_insight_feedback(insight_id, keep)
 
     def search_memory(self, query: str, top_k: int = 5) -> dict:
         recall = self.memory.search_memory(query, top_k=top_k)
@@ -194,6 +258,17 @@ class MemoryController:
     def write_memory(self, statement: str) -> dict:
         self.note_user_activity()
         return self.memory.write_memory(statement)
+
+    def recent_notes(self, limit: int = 20) -> list[dict]:
+        return self.memory.recent_notes(limit=limit)
+
+    def create_reminder(self, content: str, *, due_at: float | None = None) -> dict:
+        self.note_user_activity()
+        return self.memory.create_reminder(content, due_at=due_at)
+
+    def queue_research(self, topic: str) -> dict:
+        self.note_user_activity()
+        return self.memory.queue_research(topic)
 
     def list_memory_items(self, **filters) -> list[dict]:
         return self.memory.list_memory_items(**filters)

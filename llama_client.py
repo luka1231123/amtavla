@@ -8,12 +8,11 @@ import atexit
 
 LLAMA_SERVER_HOST = "127.0.0.1"
 LLAMA_SERVER_PORT = 8085
-MODEL_PATH = os.path.join(
-    os.path.expanduser("~"),
-    "llama.cpp",
-    "models",
-    "Qwen2.5-Coder-7B-Instruct-Q6_K_L.gguf",
-)
+_MODELS_DIR = os.path.join(os.path.expanduser("~"), "llama.cpp", "models")
+# Default filename used only when config does not name a model. Kept as the
+# current model so behavior is unchanged until the config is pointed at a new
+# one; the model swap is a one-line config edit (llm.model_filename).
+_DEFAULT_MODEL_FILENAME = "Qwen2.5-Coder-7B-Instruct-Q6_K_L.gguf"
 LLAMA_SERVER_BIN = os.path.expanduser("~/llama.cpp/build/bin/llama-server")
 
 _server_process = None
@@ -25,16 +24,62 @@ _CACHE_MAX_SIZE = 100
 _atexit_registered = False
 
 
-def _resolve_model_path() -> str | None:
-    if os.path.exists(MODEL_PATH):
-        return MODEL_PATH
-    model_dir = os.path.join(os.path.expanduser("~"), "llama.cpp", "models")
-    if not os.path.isdir(model_dir):
+def _llm_config() -> dict:
+    """LLM runtime settings from brain_config.json ('llm' block).
+
+    Imported lazily so a missing/partial config never breaks the client, and so
+    tests can monkeypatch the config loader.
+    """
+    try:
+        from brain.config import load_brain_config
+
+        cfg = load_brain_config().get("llm", {})
+        return cfg if isinstance(cfg, dict) else {}
+    except Exception:
+        return {}
+
+
+def resolve_model_path(config: dict | None = None) -> str | None:
+    """Resolve the GGUF to load.
+
+    Precedence: an explicit config filename/path, then the historical default
+    if present, then the first .gguf in the models dir. The explicit-filename
+    path exists so that once a second model is downloaded the process does not
+    silently pick an arbitrary file — the swap must be a deliberate config edit.
+    """
+    cfg = config if config is not None else _llm_config()
+
+    configured_path = (cfg.get("model_path") or "").strip()
+    if configured_path:
+        # An explicit full path either exists or the model is unavailable —
+        # never silently substitute a different file.
+        return configured_path if os.path.exists(configured_path) else None
+
+    configured_name = (cfg.get("model_filename") or "").strip()
+    if configured_name:
+        candidate = os.path.join(_MODELS_DIR, configured_name)
+        # Same rule for an explicit filename: missing means degraded, not a
+        # guess. Silently picking an arbitrary GGUF once a second model is
+        # downloaded is exactly the footgun we are closing.
+        return candidate if os.path.exists(candidate) else None
+
+    # No explicit config: convenience fallback for a fresh checkout.
+    default = os.path.join(_MODELS_DIR, _DEFAULT_MODEL_FILENAME)
+    if os.path.exists(default):
+        return default
+    if not os.path.isdir(_MODELS_DIR):
         return None
-    for filename in os.listdir(model_dir):
-        if filename.endswith(".gguf"):
-            return os.path.join(model_dir, filename)
+    # Deterministic (sorted) so behavior is stable across runs rather than
+    # dependent on directory iteration order.
+    for name in sorted(os.listdir(_MODELS_DIR)):
+        if name.endswith(".gguf") and not name.startswith("ggml-vocab-"):
+            return os.path.join(_MODELS_DIR, name)
     return None
+
+
+# Back-compat alias for existing callers/tests.
+def _resolve_model_path() -> str | None:
+    return resolve_model_path()
 
 
 def _can_use_llama_server() -> tuple[bool, str | None, str | None]:
@@ -62,18 +107,7 @@ def _ensure_server_running():
         import subprocess
 
         print("Starting llama-server...")
-
-        cmd = [
-            LLAMA_SERVER_BIN,
-            "-m",
-            model_path,
-            "-ngl",
-            "99",
-            "--host",
-            LLAMA_SERVER_HOST,
-            "--port",
-            str(LLAMA_SERVER_PORT),
-        ]
+        cmd = _build_server_cmd(model_path)
 
         _server_process = subprocess.Popen(
             cmd,
@@ -118,17 +152,84 @@ def _stop_server():
             _server_process = None
 
 
-def _call_llama(messages: list[dict], model: str | None = None) -> dict:
+def _build_server_cmd(model_path: str, config: dict | None = None) -> list[str]:
+    """Assemble the llama-server launch command from config.
+
+    Pure/deterministic so the exact flags can be asserted in tests without
+    spawning a process.
+    """
+    cfg = config if config is not None else _llm_config()
+    cmd = [
+        LLAMA_SERVER_BIN,
+        "-m",
+        model_path,
+        "-ngl",
+        str(cfg.get("gpu_layers", 99)),
+        "-c",
+        str(cfg.get("context_size", 4096)),
+        "--host",
+        LLAMA_SERVER_HOST,
+        "--port",
+        str(LLAMA_SERVER_PORT),
+    ]
+    if cfg.get("use_jinja"):
+        # Correct model-native chat template; required by Qwen3.x thinking mode.
+        cmd.append("--jinja")
+    return cmd
+
+
+def _sampling_for(profile: str | None, config: dict | None = None) -> dict:
+    """Sampling params for a named profile ('default', 'thinking', ...)."""
+    cfg = config if config is not None else _llm_config()
+    profiles = cfg.get("sampling", {}) if isinstance(cfg.get("sampling"), dict) else {}
+    base = {"temperature": 0.7, "max_tokens": cfg.get("max_tokens", 512)}
+    base.update(profiles.get("default", {}) if isinstance(profiles.get("default"), dict) else {})
+    name = (profile or "default").strip()
+    if name != "default" and isinstance(profiles.get(name), dict):
+        base.update(profiles[name])
+    return base
+
+
+def _build_payload(
+    messages: list[dict],
+    *,
+    model: str | None = None,
+    schema: dict | None = None,
+    profile: str | None = None,
+    config: dict | None = None,
+) -> dict:
+    """Build the /v1/chat/completions request body.
+
+    When `schema` is provided it is sent as an OpenAI-style json_schema
+    response_format, which llama.cpp converts to a GBNF grammar so malformed
+    JSON is impossible at the sampler — not merely discouraged by the prompt.
+    """
+    sampling = _sampling_for(profile, config=config)
+    payload: dict = {
+        "model": model or "default",
+        "messages": messages,
+        "max_tokens": int(sampling.pop("max_tokens", 512)),
+    }
+    payload.update(sampling)
+    if schema is not None:
+        payload["response_format"] = {
+            "type": "json_schema",
+            "json_schema": {"name": "structured_output", "schema": schema},
+        }
+    return payload
+
+
+def _call_llama(
+    messages: list[dict],
+    model: str | None = None,
+    *,
+    schema: dict | None = None,
+    profile: str | None = None,
+) -> dict:
     _ensure_server_running()
 
     url = f"http://{LLAMA_SERVER_HOST}:{LLAMA_SERVER_PORT}/v1/chat/completions"
-
-    payload = {
-        "model": model or "default",
-        "messages": messages,
-        "max_tokens": 512,
-        "temperature": 0.7,
-    }
+    payload = _build_payload(messages, model=model, schema=schema, profile=profile)
 
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
@@ -143,22 +244,39 @@ def _call_llama(messages: list[dict], model: str | None = None) -> dict:
         raise RuntimeError(f"llama-server call failed: {e}")
 
 
-def _make_cache_key(messages: list[dict], model: str | None = None) -> str:
+def _make_cache_key(
+    messages: list[dict],
+    model: str | None = None,
+    schema: dict | None = None,
+    profile: str | None = None,
+) -> str:
     cache_str = json.dumps(
-        {"model": model or "default", "messages": messages}, sort_keys=True
+        {
+            "model": model or "default",
+            "messages": messages,
+            "schema": schema,
+            "profile": profile,
+        },
+        sort_keys=True,
     )
     return hashlib.sha256(cache_str.encode()).hexdigest()[:32]
 
 
-def chat(messages: list[dict], model: str = None) -> dict:
-    key = _make_cache_key(messages, model=model)
+def chat(
+    messages: list[dict],
+    model: str = None,
+    *,
+    schema: dict | None = None,
+    profile: str | None = None,
+) -> dict:
+    key = _make_cache_key(messages, model=model, schema=schema, profile=profile)
 
     with _cache_lock:
         if key in _response_cache:
             return _response_cache[key]
 
     try:
-        result = _call_llama(messages, model=model)
+        result = _call_llama(messages, model=model, schema=schema, profile=profile)
         content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
         if not content:
             content = result.get("message", {}).get("content", "")
