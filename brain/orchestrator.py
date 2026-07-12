@@ -70,7 +70,9 @@ class TurnOrchestrator:
         self.max_plan_steps = max(1, min(5, max_steps))
         self.resolver = resolver or TurnResolver.from_config(self.config)
         self.planner = planner or Planner(max_steps=self.max_plan_steps)
-        self.action_runner = action_runner or ActionRunner(memory_client=memory)
+        self.action_runner = action_runner or ActionRunner(
+            memory_client=memory, approvals=memory
+        )
         self.response_generator = response_generator or ResponseGenerator()
         self.reasoner = reasoner or GroundedReasoner(config=self.config)
         self.health_reporter = health_reporter or HealthReporter(
@@ -333,6 +335,8 @@ class TurnOrchestrator:
                         action,
                         user_input=turn.user_input,
                         search_cache=search_cache,
+                        turn_id=turn.turn_id,
+                        session_id=turn.session_id,
                     )
                     turn.action_results.append(result)
                     self._record(

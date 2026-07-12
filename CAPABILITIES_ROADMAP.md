@@ -84,7 +84,9 @@ M3 Approvals ───┘        ▲                              ▲
 
 ## 3. Milestones
 
-### M1 — File write / edit / create (T1) · _start here_
+### M1 — File write / edit / create (T1) · _implemented 2026-07-12_
+**Status:** `FILE_WRITE`/`FILE_EDIT` actions live via `LocalFilesWriter` (sandboxed `local_files.writable_root`, `.bak` snapshot before overwrite, text-only, 256KB cap, path-escape refused). Detail is JSON (`{path, content}` / `{path, find, replace}`). Remaining: a post-generation write hook so "save the summary you just wrote" can write generated text (currently the content must be known at plan time), and file-header/sidecar provenance.
+
 **Goal:** turn the read-only note tool into one that produces artifacts.
 
 - **Actions:** `FILE_WRITE`, `FILE_EDIT` (create/overwrite; targeted replace).
@@ -101,7 +103,9 @@ M3 Approvals ───┘        ▲                              ▲
 - **Exit:** "save that summary to notes.md" writes a file and can be undone.
 - **Effort:** S (1–2 days). No new infra.
 
-### M2 — Read & ingest the world (T0)
+### M2 — Read & ingest the world (T0) · _implemented 2026-07-12_
+**Status:** `WEB_FETCH` (`tools/webfetch.py`: one URL → readable text, scripts stripped, timeout/size-bounded, `web:<hash>` citation, injectable fetcher for offline tests) and `FILE_PARSE` (`tools/fileparse.py`: JSON/CSV/text natively; PDF/DOCX degrade to a clear "install X" message rather than crashing) are live. Remaining: bundle `pypdf`/`python-docx`, domain allow/denylist config.
+
 **Goal:** make research and "read this" real beyond plain-text local files.
 
 - **Actions:** `WEB_FETCH` (fetch one URL → readable text + citation),
@@ -118,7 +122,9 @@ M3 Approvals ───┘        ▲                              ▲
 - **Exit:** "read <url> and summarize" and "what's in this PDF" work with sources.
 - **Effort:** M (3–4 days).
 
-### M3 — Approvals substrate (the T2 unlock)
+### M3 — Approvals substrate (the T2 unlock) · _core implemented 2026-07-12_
+**Status:** Trust-tier map (`brain/trust.py`, T2 default fail-closed), catalog `approvals` + `action_audit` tables, `ActionRunner` T2 short-circuit (writes a pending approval, returns `awaiting_approval`, never executes), and `ApprovalCoordinator.resolve` (records decision, executes once on approval, settled approvals never flip, denials never run, every decision audited). Wired into the orchestrator's ActionRunner and MemoryController. Proven by tests with an injected T2 classification (the "fake send action"). Remaining before an outbound action ships: phone-server/CLI approve-deny UI + proactive delivery of the executed result (reuse the `insight_feedback` yes/no channel), and a Privacy-Guardian pre-check on the payload.
+
 **Goal:** a safe boundary so anything that leaves the device pauses for a click.
 
 - **Data model (catalog):** `approvals` (id, turn_id, action_type, payload,

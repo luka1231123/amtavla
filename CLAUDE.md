@@ -66,10 +66,18 @@ All contracts in `brain/contracts.py` are plain dataclasses that serialize to JS
 | `SUMMARIZE` | Collect recent catalog notes as cited material for the generator | Local read |
 | `REMINDER` | Parse "remind me..." into a confirmed commitment with `due_at`; a dedicated ~2s reminder tick fires it via the proactive channel | Local write |
 | `NOTE_READ` | List/read/find local files via `tools/localfiles.py` (sandboxed root, read-only, size-bounded) | Local read |
+| `FILE_WRITE` | Create/overwrite a sandbox text file via `LocalFilesWriter` (`local_files.writable_root`); JSON detail `{path, content}`; reversible — keeps a `.bak` snapshot | Local write |
+| `FILE_EDIT` | Targeted find/replace in a sandbox text file; JSON detail `{path, find, replace}`; also snapshots `.bak` | Local write |
+| `WEB_FETCH` | Fetch one URL → readable text + `web:<hash>` citation (`tools/webfetch.py`; timeout/size-bounded, scripts stripped) | Network read |
+| `FILE_PARSE` | Parse a local PDF/CSV/JSON/text file → citable text (`tools/fileparse.py`, sandboxed; PDF/DOCX degrade gracefully if the optional dep is absent) | Local read |
 | `CLARIFY` | One clarifying question that becomes the reply verbatim (no generation) | None |
 | `RESEARCH` | Queue a bounded background research job (2 searches + 1 synthesis); result arrives proactively | Local write, deferred network |
 
 Unknown planner actions become validation warnings and are never executed. `MEMORY_WRITE` and `REMINDER` are permission-gated: they refuse to run unless the user's own words asked for them (`REMINDER` also accepts self-declared commitments like "I promised X by Friday" — the same phrasing commit-time extraction stores anyway, and both share one dedup key).
+
+### Trust tiers and approvals (`brain/trust.py`, `brain/approvals.py`)
+
+Every action has a trust tier keyed off its worst-case effect (`brain/trust.py`): **T0** read/compute (runs freely), **T1** reversible local write (runs, audited), **T2** outbound/irreversible (requires approval). An unlisted action defaults to T2 — fail closed. When `ActionRunner.run` sees a T2 action it does **not** execute it: it writes a `pending` row to the catalog `approvals` table and returns an `awaiting_approval` result. `ApprovalCoordinator.resolve(id, approved)` records the decision and, only on approval, re-invokes the runner with `approved=True` exactly once (settled approvals never flip; denials never run). Every T2 decision writes an `action_audit` row. No shipped action is T2 yet — this substrate is the unlock for outbound capabilities (messaging, calendar, shell). Remaining: phone-server/CLI approve-deny UI + proactive delivery of executed results (reuse the `insight_feedback` yes/no channel).
 
 Idle-produced messages (due reminders, finished research) reach the user through `MemoryController.set_proactive_hook` — `main.py` wires it to both the CLI and Socket.IO, buffering for the UI while the socket is down. Reminders and overdue research force-starts run on a dedicated ~2s tick (`_reminder_loop`) so they don't depend on the heavier idle pipeline; idle steps in `run_idle_jobs` are individually isolated so one failing step can't starve the rest. Proactive memory-check questions ("should I keep this insight?") travel as a separate `memory_check` message — rendered with yes/no buttons in the UI (`insight_feedback` event → `apply_insight_feedback`), answered by a short yes/no in the CLI — never appended to answer text.
 

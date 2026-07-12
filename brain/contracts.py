@@ -32,6 +32,12 @@ class ActionType(str, Enum):
     NOTE_READ = "NOTE_READ"
     CLARIFY = "CLARIFY"
     RESEARCH = "RESEARCH"
+    # M1 — local artifact writes (T1: reversible, sandboxed, audited).
+    FILE_WRITE = "FILE_WRITE"
+    FILE_EDIT = "FILE_EDIT"
+    # M2 — read/ingest the world (T0: read-only, bounded).
+    WEB_FETCH = "WEB_FETCH"
+    FILE_PARSE = "FILE_PARSE"
 
     @classmethod
     def parse(cls, value: str) -> ActionType | None:

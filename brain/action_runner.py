@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import operator
 import re
 import time
@@ -17,6 +18,7 @@ from brain.contracts import (
     utc_now,
 )
 from brain.memory.commitments import extract_commitments, parse_reminder
+from brain.trust import action_tier
 from tools.websearch import DEFAULT_SEARCH_CLIENT, WebSearchClient
 
 
@@ -48,6 +50,28 @@ _EXPLICIT_REMINDER = re.compile(
     r"\b(remind me|set a reminder|don'?t let me forget|would you remind|can you remind|could you remind|will you remind)\b",
     re.IGNORECASE,
 )
+
+
+def _parse_structured_detail(detail: str) -> dict[str, Any]:
+    """Best-effort structured detail for file actions.
+
+    Prefers JSON ({"path": ..., "content": ...}); falls back to a
+    "<path> :: <body>" convention so a small model that skips JSON still works.
+    """
+    text = (detail or "").strip()
+    if not text:
+        return {}
+    if text.startswith("{"):
+        try:
+            data = json.loads(text)
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+    if "::" in text:
+        path, _, body = text.partition("::")
+        return {"path": path.strip(), "content": body.strip()}
+    return {"path": text}
 
 
 def reminder_request_supported(user_input: str) -> bool:
@@ -136,10 +160,22 @@ class ActionRunner:
         search_client: WebSearchClient | Any | None = None,
         memory_client: MemoryActionClient | None = None,
         files_client: Any | None = None,
+        files_writer: Any | None = None,
+        web_fetch_client: Any | None = None,
+        file_parse_client: Any | None = None,
+        approvals: Any | None = None,
+        tier_for: Any | None = None,
     ) -> None:
         self.search_client = search_client or DEFAULT_SEARCH_CLIENT
         self.memory_client = memory_client
         self._files_client = files_client
+        self._files_writer = files_writer
+        self._web_fetch_client = web_fetch_client
+        self._file_parse_client = file_parse_client
+        # M3: the approvals store (T2 gate) and the tier classifier. tier_for is
+        # injectable so the gate can be exercised without a shipped T2 action.
+        self.approvals = approvals
+        self._tier_for = tier_for or action_tier
 
     @property
     def files_client(self):
@@ -150,10 +186,91 @@ class ActionRunner:
             self._files_client = LocalFilesClient()
         return self._files_client
 
+    @property
+    def files_writer(self):
+        if self._files_writer is None:
+            from tools.localfiles import LocalFilesWriter
+
+            self._files_writer = LocalFilesWriter()
+        return self._files_writer
+
+    @property
+    def web_fetch_client(self):
+        if self._web_fetch_client is None:
+            from tools.webfetch import WebFetchClient
+
+            self._web_fetch_client = WebFetchClient()
+        return self._web_fetch_client
+
+    @property
+    def file_parse_client(self):
+        if self._file_parse_client is None:
+            from tools.fileparse import FileParseClient
+
+            self._file_parse_client = FileParseClient()
+        return self._file_parse_client
+
     def _require_memory(self) -> MemoryActionClient:
         if self.memory_client is None:
             raise RuntimeError("Memory actions are unavailable")
         return self.memory_client
+
+    def _await_approval(
+        self,
+        action: Action,
+        started_at: str,
+        started: float,
+        turn_id: str,
+        session_id: str,
+    ) -> ActionResult:
+        summary = f"{action.action_type.value.replace('_', ' ').title()}: {action.detail}".strip()
+        error = ""
+        output: dict[str, Any]
+        if self.approvals is None:
+            # Fail closed: with nowhere to record the request, refuse rather
+            # than execute an unreviewed T2 action.
+            error = "This action needs your approval, but the approvals store is unavailable."
+            output = {"status": "blocked", "summary": summary}
+        else:
+            approval = self.approvals.create_approval(
+                action_type=action.action_type.value,
+                summary=summary,
+                payload={"detail": action.detail},
+                turn_id=turn_id,
+                session_id=session_id,
+            )
+            record = getattr(self.approvals, "record_action_audit", None)
+            if callable(record):
+                record(
+                    action_type=action.action_type.value,
+                    tier="T2",
+                    detail=action.detail,
+                    ok=True,
+                    approval_id=approval["id"],
+                    outcome="awaiting_approval",
+                    turn_id=turn_id,
+                )
+            output = {
+                "status": "awaiting_approval",
+                "approval_id": approval["id"],
+                "summary": summary,
+                "note": (
+                    "This action was NOT performed. It is waiting for the user's "
+                    "explicit approval and will run only once they approve it."
+                ),
+            }
+        return ActionResult(
+            action_id=action.action_id,
+            action_type=action.action_type,
+            detail=action.detail,
+            ok=not error,
+            output=output,
+            sources=[],
+            error=error,
+            started_at=started_at,
+            completed_at=utc_now(),
+            duration_ms=max(0, int((time.perf_counter() - started) * 1000)),
+        )
 
     def run(
         self,
@@ -161,12 +278,23 @@ class ActionRunner:
         *,
         user_input: str,
         search_cache: dict[str, list[SearchResult]] | None = None,
+        approved: bool = False,
+        turn_id: str = "",
+        session_id: str = "",
     ) -> ActionResult:
         started_at = utc_now()
         started = time.perf_counter()
         output: Any = None
         sources: list[SourceRef] = []
         error = ""
+
+        # T2 gate: an outbound/irreversible action never executes on first sight.
+        # It pauses as a pending approval and only runs when re-invoked with
+        # approved=True by the approval flow.
+        if not approved and self._tier_for(action.action_type) == "T2":
+            return self._await_approval(
+                action, started_at, started, turn_id, session_id
+            )
 
         try:
             if action.action_type == ActionType.THINK:
@@ -292,6 +420,66 @@ class ActionRunner:
                             excerpt=str(result.get("content", ""))[:200],
                         )
                     ]
+            elif action.action_type == ActionType.FILE_WRITE:
+                spec = _parse_structured_detail(action.detail)
+                path = str(spec.get("path") or "").strip()
+                if not path:
+                    raise ValueError("FILE_WRITE requires a target path")
+                result = self.files_writer.write_file(path, str(spec.get("content", "")))
+                output = result
+                if result.get("error"):
+                    raise ValueError(result["error"])
+                sources = [
+                    SourceRef(
+                        source_id=stable_source_id("file", result["path"]),
+                        kind="local_file",
+                        title=result["path"],
+                        excerpt=str(spec.get("content", ""))[:200],
+                        metadata={"backup": result.get("backup"), "tier": "T1"},
+                    )
+                ]
+            elif action.action_type == ActionType.FILE_EDIT:
+                spec = _parse_structured_detail(action.detail)
+                path = str(spec.get("path") or "").strip()
+                if not path or "find" not in spec:
+                    raise ValueError(
+                        "FILE_EDIT requires a path, 'find' text, and 'replace' text"
+                    )
+                result = self.files_writer.edit_file(
+                    path, str(spec.get("find", "")), str(spec.get("replace", ""))
+                )
+                output = result
+                if result.get("error"):
+                    raise ValueError(result["error"])
+                sources = [
+                    SourceRef(
+                        source_id=stable_source_id("file", result["path"]),
+                        kind="local_file",
+                        title=result["path"],
+                        excerpt=str(spec.get("replace", ""))[:200],
+                        metadata={"backup": result.get("backup"), "tier": "T1"},
+                    )
+                ]
+            elif action.action_type == ActionType.WEB_FETCH:
+                result = self.web_fetch_client.fetch(action.detail or user_input)
+                output = result
+                if result.get("error"):
+                    raise ValueError(result["error"])
+                sources = [self.web_fetch_client.source_for(result)]
+            elif action.action_type == ActionType.FILE_PARSE:
+                result = self.file_parse_client.parse(action.detail or user_input)
+                output = result
+                if result.get("error"):
+                    raise ValueError(result["error"])
+                sources = [
+                    SourceRef(
+                        source_id=stable_source_id("file", result["path"]),
+                        kind="local_file",
+                        title=result["path"],
+                        excerpt=str(result.get("content", ""))[:200],
+                        metadata={"tier": "T0", "kind": result.get("kind", "")},
+                    )
+                ]
             elif action.action_type == ActionType.CLARIFY:
                 question = (action.detail or "").strip()
                 if not question:

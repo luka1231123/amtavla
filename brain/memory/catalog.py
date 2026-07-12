@@ -320,6 +320,171 @@ class MemoryCatalog:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_context_snapshots_created ON context_snapshots(created_at DESC)"
             )
+            # M3 approvals substrate: T2 (outbound / irreversible) actions pause
+            # here for an explicit human decision before they ever execute.
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS approvals (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    turn_id TEXT NOT NULL DEFAULT '',
+                    session_id TEXT NOT NULL DEFAULT '',
+                    action_type TEXT NOT NULL,
+                    summary TEXT NOT NULL DEFAULT '',
+                    payload_json TEXT NOT NULL DEFAULT '{}',
+                    state TEXT NOT NULL DEFAULT 'pending',
+                    requested_at REAL NOT NULL,
+                    decided_at REAL,
+                    executed_at REAL,
+                    result_json TEXT
+                )
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_approvals_state ON approvals(state, requested_at)"
+            )
+            # Full "why did it do that?" record for every action, all tiers.
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS action_audit (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    turn_id TEXT NOT NULL DEFAULT '',
+                    action_type TEXT NOT NULL,
+                    tier TEXT NOT NULL DEFAULT '',
+                    detail TEXT NOT NULL DEFAULT '',
+                    ok INTEGER NOT NULL DEFAULT 1,
+                    approval_id INTEGER,
+                    outcome TEXT NOT NULL DEFAULT '',
+                    created_at REAL NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_action_audit_created ON action_audit(created_at DESC)"
+            )
+
+    # --- M3 approvals + audit -------------------------------------------------
+
+    _APPROVAL_STATES = {"pending", "approved", "denied", "executed", "failed"}
+
+    def create_approval(
+        self,
+        *,
+        action_type: str,
+        summary: str,
+        payload: dict[str, Any] | None = None,
+        turn_id: str = "",
+        session_id: str = "",
+    ) -> dict[str, Any]:
+        now = time.time()
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO approvals(
+                    turn_id, session_id, action_type, summary, payload_json,
+                    state, requested_at
+                ) VALUES(?, ?, ?, ?, ?, 'pending', ?)
+                """,
+                (
+                    turn_id,
+                    session_id,
+                    action_type,
+                    summary,
+                    json.dumps(payload or {}),
+                    now,
+                ),
+            )
+            approval_id = int(cursor.lastrowid)
+        return self.get_approval(approval_id)
+
+    def get_approval(self, approval_id: int) -> dict[str, Any]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM approvals WHERE id = ?", (int(approval_id),)
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"No approval {approval_id}")
+        return self._row_to_approval(row)
+
+    def list_approvals(self, state: str | None = None, limit: int = 50) -> list[dict]:
+        clause = " WHERE state = ?" if state else ""
+        params: list[Any] = [state] if state else []
+        params.append(max(1, min(500, int(limit))))
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM approvals{clause} ORDER BY requested_at DESC LIMIT ?",
+                params,
+            ).fetchall()
+        return [self._row_to_approval(row) for row in rows]
+
+    def decide_approval(self, approval_id: int, approved: bool) -> dict[str, Any]:
+        """Record a human decision. Idempotent: only a pending approval moves."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT state FROM approvals WHERE id = ?", (int(approval_id),)
+            ).fetchone()
+            if row is None:
+                raise KeyError(f"No approval {approval_id}")
+            if row["state"] != "pending":
+                # Already decided/executed — never flip a settled approval.
+                return self.get_approval(approval_id)
+            conn.execute(
+                "UPDATE approvals SET state = ?, decided_at = ? WHERE id = ?",
+                ("approved" if approved else "denied", time.time(), int(approval_id)),
+            )
+        return self.get_approval(approval_id)
+
+    def mark_approval_executed(
+        self, approval_id: int, *, ok: bool, result: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE approvals SET state = ?, executed_at = ?, result_json = ? WHERE id = ?",
+                (
+                    "executed" if ok else "failed",
+                    time.time(),
+                    json.dumps(result or {}),
+                    int(approval_id),
+                ),
+            )
+        return self.get_approval(approval_id)
+
+    @staticmethod
+    def _row_to_approval(row: sqlite3.Row) -> dict[str, Any]:
+        approval = dict(row)
+        approval["payload"] = _json_load(approval.pop("payload_json", "{}"), {})
+        approval["result"] = _json_load(approval.pop("result_json", None) or "null", None)
+        return approval
+
+    def record_action_audit(
+        self,
+        *,
+        action_type: str,
+        tier: str,
+        detail: str = "",
+        ok: bool = True,
+        approval_id: int | None = None,
+        outcome: str = "",
+        turn_id: str = "",
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO action_audit(
+                    turn_id, action_type, tier, detail, ok, approval_id,
+                    outcome, created_at
+                ) VALUES(?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    turn_id,
+                    action_type,
+                    tier,
+                    detail[:500],
+                    1 if ok else 0,
+                    approval_id,
+                    outcome[:500],
+                    time.time(),
+                ),
+            )
 
     @staticmethod
     def _validate_item_type(item_type: str) -> str:

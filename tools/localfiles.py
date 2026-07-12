@@ -22,6 +22,21 @@ _TEXT_SUFFIXES = {
 
 _READ_RE = re.compile(r"\b(?:read|open|show|cat)\s+(?:file\s+)?([\w./ -]+\.\w{1,8})", re.IGNORECASE)
 
+# M1 write limits (T1). Writes stay text-only, size-bounded, and inside the root.
+_MAX_WRITE_BYTES = 256 * 1024
+_WRITABLE_SUFFIXES = {
+    ".txt", ".md", ".json", ".csv", ".yaml", ".yml", ".toml", ".ini", ".cfg",
+    ".log", ".html", ".css", ".js", ".py", ".sh",
+}
+
+
+def _resolve_within(root: Path, candidate: str) -> Path | None:
+    """Resolve a candidate path against a root, refusing any escape."""
+    path = (root / (candidate or "").strip().lstrip("/")).resolve()
+    if path != root and root not in path.parents:
+        return None
+    return path
+
 
 class LocalFilesClient:
     """Sandboxed, read-only access to files under one allowlisted root.
@@ -39,10 +54,7 @@ class LocalFilesClient:
         self.root = Path(root).expanduser().resolve()
 
     def _safe_path(self, candidate: str) -> Path | None:
-        path = (self.root / candidate.strip().lstrip("/")).resolve()
-        if path != self.root and self.root not in path.parents:
-            return None
-        return path
+        return _resolve_within(self.root, candidate)
 
     def run(self, detail: str) -> dict[str, Any]:
         """Interpret a natural or structured detail: read <path>, list [subdir], find <term>."""
@@ -124,3 +136,96 @@ class LocalFilesClient:
             "term": term,
             "matches": matches,
         }
+
+
+class LocalFilesWriter:
+    """Sandboxed, reversible text-file writes under one allowlisted root (T1).
+
+    Every write resolves against the writable root and refuses escapes; it is
+    text-only and size-bounded, and any overwrite first snapshots the previous
+    contents to `<file>.bak` so the write can be undone. This is deliberately a
+    separate root from the read client's so generated artifacts never land in,
+    say, the source tree unless explicitly configured to.
+    """
+
+    def __init__(self, root: str | Path | None = None):
+        if root is None:
+            config = load_brain_config()
+            files_cfg = config.get("local_files", {})
+            configured = files_cfg.get("writable_root") or files_cfg.get("root", "")
+            root = resolve_repo_path(configured) if configured else os.getcwd()
+        self.root = Path(root).expanduser().resolve()
+
+    def _validate(self, rel_path: str) -> tuple[Path | None, str]:
+        path = _resolve_within(self.root, rel_path)
+        if path is None:
+            return None, f"Path outside allowed root: {rel_path}"
+        if path == self.root or path.is_dir():
+            return None, f"Not a file path: {rel_path}"
+        if path.suffix.lower() not in _WRITABLE_SUFFIXES:
+            return None, f"Only text files can be written: {rel_path}"
+        return path, ""
+
+    def write_file(self, rel_path: str, content: str) -> dict[str, Any]:
+        path, error = self._validate(rel_path)
+        if error:
+            return {"operation": "write", "error": error}
+        data = (content or "").encode("utf-8")
+        if len(data) > _MAX_WRITE_BYTES:
+            return {
+                "operation": "write",
+                "error": f"Content exceeds the {_MAX_WRITE_BYTES // 1024}KB write limit",
+            }
+        backup = self._snapshot(path)
+        existed = path.exists()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        return {
+            "operation": "write",
+            "path": str(path.relative_to(self.root)),
+            "root": str(self.root),
+            "bytes": len(data),
+            "created": not existed,
+            "overwrote": existed,
+            "backup": backup,
+            "reversible": True,
+        }
+
+    def edit_file(self, rel_path: str, find: str, replace: str) -> dict[str, Any]:
+        path, error = self._validate(rel_path)
+        if error:
+            return {"operation": "edit", "error": error}
+        if not path.exists() or not path.is_file():
+            return {"operation": "edit", "error": f"File not found: {rel_path}"}
+        if not find:
+            return {"operation": "edit", "error": "Nothing to find/replace"}
+        original = path.read_bytes()[: _MAX_WRITE_BYTES + 1]
+        if len(original) > _MAX_WRITE_BYTES:
+            return {"operation": "edit", "error": "File is too large to edit safely"}
+        text = original.decode("utf-8", errors="replace")
+        count = text.count(find)
+        if count == 0:
+            return {
+                "operation": "edit",
+                "path": str(path.relative_to(self.root)),
+                "error": "The text to replace was not found; nothing changed.",
+            }
+        backup = self._snapshot(path)
+        updated = text.replace(find, replace)
+        path.write_bytes(updated.encode("utf-8"))
+        return {
+            "operation": "edit",
+            "path": str(path.relative_to(self.root)),
+            "root": str(self.root),
+            "replacements": count,
+            "backup": backup,
+            "reversible": True,
+        }
+
+    def _snapshot(self, path: Path) -> str | None:
+        """Copy current contents to `<file>.bak` so a write is reversible."""
+        if not path.exists() or not path.is_file():
+            return None
+        backup = path.with_suffix(path.suffix + ".bak")
+        backup.write_bytes(path.read_bytes())
+        return str(backup.relative_to(self.root))

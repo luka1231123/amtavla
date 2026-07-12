@@ -263,6 +263,25 @@ class MemoryController:
     def recent_notes(self, limit: int = 20) -> list[dict]:
         return self.memory.recent_notes(limit=limit)
 
+    # --- M3 approvals passthrough (the ActionRunner uses this as its T2 store) ---
+
+    def create_approval(self, **kwargs) -> dict:
+        self.note_user_activity()
+        return self.memory.catalog.create_approval(**kwargs)
+
+    def record_action_audit(self, **kwargs) -> None:
+        self.memory.catalog.record_action_audit(**kwargs)
+
+    def list_approvals(self, state: str | None = None, limit: int = 50) -> list[dict]:
+        return self.memory.catalog.list_approvals(state=state, limit=limit)
+
+    def decide_approval(self, approval_id: int, approved: bool) -> dict:
+        self.note_user_activity()
+        return self.memory.catalog.decide_approval(approval_id, approved)
+
+    def mark_approval_executed(self, approval_id: int, *, ok: bool, result=None) -> dict:
+        return self.memory.catalog.mark_approval_executed(approval_id, ok=ok, result=result)
+
     def recent_dialogue(
         self, limit: int | None = None, within_seconds: float | None = None
     ) -> list[dict]:

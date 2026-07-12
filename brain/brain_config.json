@@ -81,7 +81,8 @@
     "max_context_chars": 6500
   },
   "local_files": {
-    "root": "sandbox"
+    "root": "sandbox",
+    "writable_root": "sandbox"
   },
   "intents": [
     {
