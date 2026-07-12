@@ -180,11 +180,19 @@ AMTAVLA_CATALOG_DB=/tmp/amtavla-memory.db venv/bin/python server/phone_server.py
 
 ## Raw Trace Run
 
-Run the scripted trace through the same `TurnOrchestrator` used by the live app:
+Run the live soak test through the same `TurnOrchestrator` used by the app. It
+uses isolated probe databases, verifies the model reported by the running
+llama.cpp server, exercises 25+ cross-feature turns, waits for a real reminder,
+and writes a machine-readable pass/fail verdict:
 
 ```bash
 python3 raw_full_trace.py
 ```
+
+The default live runtime is tuned for responsiveness: it uses an 8K context,
+a 192-token response cap, server-side thinking disabled, deterministic/embedding intent routing, and skips the
+optional second model pass for grounded reasoning. Raise those settings only
+when a slower, deeper answer is worth the latency.
 
 Artifacts are written to:
 
@@ -194,6 +202,7 @@ Artifacts are written to:
 - `logs/raw_runs/<timestamp>/web_searches.txt`
 - `logs/raw_runs/<timestamp>/idle_processes.txt`
 - `logs/raw_runs/<timestamp>/thoughts.txt`
+- `logs/raw_runs/<timestamp>/validation.json`
 
 ## Operational Notes
 

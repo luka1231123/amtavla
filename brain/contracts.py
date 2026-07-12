@@ -283,6 +283,11 @@ class ContextPack:
     pending_feedback_prompt: str = ""
     pending_feedback_id: int | None = None
     reminder_nudge: str = ""
+    # The immediately preceding turns of this conversation, oldest-first. Unlike
+    # the similarity-gated recall fields above, this is always the literal recent
+    # exchange, so follow-ups ("look it up", "that phrase") have a referent. Empty
+    # means we are starting a conversation, not continuing one.
+    conversation: list[dict[str, Any]] = field(default_factory=list)
     sources: list[SourceRef] = field(default_factory=list)
 
     @classmethod
@@ -393,6 +398,7 @@ class ContextPack:
             pending_feedback_prompt=str(value.get("pending_feedback_prompt") or ""),
             pending_feedback_id=value.get("pending_feedback_id"),
             reminder_nudge=str(value.get("reminder_nudge") or ""),
+            conversation=list(value.get("conversation") or []),
             sources=sources,
         )
 
@@ -421,6 +427,7 @@ class ContextPack:
             "pending_feedback_prompt": self.pending_feedback_prompt,
             "pending_feedback_id": self.pending_feedback_id,
             "reminder_nudge": self.reminder_nudge,
+            "conversation": list(self.conversation),
             "sources": [source.to_dict() for source in self.sources],
             "source_ids": self.source_ids,
         }
@@ -458,6 +465,11 @@ class Turn:
     turn_id: str = field(default_factory=lambda: new_id("turn"))
     created_at: str = field(default_factory=utc_now)
     status: str = "received"
+    # The user's words rewritten to stand on their own (pronouns/references
+    # resolved from recent conversation). Routing, recall, and search key off
+    # this; the original `user_input` is preserved for gates, display, and
+    # memory. Equal to `user_input` when the turn already stands alone.
+    resolved_input: str = ""
     route: RouteDecision | None = None
     context: ContextPack = field(default_factory=ContextPack)
     plan: Plan = field(default_factory=Plan)
@@ -496,6 +508,7 @@ class Turn:
             "created_at": self.created_at,
             "status": self.status,
             "user_input": self.user_input,
+            "resolved_input": self.resolved_input,
             "route": self.route.to_dict() if self.route else None,
             "context": self.context.to_dict(),
             "plan": self.plan.to_dict(),

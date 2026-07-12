@@ -42,6 +42,22 @@ def test_parse_reminder_relative_offset():
     assert parsed["due_at"] == _NOW + 20 * 60
 
 
+def test_parse_reminder_spelled_out_amounts():
+    # The live failure: "in one minute" was rejected as "not an exact time"
+    # because the parser only accepted digits. Number words and articles now
+    # resolve too, without enumerating phrasings.
+    assert parse_reminder("remind me to stretch in one minute", _NOW)["due_at"] == _NOW + 60
+    assert parse_reminder("remind me to drink water in a minute", _NOW)["due_at"] == _NOW + 60
+    assert parse_reminder("remind me to leave in an hour", _NOW)["due_at"] == _NOW + 3600
+    assert parse_reminder("remind me to email in five minutes", _NOW)["due_at"] == _NOW + 300
+    assert (
+        parse_reminder("remind me to check in a couple of hours", _NOW)["due_at"]
+        == _NOW + 2 * 3600
+    )
+    # Unrecognized amounts still fall through rather than guessing a time.
+    assert parse_reminder("remind me to nap in gazillion minutes", _NOW)["due_at"] is None
+
+
 def test_parse_reminder_tomorrow_morning():
     parsed = parse_reminder("remind me to call the dentist tomorrow morning", _NOW)
     due = datetime.datetime.fromtimestamp(parsed["due_at"])

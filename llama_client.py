@@ -175,6 +175,9 @@ def _build_server_cmd(model_path: str, config: dict | None = None) -> list[str]:
     if cfg.get("use_jinja"):
         # Correct model-native chat template; required by Qwen3.x thinking mode.
         cmd.append("--jinja")
+    reasoning_mode = str(cfg.get("reasoning_mode", "auto")).lower()
+    if reasoning_mode in {"on", "off", "auto"}:
+        cmd.extend(["--reasoning", reasoning_mode])
     return cmd
 
 

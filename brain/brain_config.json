@@ -1,26 +1,39 @@
 {
+  "extraction": {
+    "model_enabled": true,
+    "profile": "default",
+    "_note": "Structured (entity, attribute, value) fact extraction. When true, a grammar-constrained LLM pass runs at commit time with the deterministic rule extractor as fallback; when false/absent, rules only (the offline test path)."
+  },
   "llm": {
-    "model_filename": "Qwen2.5-Coder-7B-Instruct-Q6_K_L.gguf",
+    "model_filename": "Qwen3.5-9B-Q5_K_M.gguf",
     "gpu_layers": 99,
-    "context_size": 4096,
-    "use_jinja": false,
-    "max_tokens": 512,
-    "structured_output_enabled": false,
+    "context_size": 8192,
+    "use_jinja": true,
+    "reasoning_mode": "off",
+    "max_tokens": 192,
+    "structured_output_enabled": true,
     "sampling": {
-      "default": {"temperature": 0.7, "top_p": 0.8},
-      "thinking": {"temperature": 0.6, "top_p": 0.95}
+      "default": {
+        "temperature": 0.7,
+        "top_p": 0.8
+      },
+      "thinking": {
+        "temperature": 0.6,
+        "top_p": 0.95
+      }
     },
-    "_swap_note": "To adopt Qwen3.5-9B: set model_filename to the new .gguf, use_jinja true, context_size 16384, structured_output_enabled true."
+    "_swap_note": "Qwen3.5-9B Q5_K_M is the active local model. Keep its native Jinja template enabled and server-side thinking disabled for responsive replies."
   },
   "routing": {
     "default_pathway": "planner_full",
     "max_plan_steps": 4,
-    "intent_model_enabled": true,
+    "intent_model_enabled": false,
     "intent_model": "default",
     "intent_model_threshold": 1,
     "intent_embedding_enabled": true,
     "intent_low_confidence_fallback": "planner_full",
-    "show_sources": true
+    "show_sources": true,
+    "resolve_followups_enabled": true
   },
   "idle_memory": {
     "enabled": true,
@@ -63,7 +76,7 @@
     "timeout_seconds": 6
   },
   "reasoning": {
-    "enabled": true,
+    "enabled": false,
     "min_sources": 2,
     "max_context_chars": 6500
   },

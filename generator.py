@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from brain.contracts import (
@@ -138,11 +139,21 @@ def build_response_context(
         lines = []
         for index, item in enumerate(context.episodic_context):
             source_id = _source_for_kind(context.sources, "episodic_memory", index)
-            lines.append(
-                f"[{source_id}] User: {item.get('user_input', '')} | "
-                f"Assistant: {item.get('response', '')}"
+            user_said = (item.get("user_input", "") or "").strip()
+            if not user_said:
+                continue
+            # Firewall: recall the user's own words, never the assistant's past
+            # reply. Feeding bot prose back as a citable memory is how a single
+            # hallucination becomes a durable "fact" on later turns.
+            lines.append(f"[{source_id}] Earlier the user said: {user_said}")
+        if lines:
+            parts.append(
+                "--- Past User Statements ---\n"
+                "Things the user said in earlier turns (their own words, not "
+                "verified facts and not your past replies). Ground personal claims "
+                "in these, but do not treat them as more certain than they are.\n"
+                + "\n".join(lines)
             )
-        parts.append("--- Episodic Recall ---\n" + "\n".join(lines))
 
     if context.ltm_context and not context.memory_items:
         lines = []
@@ -201,6 +212,45 @@ def build_response_context(
         parts.append("--- Source Catalog ---\n" + "\n".join(lines))
 
     return "\n\n".join(parts)
+
+
+_CITATION_TOKEN_RE = re.compile(r"\[([^\[\]]{1,80})\]")
+# Inner text that "looks like" a citation attempt (source id / bare index),
+# as opposed to ordinary bracketed prose we should leave alone.
+# Two unambiguous citation shapes: a prefixed source id (`memory:item:5`,
+# `web:ab12`, `item:5`) or a bare numeric index (`14`). Bracketed prose without
+# this shape (`[x]`, `[note]`, `[TODO]`) is left untouched.
+_CITATION_SHAPE_RE = re.compile(r"^(?:[a-z_]+:\S+|\d{1,4})$", re.IGNORECASE)
+
+
+def sanitize_citations(text: str, valid_source_ids: list[str]) -> str:
+    """Strip citation tokens the model invented.
+
+    The generator is told to cite only IDs present in its context, but a small
+    model still fabricates them — the live session cited `[memory:item:12]` (a
+    reminder) for a car fact. Provenance must be *bound*, not merely requested:
+    any bracketed token that looks like a source id but is not in the actual
+    available set is removed before the user ever sees it. Ordinary bracketed
+    prose (no id shape) is preserved.
+    """
+    if not text:
+        return text
+    valid = set(valid_source_ids or [])
+
+    def repl(match: re.Match[str]) -> str:
+        inner = match.group(1).strip()
+        if inner in valid:
+            return match.group(0)  # real, keep it
+        if _CITATION_SHAPE_RE.match(inner):
+            return ""  # fabricated / dangling citation — drop it
+        return match.group(0)  # not a citation, leave prose untouched
+
+    cleaned = _CITATION_TOKEN_RE.sub(repl, text)
+    # Tidy the whitespace/punctuation a removed token leaves behind.
+    cleaned = re.sub(r"[ \t]+([.,;:!?])", r"\1", cleaned)
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r"[ \t]+\n", "\n", cleaned)
+    return cleaned.strip()
 
 
 def render_source_summary(response: str, sources: list[SourceRef]) -> str:
@@ -270,10 +320,19 @@ class ResponseGenerator:
             intent=route.intent,
             pathway=route.pathway,
         )
-        messages = [
-            {"role": "system", "content": system_message},
-            {"role": "user", "content": user_prompt},
-        ]
+        messages = [{"role": "system", "content": system_message}]
+        # Real conversational grounding: replay the immediately-preceding turns as
+        # actual chat messages so the model resolves follow-ups ("look it up",
+        # "the continuation of that phrase") against what was just said. This is
+        # the literal recent exchange, distinct from similarity-recalled memory.
+        for prior in context.conversation:
+            user_said = (prior.get("user_input") or "").strip()
+            assistant_said = (prior.get("response") or "").strip()
+            if user_said:
+                messages.append({"role": "user", "content": user_said})
+            if assistant_said:
+                messages.append({"role": "assistant", "content": assistant_said})
+        messages.append({"role": "user", "content": user_prompt})
 
         try:
             response = self._client().chat(messages)

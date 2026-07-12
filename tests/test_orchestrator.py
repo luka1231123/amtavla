@@ -10,8 +10,10 @@ class _FakeRouter:
     def __init__(self, intent="web_factual", pathway="search_then_reply"):
         self.intent = intent
         self.pathway = pathway
+        self.routed_texts = []
 
     def route(self, text):
+        self.routed_texts.append(text)
         return {
             "intent": self.intent,
             "pathway": self.pathway,
@@ -42,6 +44,9 @@ class _FakeMemory:
 
     def process_turn_async(self, user_input, response, trace):
         self.commits.append((user_input, response, trace))
+
+    def recent_dialogue(self, limit=None, within_seconds=None):
+        return self.context.get("conversation", [])
 
     def get_brain_dump(self, mode):
         return f"brain dump: {mode}"
@@ -135,6 +140,7 @@ def test_full_search_turn_has_structured_actions_sources_trace_and_commit():
     assert [event.event_type for event in turn.trace] == [
         "user_prompt",
         "health",
+        "resolution",
         "intent_decision",
         "route_pathway",
         "context",
@@ -148,6 +154,127 @@ def test_full_search_turn_has_structured_actions_sources_trace_and_commit():
     assert memory.commits[0][2]["actions"][0]["ok"] is True
     assert len(generator.calls) == 1
     json.dumps(turn.to_dict())
+
+
+def test_recent_conversation_flows_from_context_into_generator():
+    # The turn loop must carry the live conversation from memory recall through
+    # to the generator so follow-ups resolve against what was just said.
+    conversation = [
+        {"user_input": "to err is human", "response": "A common idiom."},
+    ]
+    memory = _FakeMemory(
+        {"combined_context": "prior stuff", "conversation": conversation}
+    )
+    generator = _FakeGenerator()
+    orchestrator = TurnOrchestrator(
+        router=_FakeRouter("web_factual", "search_then_reply"),
+        memory=memory,
+        planner=_FakePlanner(),
+        action_runner=ActionRunner(search_client=_FakeSearch(), memory_client=memory),
+        response_generator=generator,
+        health_reporter=_FakeHealth(),
+        config={"routing": {"max_plan_steps": 5}},
+    )
+
+    _run(orchestrator, "what is the continuation of that phrase")
+
+    context_arg = generator.calls[0][3]
+    assert context_arg.conversation == conversation
+
+
+class _StubResolver:
+    def __init__(self, text):
+        self.text = text
+        self.seen = None
+
+    def resolve(self, user_input, conversation):
+        from brain.resolver import ResolvedInput
+
+        self.seen = {"user_input": user_input, "conversation": conversation}
+        return ResolvedInput(user_input, self.text, is_followup=True, source="model")
+
+
+def test_resolved_followup_query_drives_routing_and_search():
+    # A vague follow-up is resolved to a standalone query; routing and the
+    # SEARCH action must both key off the resolved text, while memory commit
+    # keeps the user's real words.
+    conversation = [
+        {"user_input": "to err is human", "response": "A common idiom."},
+    ]
+    memory = _FakeMemory({"conversation": conversation})
+    router = _FakeRouter("web_factual", "search_then_reply")
+    generator = _FakeGenerator()
+    orchestrator = TurnOrchestrator(
+        router=router,
+        memory=memory,
+        planner=None,  # SINGLE_ACTION pathway skips the planner
+        action_runner=ActionRunner(search_client=_FakeSearch(), memory_client=memory),
+        response_generator=generator,
+        resolver=_StubResolver("who said to err is human"),
+        health_reporter=_FakeHealth(),
+        config={"routing": {"max_plan_steps": 5}},
+    )
+
+    turn = _run(orchestrator, "look it up in the web")
+
+    assert turn.resolved_input == "who said to err is human"
+    assert router.routed_texts == ["who said to err is human"]
+    assert turn.plan.to_pairs() == [("SEARCH", "who said to err is human")]
+    # The original words are what gets committed to memory, not the rewrite.
+    assert memory.commits[0][0] == "look it up in the web"
+
+
+class _RaisingResolver:
+    def resolve(self, user_input, conversation):
+        raise RuntimeError("resolver blew up")
+
+
+def test_resolver_failure_degrades_to_original_words():
+    # Resolution is an optimization, never a gate: if it throws, the turn still
+    # runs on the user's literal words rather than failing.
+    memory = _FakeMemory({"combined_context": "ctx"})
+    orchestrator = TurnOrchestrator(
+        router=_FakeRouter("web_factual", "search_then_reply"),
+        memory=memory,
+        planner=None,
+        action_runner=ActionRunner(search_client=_FakeSearch(), memory_client=memory),
+        response_generator=_FakeGenerator(),
+        resolver=_RaisingResolver(),
+        health_reporter=_FakeHealth(),
+        config={"routing": {"max_plan_steps": 5}},
+    )
+
+    turn = _run(orchestrator, "what is current?")
+
+    assert turn.status == "completed"
+    assert turn.resolved_input == "what is current?"
+    assert turn.plan.to_pairs() == [("SEARCH", "what is current?")]
+
+
+class _FabricatedCitationGenerator:
+    def generate(self, user_input, plan, results, context, route):
+        # The model invents a source id that is not in the available context —
+        # the live "[memory:item:12]" bug. It must never reach the user.
+        return "Your car is at level 3 [memory:item:12]."
+
+
+def test_fabricated_citation_is_stripped_from_response():
+    memory = _FakeMemory({"combined_context": "The user's car is located at 10 B."})
+    orchestrator = TurnOrchestrator(
+        router=_FakeRouter("memory_recall", "memory_recall_reply"),
+        memory=memory,
+        planner=_FakePlanner(),
+        action_runner=ActionRunner(search_client=_FakeSearch(), memory_client=memory),
+        response_generator=_FabricatedCitationGenerator(),
+        health_reporter=_FakeHealth(),
+        config={"routing": {"max_plan_steps": 5}},
+    )
+
+    turn = _run(orchestrator, "where is my car?")
+
+    assert "[memory:item:12]" not in turn.response
+    assert "memory:item:12" not in turn.response
+    assert turn.response_source_ids == []  # nothing real was cited
 
 
 def test_planned_calculation_runs_without_model_search_or_embedding():

@@ -50,9 +50,15 @@ def test_resolve_model_path_fallback_is_deterministic_and_skips_vocab(
 def test_build_server_cmd_reflects_config():
     cmd = llama_client._build_server_cmd(
         "/models/m.gguf",
-        {"gpu_layers": 50, "context_size": 16384, "use_jinja": True},
+        {
+            "gpu_layers": 50,
+            "context_size": 16384,
+            "use_jinja": True,
+            "reasoning_mode": "off",
+        },
     )
     assert "--jinja" in cmd
+    assert cmd[cmd.index("--reasoning") + 1] == "off"
     assert cmd[cmd.index("-c") + 1] == "16384"
     assert cmd[cmd.index("-ngl") + 1] == "50"
     assert cmd[cmd.index("-m") + 1] == "/models/m.gguf"
@@ -61,6 +67,7 @@ def test_build_server_cmd_reflects_config():
 def test_build_server_cmd_omits_jinja_by_default():
     cmd = llama_client._build_server_cmd("/models/m.gguf", {})
     assert "--jinja" not in cmd
+    assert cmd[cmd.index("--reasoning") + 1] == "auto"
     assert cmd[cmd.index("-c") + 1] == "4096"
 
 

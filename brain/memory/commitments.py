@@ -70,7 +70,35 @@ _WHEN_RE = re.compile(
 )
 _TOD_RE = re.compile(r"\b(morning|noon|afternoon|evening|night)\b", re.IGNORECASE)
 _CLOCK_RE = re.compile(r"\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b", re.IGNORECASE)
-_IN_RE = re.compile(r"\bin\s+(\d+)\s+(minute|min|hour|day|week)s?\b", re.IGNORECASE)
+# Relative offset: capture whatever sits between "in" and the time unit, then
+# resolve the amount from that span (a digit or number word, anywhere in it) so
+# "in 20 minutes", "in one minute", "in an hour", and "in a couple of hours" all
+# work without enumerating phrasings.
+_IN_RE = re.compile(
+    r"\bin\s+(.{1,20}?)\s+(minute|min|hour|day|week)s?\b", re.IGNORECASE
+)
+
+_NUMBER_WORDS = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+    "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+    "thirteen": 13, "fourteen": 14, "fifteen": 15, "twenty": 20, "thirty": 30,
+    "forty": 40, "fifty": 50, "sixty": 60, "ninety": 90,
+    # Vague quantifiers people actually use for reminders.
+    "a": 1, "an": 1, "couple": 2, "few": 3, "several": 3,
+}
+
+
+def _amount_to_number(span: str) -> int | None:
+    """Resolve a duration amount from a span like "one", "an", "a couple of".
+    Scans for digits and number words and returns the one nearest the unit
+    (last match wins: "a couple" -> 2). None when the span has no number."""
+    found = None
+    for word in re.findall(r"[a-z0-9]+", (span or "").lower()):
+        if word.isdigit():
+            found = int(word)
+        elif word in _NUMBER_WORDS:
+            found = _NUMBER_WORDS[word]
+    return found
 
 
 def parse_reminder(text: str, now: float) -> dict | None:
@@ -90,10 +118,11 @@ def parse_reminder(text: str, now: float) -> dict | None:
 
     relative = _IN_RE.search(text)
     if relative:
-        amount = int(relative.group(1))
-        unit = relative.group(2).lower()
-        seconds = {"minute": 60, "min": 60, "hour": 3600, "day": 86400, "week": 7 * 86400}[unit]
-        return {"content": task or text, "due_at": now + amount * seconds}
+        amount = _amount_to_number(relative.group(1))
+        if amount is not None:
+            unit = relative.group(2).lower()
+            seconds = {"minute": 60, "min": 60, "hour": 3600, "day": 86400, "week": 7 * 86400}[unit]
+            return {"content": task or text, "due_at": now + amount * seconds}
 
     day_match = _WHEN_RE.search(text)
     base_day = datetime.date.fromtimestamp(now)

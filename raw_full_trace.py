@@ -15,6 +15,7 @@ import re
 import sys
 import time
 import traceback
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 
@@ -320,6 +321,39 @@ def write_gap_report(run_dir: Path, gaps: list[dict], turn_log: list[dict]):
     return path
 
 
+def server_model_props() -> dict:
+    """Read llama.cpp's live model metadata without relying on log output."""
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:8085/props", timeout=5) as response:
+            payload = json.loads(response.read())
+            return payload if isinstance(payload, dict) else {"raw": payload}
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
+def validate_soak_run(run_dir: Path, config: dict, model_props: dict, gaps: list[dict], turn_log: list[dict]) -> dict:
+    """Produce a machine-readable verdict for the real, completed soak run."""
+    expected_model = config.get("llm", {}).get("model_filename", "")
+    serialized_props = json.dumps(model_props).lower()
+    model_confirmed = bool(expected_model) and expected_model.lower() in serialized_props
+    incomplete_turns = [entry["index"] for entry in turn_log if entry["pathway"] == "?"]
+    high_gaps = [gap for gap in gaps if gap["severity"] == "high"]
+    verdict = {
+        "passed": model_confirmed and not incomplete_turns and not high_gaps,
+        "expected_model": expected_model,
+        "model_confirmed_by_live_server": model_confirmed,
+        "turns_completed": len(turn_log),
+        "incomplete_turns": incomplete_turns,
+        "high_severity_gap_count": len(high_gaps),
+        "high_severity_gaps": high_gaps,
+        "server_props": model_props,
+    }
+    (run_dir / "validation.json").write_text(
+        json.dumps(verdict, indent=2, ensure_ascii=True) + "\n", encoding="utf-8"
+    )
+    return verdict
+
+
 def _write_turn(writer: TraceWriter, turn, turn_index: int, elapsed_ms: int):
     writer.block(
         "session",
@@ -425,6 +459,8 @@ async def run_trace():
     try:
         print("Starting llama-server...")
         await asyncio.to_thread(llama_client._ensure_server_running)
+        model_props = await asyncio.to_thread(server_model_props)
+        writer.block("brain", "LIVE SERVER MODEL PROPS", model_props)
         print("llama-server ready.")
         await asyncio.to_thread(memory.clear_all_memory)
         writer.line("brain", "Memory cleared at start")
@@ -528,8 +564,15 @@ async def run_trace():
         writer.block("memory", "FINAL BRAIN DUMP", final_dump)
 
         report_path = write_gap_report(run_dir, gaps, turn_log)
+        verdict = validate_soak_run(run_dir, config, model_props, gaps, turn_log)
         print(f"\nProbe complete: {len(turn_log)} turns, {len(gaps)} gaps flagged.")
         print(f"Gap report: {report_path}")
+        print(
+            "Validation: "
+            f"{'PASS' if verdict['passed'] else 'FAIL'} "
+            f"(live model confirmed={verdict['model_confirmed_by_live_server']}, "
+            f"high gaps={verdict['high_severity_gap_count']})"
+        )
         print(f"Logs saved in {run_dir}")
     except Exception as exc:
         print(f"FATAL ERROR: {exc}")

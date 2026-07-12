@@ -73,6 +73,37 @@ def test_response_generator_uses_injected_client():
     assert "memory:semantic:3" in client.messages[0]["content"]
 
 
+def test_recent_conversation_is_replayed_as_chat_messages():
+    # Follow-ups like "what is the continuation of that phrase" only resolve if
+    # the model can see the immediately-preceding exchange as real dialogue.
+    client = _FakeClient()
+    generator = ResponseGenerator(client=client)
+    context = ContextPack.from_memory(
+        {
+            "conversation": [
+                {
+                    "user_input": "to err is human",
+                    "response": "That is a common idiom about mistakes.",
+                },
+            ]
+        }
+    )
+
+    generator.generate(
+        "what is the continuation of that phrase",
+        Plan(),
+        [],
+        context,
+        RouteDecision("web_factual", "search_then_reply"),
+    )
+
+    roles = [m["role"] for m in client.messages]
+    # system, prior user, prior assistant, current user — in order.
+    assert roles == ["system", "user", "assistant", "user"]
+    assert client.messages[1]["content"] == "to err is human"
+    assert client.messages[3]["content"] == "what is the continuation of that phrase"
+
+
 def test_unified_memory_item_replaces_duplicate_legacy_prompt_context():
     context = ContextPack.from_memory(
         {

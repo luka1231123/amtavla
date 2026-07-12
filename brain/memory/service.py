@@ -13,6 +13,7 @@ from brain.memory.capture import capture_note as _capture_note
 from brain.memory.catalog import MemoryCatalog, resolve_repo_path
 from brain.memory.commitments import extract_commitments
 from brain.memory.context_engine import ContextEngine
+from brain.memory.extraction import FactExtractor
 from brain.memory.ltm_repository import LtmRepository
 from brain.memory.tagging import TagEngine
 from brain.memory.vector_store import SQLiteVecStore
@@ -227,6 +228,32 @@ def _is_memory_like_text(text: str) -> bool:
     return any(pattern.search(value) for pattern in MEMORY_LIKE_PATTERNS)
 
 
+BROAD_RECALL_PATTERNS = [
+    re.compile(
+        r"\bwhat do you (?:know|remember|recall|have)\b", re.IGNORECASE
+    ),
+    re.compile(r"\bwhat does your memory\b", re.IGNORECASE),
+    re.compile(r"\bwhat('?s| is) (?:in|stored in) your (?:memory|brain)\b", re.IGNORECASE),
+    re.compile(r"\b(?:tell me|what) (?:about )?(?:everything|all) you know\b", re.IGNORECASE),
+    re.compile(r"\bwhat do you know about me\b", re.IGNORECASE),
+    re.compile(r"\b(?:tell me about|about) (?:myself|me)\b", re.IGNORECASE),
+    re.compile(r"\bwho am i\b", re.IGNORECASE),
+    re.compile(r"\bwhat do you remember\b", re.IGNORECASE),
+]
+
+
+def _is_broad_recall(text: str) -> bool:
+    """Open-ended recall ("what do you know about me?", "what do you remember?")
+    that names no specific entity. These queries reduce to stopwords or a single
+    verb, so a lexical-overlap gate returns nothing — the exact reason the live
+    session answered "IDK" while facts sat in the store. They must instead sweep
+    the durable facts about the user."""
+    value = (text or "").strip()
+    if not value:
+        return False
+    return any(pattern.search(value) for pattern in BROAD_RECALL_PATTERNS)
+
+
 def _is_polluted_statement(text: str) -> bool:
     value = (text or "").strip()
     if not value:
@@ -342,6 +369,13 @@ class MemoryService:
         )
         self._strength_alpha = float(memory_cfg.get("episodic_strength_alpha", 0.25))
         self._strength_decay = float(memory_cfg.get("episodic_strength_decay", 0.02))
+        # Rolling conversational continuity: the last few turns are always fed
+        # back verbatim (independent of similarity recall) so follow-ups resolve.
+        # A gap larger than the window marks a fresh conversation.
+        self._dialogue_turns = int(memory_cfg.get("conversation_recent_turns", 6))
+        self._dialogue_window_seconds = float(
+            memory_cfg.get("conversation_window_seconds", 1800)
+        )
         self._proactive_turn_gap = int(memory_cfg.get("proactive_turn_gap", 8))
         self._proactive_seconds_gap = float(
             memory_cfg.get("proactive_seconds_gap", 600)
@@ -381,6 +415,16 @@ class MemoryService:
         self.catalog = MemoryCatalog(catalog_db_path)
         self.tag_engine = TagEngine(self.catalog, memory_cfg.get("tagging", {}))
         self.context_engine = ContextEngine(self.catalog, memory_cfg.get("context", {}))
+        # Structured fact extraction: (entity, attribute, value) tuples keyed so
+        # a new value supersedes the old. Rule-based by default (offline,
+        # deterministic — the test path); model-based in production when
+        # extraction.model_enabled is set, mirroring intent_model_enabled.
+        extraction_cfg = self._config.get("extraction", {})
+        self.fact_extractor = FactExtractor(
+            model_enabled=bool(extraction_cfg.get("model_enabled", False)),
+            chat_fn=llama_client.chat,
+            profile=str(extraction_cfg.get("profile", "default")),
+        )
         self._focus_until = 0.0
         self._reminder_gap_seconds = float(
             memory_cfg.get("reminder_gap_seconds", 6 * 3600)
@@ -1016,6 +1060,60 @@ class MemoryService:
         else:
             self._ltm_repo.delete_memory_item_node(memory_item["id"])
 
+    def _entity_tag_recall(
+        self,
+        query_tokens: set[str],
+        active_states: set[str],
+        limit: int,
+    ) -> list[tuple[dict, float]]:
+        """Items linked to an entity or tag named in the query.
+
+        Phase 3 "source-aware retrieval": keyword/vector recall matches on an
+        item's own words, so asking about a project or person by name misses
+        everything filed under it that happens to be phrased differently. Here we
+        resolve entity/tag names mentioned in the query and pull the items linked
+        to them regardless of lexical overlap. Catalog-only, no model calls.
+        """
+        if not query_tokens:
+            return []
+
+        def _name_hit(name: str) -> bool:
+            name_tokens = _recall_tokens(name or "")
+            # Every meaningful token of the entity/tag name must appear in the
+            # query, so "Vake" matches "the Vake flat" but a stray common word
+            # can't drag in an unrelated entity.
+            return bool(name_tokens) and name_tokens <= query_tokens
+
+        pulls: list[tuple[dict, float]] = []
+        try:
+            for entity in self.catalog.list_entities(limit=200):
+                name = entity.get("canonical_name") or entity.get("name") or ""
+                if _name_hit(name):
+                    for item in self.catalog.list_items(
+                        entity_id=int(entity["id"]), limit=limit
+                    ):
+                        pulls.append((item, 0.9))
+            for tag in self.catalog.list_tags():
+                name = tag.get("canonical_name") or tag.get("name") or ""
+                if not _name_hit(name):
+                    continue
+                tag_type = tag.get("tag_type")
+                tag_ref = f"{tag_type}:{tag['name']}" if tag_type else tag.get("name")
+                for item in self.catalog.list_items(tag=tag_ref, limit=limit):
+                    pulls.append((item, 0.85))
+        except Exception:
+            logger.debug("entity/tag recall failed", exc_info=True)
+            return []
+
+        results = []
+        for item, base in pulls:
+            if item["review_state"] not in active_states:
+                continue
+            if item["item_type"] in {"episode", "source_excerpt"}:
+                continue
+            results.append((item, base + float(item.get("importance", 0.0)) * 0.2))
+        return results
+
     def recall_memory_items(self, query: str, top_k: int = 8) -> list[dict]:
         text = (query or "").strip()
         if not text:
@@ -1026,7 +1124,10 @@ class MemoryService:
         items: dict[int, dict] = {}
 
         query_tokens = _recall_tokens(text)
-        if not query_tokens:
+        broad = _is_broad_recall(text)
+        # A broad self-recall ("what do you know about me?") carries no entity
+        # token to match on, so it must not be dropped by the lexical gate.
+        if not query_tokens and not broad:
             return []
         since, until = _time_window_from_query(text, _now_ts())
         keyword_items = self.catalog.list_items(
@@ -1071,6 +1172,36 @@ class MemoryService:
             scores[item_id] = max(scores.get(item_id, 0.0), vector_score)
             items[item_id] = item
 
+        for item, link_score in self._entity_tag_recall(
+            query_tokens, active_states, max(top_k * 3, 12)
+        ):
+            if since is not None and float(item["created_at"]) < since:
+                continue
+            if until is not None and float(item["created_at"]) > until:
+                continue
+            item_id = int(item["id"])
+            scores[item_id] = max(scores.get(item_id, 0.0), link_score)
+            # Never clobber an item already found by the keyword/vector passes —
+            # those carry the richer inspected shape (e.g. attached sources).
+            items.setdefault(item_id, item)
+
+        if broad:
+            # Sweep the durable facts about the user regardless of lexical
+            # overlap, ranked by importance so the answer reflects what is
+            # actually known rather than "IDK". Episodes and raw excerpts stay
+            # excluded — this returns interpreted knowledge, not transcript.
+            sweep_types = {"fact", "preference", "commitment", "insight"}
+            for item in self.catalog.list_items(limit=200):
+                if item["review_state"] not in active_states:
+                    continue
+                if item["item_type"] not in sweep_types:
+                    continue
+                if item["id"] in items:
+                    continue
+                sweep_score = 0.4 + float(item["importance"]) * 0.4
+                scores[item["id"]] = max(scores.get(item["id"], 0.0), sweep_score)
+                items[item["id"]] = item
+
         ranked = sorted(
             items.values(),
             key=lambda item: (
@@ -1083,6 +1214,51 @@ class MemoryService:
         for item in ranked:
             item["score"] = round(scores.get(item["id"], 0.0), 6)
         return ranked[: max(1, int(top_k))]
+
+    def recent_dialogue(
+        self, limit: int | None = None, within_seconds: float | None = None
+    ) -> list[dict]:
+        """The last few turns of the live conversation, oldest-first.
+
+        Independent of the similarity-gated recall in ``recall_context``: this is
+        the literal preceding exchange, so a vague follow-up ("look it up", "what
+        is the continuation of that phrase") still has a referent. Only turns
+        within ``within_seconds`` of now count — a larger gap means the user is
+        starting a new conversation, not continuing this one, so an empty list is
+        the honest signal for "no live context".
+        """
+        turn_limit = self._dialogue_turns if limit is None else int(limit)
+        turn_limit = max(0, turn_limit)
+        if turn_limit == 0:
+            return []
+        window = (
+            self._dialogue_window_seconds
+            if within_seconds is None
+            else float(within_seconds)
+        )
+        cutoff = _now_ts() - max(0.0, window)
+        with self._connect(self._episodic_db) as conn:
+            rows = conn.execute(
+                """
+                SELECT ts, user_input, response
+                FROM events
+                WHERE status = 'active' AND ts >= ?
+                ORDER BY ts DESC
+                LIMIT ?
+                """,
+                (cutoff, turn_limit),
+            ).fetchall()
+        turns = [
+            {
+                "user_input": row["user_input"],
+                "response": row["response"],
+                "ts": row["ts"],
+            }
+            for row in rows
+            if (row["user_input"] or "").strip()
+        ]
+        turns.reverse()  # oldest-first for natural reading / message order
+        return turns
 
     def recall_context(
         self,
@@ -1249,13 +1425,39 @@ class MemoryService:
             f"- [{item['item_type']}/{item['review_state']}]{_flags(item)} {item['content']}"
             for item in memory_items
         )
+        # Firewall: recall surfaces only what the user actually said, never the
+        # assistant's own past prose. Re-injecting bot replies as "memory" lets a
+        # single hallucination ("your car is at level 3") reinforce itself as fact
+        # on every later turn. The user's utterance is a grounded observation; the
+        # assistant's reply is not, and must not re-enter the factual context.
         episodic_text = "\n".join(
-            f"- User: {x['user_input']} | Bot: {x['response']}" for x in episodic
+            f"- User said: {x['user_input']}"
+            for x in episodic
+            if (x.get("user_input") or "").strip()
         )
         insight_text = "\n".join(f"- {x['thesis']}" for x in insights)
+        dialogue = self.recent_dialogue()
+        # Firewall (see below): only the user's own recent utterances enter the
+        # factual grounding string — never the assistant's past prose, which
+        # could otherwise reinforce a hallucination as fact. The generator still
+        # replays the full exchange (both roles) via the separate `conversation`
+        # channel to write a coherent reply.
+        dialogue_text = "\n".join(
+            f"User: {turn['user_input']}"
+            for turn in dialogue
+            if (turn.get("user_input") or "").strip()
+        )
         combined = "\n\n".join(
             x
             for x in [
+                (
+                    "[Recent Conversation]\n"
+                    "What the user said in the turns just before this one. Resolve "
+                    'pronouns and vague references ("it", "that", "look it up") '
+                    "against these before anything else.\n" + dialogue_text
+                    if dialogue_text
+                    else ""
+                ),
                 f"[Unified Memory]\n{memory_text}" if memory_text else "",
                 (
                     f"[Semantic Facts]\n{semantic_text}"
@@ -1284,6 +1486,7 @@ class MemoryService:
             "memory_items": memory_items,
             "web": web_result,
             "web_results": [item.to_dict() for item in web_results],
+            "conversation": dialogue,
             "combined_context": combined,
             "style_context": self._style_context(),
             "pending_feedback_prompt": feedback_prompt,
@@ -1422,6 +1625,102 @@ class MemoryService:
                 break
         return out
 
+    @staticmethod
+    def _fact_slug(text: str) -> str:
+        slug = re.sub(r"[^a-z0-9]+", "_", (text or "").lower()).strip("_")
+        return slug or "unknown"
+
+    @staticmethod
+    def _render_fact(entity: str, attribute: str, value: str) -> str:
+        """Canonical, unambiguous sentence for a typed fact. The value is copied
+        verbatim so recall never has room to substitute a hallucinated one."""
+        entity = (entity or "").strip().lower()
+        attribute = (attribute or "").strip().lower()
+        value = (value or "").strip()
+        if entity == "user":
+            if attribute == "name":
+                return f"The user's name is {value}."
+            if attribute == "residence":
+                return f"The user lives in {value}."
+            if attribute == "employer":
+                return f"The user works at {value}."
+            if attribute in {"preference", "prefer"}:
+                return f"The user prefers {value}."
+            return f"The user's {attribute} is {value}."
+        if attribute == "location":
+            return f"The user's {entity} is located at {value}."
+        return f"The user's {entity}'s {attribute} is {value}."
+
+    def _upsert_typed_facts(
+        self,
+        claims: list[dict],
+        *,
+        explicit: bool,
+        event_id: int | None = None,
+        turn_id: str = "",
+    ) -> list[dict]:
+        """Store (entity, attribute, value) claims as memory items keyed by
+        (entity, attribute). The stable external_key means a later value for the
+        same property supersedes the old one in place — updated content, bumped
+        version, prior value retained only in memory_history — instead of forking
+        into a contradictory duplicate."""
+        stored: list[dict] = []
+        now = _now_ts()
+        for claim in claims:
+            entity = (claim.get("entity") or "").strip().lower()
+            attribute = (claim.get("attribute") or "").strip().lower()
+            value = " ".join((claim.get("value") or "").split()).strip()
+            if not (entity and attribute and value):
+                continue
+            content = self._render_fact(entity, attribute, value)
+            if _is_noise_text(content) or _is_polluted_statement(content):
+                continue
+            external_key = f"fact:{self._fact_slug(entity)}:{self._fact_slug(attribute)}"
+            confidence = float(claim.get("confidence", 0.8))
+            review_state = "confirmed" if explicit else "candidate"
+            source = (
+                {
+                    "source_type": "event",
+                    "source_id": str(event_id),
+                    "excerpt": value,
+                    "metadata": {"turn_id": turn_id, "extraction_source": "structured"},
+                }
+                if event_id is not None
+                else {
+                    "source_type": "structured",
+                    "source_id": external_key,
+                    "excerpt": value,
+                }
+            )
+            memory_item = self.catalog.upsert_item(
+                item_type="fact",
+                content=content,
+                review_state=review_state,
+                confidence=max(0.3, min(0.99, confidence)),
+                importance=0.6 if explicit else 0.5,
+                external_key=external_key,
+                metadata={
+                    "structured": True,
+                    "entity": entity,
+                    "attribute": attribute,
+                    "value": value,
+                },
+                sources=[source],
+            )
+            self._link_detected_entities(memory_item)
+            self._ltm_repo.upsert_memory_item_node(memory_item)
+            self.tag_engine.tag_item(memory_item, now=now)
+            self._detect_contradictions(memory_item)
+            stored.append(
+                {
+                    "memory_item_id": memory_item["id"],
+                    "entity": entity,
+                    "attribute": attribute,
+                    "value": value,
+                }
+            )
+        return stored
+
     def _upsert_semantic_facts(
         self,
         user_input: str,
@@ -1430,7 +1729,26 @@ class MemoryService:
         event_id: int | None = None,
         turn_id: str = "",
     ):
-        candidates = self._extract_fact_candidates(user_input, response)
+        # Primary path: typed (entity, attribute, value) facts with supersede
+        # semantics. This is what makes "my car is in 10 B" a durable, updatable
+        # fact instead of a sentence blob that recall can't reason over.
+        explicit = _has_memory_directive(user_input or "")
+        typed = self._upsert_typed_facts(
+            self.fact_extractor.extract(user_input or ""),
+            explicit=explicit,
+            event_id=event_id,
+            turn_id=turn_id,
+        )
+        # Fallback path: keep the legacy sentence-fact extraction for anything the
+        # structured extractor didn't capture, so unstructured "remember X"
+        # statements are still stored — but skip candidates a typed fact already
+        # covers, to avoid a duplicated (blob + tuple) pair for the same value.
+        typed_values = [t["value"].lower() for t in typed]
+        candidates = [
+            c
+            for c in self._extract_fact_candidates(user_input, response)
+            if not any(v and v in c["statement"].lower() for v in typed_values)
+        ]
         self._upsert_fact_candidates(
             candidates,
             event_id=event_id,

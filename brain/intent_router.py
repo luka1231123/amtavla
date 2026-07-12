@@ -6,6 +6,13 @@ from brain.config import load_brain_config
 from brain.json_utils import extract_first_json_object
 from brain.prompt_builder import PromptBuilder
 
+# Dumping the entire memory store is disruptive, so it must be an explicit,
+# deliberate request. Fuzzy classifiers (embedding similarity, small-model
+# rerank) latch onto any memory-flavoured phrasing ("what do you have in your
+# memory") and dump unprompted — the live session did exactly this. Keep this
+# pathway reachable only through the exact rule patterns, never fuzzy routing.
+_EXPLICIT_ONLY_INTENTS = {"brain_dump"}
+
 
 class IntentRouter:
     def __init__(self, config: dict | None = None):
@@ -103,6 +110,8 @@ class IntentRouter:
             return {}
         vectors = {}
         for intent in self._intents:
+            if intent["name"] in _EXPLICIT_ONLY_INTENTS:
+                continue
             seed = [intent["name"]] + intent["keywords"][:12]
             text = " | ".join(seed)
             vec = self._embed(text)
@@ -145,6 +154,7 @@ class IntentRouter:
                 "keywords": i["keywords"][:8],
             }
             for i in self._intents
+            if i["name"] not in _EXPLICIT_ONLY_INTENTS
         ]
         prompt = self.prompt_builder.build_intent_router_prompt(
             user_input=text,
@@ -164,6 +174,8 @@ class IntentRouter:
             pathway = str(data.get("pathway", "")).strip()
             confidence = float(data.get("confidence", 0.0))
             if not intent or not pathway:
+                return None
+            if intent in _EXPLICIT_ONLY_INTENTS:
                 return None
             valid = next((i for i in self._intents if i["name"] == intent), None)
             if valid is None:

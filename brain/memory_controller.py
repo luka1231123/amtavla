@@ -230,6 +230,7 @@ class MemoryController:
             "ltm_context": recall["insights"],
             "web_context": recall["web"],
             "web_results": recall.get("web_results", []),
+            "conversation": recall.get("conversation", []),
             "combined_context": recall["combined_context"],
             "style_context": recall.get("style_context", ""),
             "pending_feedback_prompt": recall["pending_feedback_prompt"],
@@ -261,6 +262,16 @@ class MemoryController:
 
     def recent_notes(self, limit: int = 20) -> list[dict]:
         return self.memory.recent_notes(limit=limit)
+
+    def recent_dialogue(
+        self, limit: int | None = None, within_seconds: float | None = None
+    ) -> list[dict]:
+        # Turns commit on a background worker; drain it first so the buffer
+        # reflects the immediately-preceding turn even when the user fires two
+        # messages in quick succession (otherwise a fast follow-up would resolve
+        # against stale context, or none at all).
+        self.wait_for_idle(timeout=2.0)
+        return self.memory.recent_dialogue(limit=limit, within_seconds=within_seconds)
 
     def create_reminder(self, content: str, *, due_at: float | None = None) -> dict:
         self.note_user_activity()

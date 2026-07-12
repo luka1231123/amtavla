@@ -76,3 +76,52 @@ def test_ambiguous_assistant_question_does_not_force_web_search():
     route = IntentRouter(config).route("What should you possess?")
 
     assert route["pathway"] == "planner_full"
+
+
+def test_brain_dump_is_never_reached_by_fuzzy_model_routing(monkeypatch):
+    # Dumping the whole memory store must be an explicit request. Here the small
+    # model tries to classify a vague memory-ish utterance as a brain dump; the
+    # router must refuse it and fall back rather than dump unprompted.
+    import llama_client
+
+    monkeypatch.setattr(
+        llama_client,
+        "chat",
+        lambda messages, model="default": {
+            "message": {
+                "content": (
+                    '{"intent": "brain_dump", "pathway": "brain_dump_reply", '
+                    '"confidence": 0.95}'
+                )
+            }
+        },
+    )
+    config = {
+        "routing": {
+            "default_pathway": "planner_full",
+            "intent_model_enabled": True,
+            "intent_model_threshold": 1,
+            "intent_embedding_enabled": False,
+            "intent_low_confidence_fallback": "planner_full",
+        },
+        "intents": [
+            {
+                "name": "brain_dump",
+                "priority": 120,
+                "pathway": "brain_dump_reply",
+                "min_score": 1,
+                "keywords": ["brain dump"],
+                "regex": ["^brain dump$"],
+            }
+        ],
+    }
+
+    route = IntentRouter(config).route("what do you have in your memory")
+
+    assert route["intent"] != "brain_dump"
+    assert route["pathway"] != "brain_dump_reply"
+
+    # ...but the exact phrase still triggers it deterministically via rules.
+    explicit = IntentRouter(config).route("brain dump")
+    assert explicit["intent"] == "brain_dump"
+    assert explicit["source"] == "rules"

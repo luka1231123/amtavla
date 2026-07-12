@@ -571,7 +571,7 @@ Exit criteria:
 
 Goal: make capture and recall accurate enough for the final memory features.
 
-Status: implemented on 2026-07-11 (heuristic TagEngine/ContextEngine, capture_events, context_snapshots, tag feedback loop, contradiction/staleness flags, source-backed answer footers). Remaining: tag/entity retrieval filters are live only on the dashboard API (`/api/memory/items`); live-turn recall (`recall_memory_items`) currently filters by time window only, not tag or entity.
+Status: implemented on 2026-07-11 (heuristic TagEngine/ContextEngine, capture_events, context_snapshots, tag feedback loop, contradiction/staleness flags, source-backed answer footers). Live-turn recall gained entity/tag-aware retrieval on 2026-07-12: `recall_memory_items` now resolves entity and tag names mentioned in the query and pulls the items linked to them regardless of lexical overlap (`_entity_tag_recall`), so asking about a project or person by name surfaces everything filed under it — previously this filtering existed only on the dashboard API (`/api/memory/items`).
 
 Build:
 

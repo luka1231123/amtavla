@@ -80,6 +80,47 @@ def test_sqlite_contexts_close_connections(tmp_path, monkeypatch):
             conn.execute("SELECT 1")
 
 
+def test_recent_dialogue_returns_recent_turns_chronologically(tmp_path, monkeypatch):
+    service = _service(tmp_path, monkeypatch)
+    service.commit_turn("to err is human", "That is a common idiom.")
+    service.commit_turn("what is the continuation", "To persist is diabolical.")
+
+    dialogue = service.recent_dialogue()
+
+    assert [t["user_input"] for t in dialogue] == [
+        "to err is human",
+        "what is the continuation",
+    ]
+    # Recent dialogue feeds continuity regardless of keyword overlap — the whole
+    # point is that a vague follow-up with no shared tokens still sees context.
+    assert dialogue[-1]["response"] == "To persist is diabolical."
+
+
+def test_recent_dialogue_excludes_turns_outside_the_window(tmp_path, monkeypatch):
+    service = _service(tmp_path, monkeypatch)
+    service.commit_turn("an old exchange", "old reply")
+
+    # A large gap means a new conversation, not a continuation: nothing recent.
+    assert service.recent_dialogue(within_seconds=0) == []
+
+
+def test_recall_context_grounds_on_user_words_not_assistant_prose(tmp_path, monkeypatch):
+    # The recent-conversation block in combined_context must respect the same
+    # firewall as episodic recall: the user's utterance grounds the next turn,
+    # the assistant's own prior prose never does.
+    service = _service(tmp_path, monkeypatch)
+    service.commit_turn(
+        "where is my bike",
+        "Your bike is at level 3.",  # confabulation — must not re-enter grounding
+    )
+
+    combined = service.recall_context("anything", include_web=False)["combined_context"]
+
+    assert "[Recent Conversation]" in combined
+    assert "where is my bike" in combined
+    assert "level 3" not in combined
+
+
 def test_recall_drops_stopword_matches_and_zero_score_vectors(tmp_path, monkeypatch):
     service = _service(tmp_path, monkeypatch)
     service.write_memory("Remember this: my bicycle is beside the garage")
@@ -328,6 +369,164 @@ def test_unified_recall_exposes_inspectable_source_id(tmp_path, monkeypatch):
 
     assert context["memory_items"][0]["id"] == stored["memory_item_id"]
     assert context["memory_items"][0]["sources"]
+
+
+def test_entity_named_in_query_recalls_linked_items(tmp_path, monkeypatch):
+    # Phase 3 source-aware retrieval: naming a project surfaces items filed under
+    # it even when their wording shares no token with the query.
+    service = _service(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        memory_service_module.llama_client,
+        "embed",
+        lambda text: {"embedding": [0.0] * 8},
+    )  # neutralize the degenerate fake vector so entity/tag recall is isolated
+    cat = service.catalog
+    entity = cat.upsert_entity("project", "Vake flat", review_state="confirmed")
+    item = cat.upsert_item(
+        item_type="fact",
+        content="The viewing is scheduled on Saturday.",
+        review_state="confirmed",
+    )
+    cat.link_item_entity(item["id"], entity["id"])
+
+    recalled = service.recall_memory_items("what's happening with the Vake flat")
+
+    assert item["id"] in {r["id"] for r in recalled}
+
+
+def test_tag_named_in_query_recalls_tagged_items(tmp_path, monkeypatch):
+    service = _service(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        memory_service_module.llama_client,
+        "embed",
+        lambda text: {"embedding": [0.0] * 8},
+    )  # neutralize the degenerate fake vector so entity/tag recall is isolated
+    cat = service.catalog
+    item = cat.upsert_item(
+        item_type="fact",
+        content="Bring the signed lease and a deposit.",
+        review_state="confirmed",
+    )
+    cat.assign_tag(item["id"], "project", "Housing", status="accepted")
+
+    recalled = service.recall_memory_items("anything about Housing?")
+
+    assert item["id"] in {r["id"] for r in recalled}
+
+
+def test_unrelated_entity_is_not_pulled_in(tmp_path, monkeypatch):
+    # A meaningful entity-name token must actually appear in the query, so an
+    # unrelated project is not dragged into every recall.
+    service = _service(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        memory_service_module.llama_client,
+        "embed",
+        lambda text: {"embedding": [0.0] * 8},
+    )  # neutralize the degenerate fake vector so entity/tag recall is isolated
+    cat = service.catalog
+    entity = cat.upsert_entity("project", "Zephyr", review_state="confirmed")
+    item = cat.upsert_item(
+        item_type="fact", content="Kickoff is next month.", review_state="confirmed"
+    )
+    cat.link_item_entity(item["id"], entity["id"])
+
+    recalled = service.recall_memory_items("where is my bike parked")
+
+    assert item["id"] not in {r["id"] for r in recalled}
+
+
+def test_broad_recall_sweeps_user_facts_without_lexical_or_vector_match(
+    tmp_path, monkeypatch
+):
+    # The live "IDK about myself" failure: a broad recall query shares no tokens
+    # with any stored fact, so the lexical gate returned nothing. The sweep must
+    # surface the durable facts anyway. Zero-vector embeddings ensure only the
+    # sweep — not vector similarity — can be responsible.
+    service = _service(tmp_path, monkeypatch)
+    service.commit_turn("my name is Mira", "ok", {"intent": "remember", "turn_id": "t1"})
+    service.commit_turn(
+        "I have a car parked in 10 B", "ok", {"intent": "remember", "turn_id": "t2"}
+    )
+    monkeypatch.setattr(
+        memory_service_module.llama_client, "embed", lambda text: {"embedding": [0.0] * 8}
+    )
+
+    recall = service.recall_context("what do you know about me?", include_web=False)
+    contents = " ".join(item["content"] for item in recall["memory_items"])
+
+    assert "Mira" in contents
+    assert "10 B" in contents
+
+
+def test_typed_fact_stored_and_recalled(tmp_path, monkeypatch):
+    # The live failure: "I have a car parked in 10 B" stored nothing structured.
+    # Now it becomes a typed (car, location) fact that recall can surface.
+    service = _service(tmp_path, monkeypatch)
+    service.commit_turn(
+        "remember that I have a car parked in 10 B of the parking lot",
+        "Okay.",
+        {"intent": "remember", "turn_id": "t1"},
+    )
+    loc = [
+        item
+        for item in service.list_memory_items()
+        if item["item_type"] == "fact"
+        and (item.get("metadata") or {}).get("attribute") == "location"
+    ]
+    assert len(loc) == 1
+    assert loc[0]["external_key"] == "fact:car:location"
+    assert "10 B" in loc[0]["content"]
+
+    recall = service.recall_context("where is my car parked", include_web=False)
+    assert "10 B" in recall["combined_context"]
+
+
+def test_typed_fact_new_value_supersedes_without_duplicate(tmp_path, monkeypatch):
+    # A new value for the same (entity, attribute) must update in place, not fork
+    # into a contradictory second fact — the flaw behind the "10 B vs level 3"
+    # phantom conflict in the live session.
+    service = _service(tmp_path, monkeypatch)
+    service.commit_turn(
+        "my car is parked in 10 B",
+        "Okay.",
+        {"intent": "remember", "turn_id": "t1"},
+    )
+    service.commit_turn(
+        "my car is now in 10 C",
+        "Okay.",
+        {"intent": "remember", "turn_id": "t2"},
+    )
+    loc = [
+        item
+        for item in service.list_memory_items()
+        if item["item_type"] == "fact"
+        and (item.get("metadata") or {}).get("attribute") == "location"
+    ]
+    assert len(loc) == 1  # superseded, not duplicated
+    assert "10 C" in loc[0]["content"]
+    assert "10 B" not in loc[0]["content"]
+    assert loc[0]["version"] >= 2  # history preserved via version bump
+
+
+def test_recall_firewall_excludes_assistant_prose(tmp_path, monkeypatch):
+    # Reproduces the "level 3" hallucination loop: the assistant fabricates a
+    # value in its reply, and on a later recall that fabrication must NOT come
+    # back as memory. Only the user's own words are grounded observations.
+    service = _service(tmp_path, monkeypatch)
+    service.commit_turn(
+        "can you remember that I have a car parked in 10 B of the parking lot",
+        "Your car is at level 3.",  # assistant confabulation — must never re-enter recall
+        {"intent": "remember", "turn_id": "turn-car"},
+    )
+
+    context = service.recall_context("where is my car parked", include_web=False)
+    combined = context["combined_context"]
+
+    # The user's grounded utterance survives recall...
+    assert "10 B" in combined
+    # ...but the assistant's fabricated value is firewalled out of the context
+    # that grounds the next answer.
+    assert "level 3" not in combined
 
 
 def test_deleted_derived_episode_does_not_leak_from_raw_event_adapter(

@@ -42,14 +42,15 @@ External runtime deps (not installed via pip): a locally-built `llama.cpp` serve
 ### Turn loop (`brain/orchestrator.py`)
 
 1. Create a typed `Turn` (`brain/contracts.py`) with a stable ID; sample subsystem health.
-2. `IntentRouter` (`brain/intent_router.py`) returns a `RouteDecision` — hybrid rules/regex + embedding retrieval + LLM rerank, with low-confidence fallback to `planner_full`.
-3. `MemoryController` (`brain/memory_controller.py`) returns a source-aware `ContextPack` (semantic + episodic + insight context) without doing implicit web work.
-4. Pathway determines planning: `DIRECT_PATHWAYS` (`direct_reply`, `creative_reply`, `remember_reply`, `memory_recall_reply`) skip planning; `SINGLE_ACTION_PATHWAYS` (`search_then_reply`, `summarize_reply`, `reminder_reply`, `notes_reply`, `research_reply`) get one deterministic action; everything else goes through `Planner` (`brain/planner.py`), bounded by `max_plan_steps`.
-5. `ActionRunner` (`brain/action_runner.py`) executes each `Action` in order, always returning an `ActionResult` (even on failure — failures are structured, not exceptions).
-6. `GroundedReasoner` (`brain/reasoner.py`) optionally runs one bounded evidence-synthesis pass between tools and generation — only for question-like, non-direct-pathway turns with at least one successful evidence action or `min_sources` supplied sources (`reasoning.enabled` in config). It emits validated claims tied to real source IDs, which the generator prompt must preserve verbatim rather than re-deriving.
-7. `ResponseGenerator` (`generator.py`) builds a source-aware prompt from the plan, action results, context, and any reasoning pass, and generates the response.
-8. The completed `Turn` + its `TraceEvent` list are queued for memory commit.
-9. Idle workers run background synthesis, promote strong discoveries to insight LTM, and decay/expire episodic memory.
+2. `TurnResolver` (`brain/resolver.py`) rewrites a context-dependent follow-up ("look it up", "the continuation of that phrase") into a standalone request using the recent conversation, storing it as `turn.resolved_input`. Routing, recall, and SEARCH key off the resolved text; permission-gated actions (REMINDER, MEMORY_WRITE, NOTE_READ) and memory commit keep the original `user_input`. Self-contained utterances and explicit commands (`remember…`, `remind me…`) pass through untouched, and a fresh conversation (no recent turns) is never rewritten — this is the "know if we're continuing vs starting" signal. Gated by `routing.resolve_followups_enabled`.
+3. `IntentRouter` (`brain/intent_router.py`) returns a `RouteDecision` — hybrid rules/regex + embedding retrieval + LLM rerank, with low-confidence fallback to `planner_full`. `brain_dump` is reachable only through explicit rule phrasing, never fuzzy embedding/LLM routing, so the store is never dumped unprompted.
+4. `MemoryController` (`brain/memory_controller.py`) returns a source-aware `ContextPack` (semantic + episodic + insight context, plus a `conversation` buffer of the recent turns for continuity) without doing implicit web work.
+5. Pathway determines planning: `DIRECT_PATHWAYS` (`direct_reply`, `creative_reply`, `remember_reply`, `memory_recall_reply`) skip planning; `SINGLE_ACTION_PATHWAYS` (`search_then_reply`, `summarize_reply`, `reminder_reply`, `notes_reply`, `research_reply`) get one deterministic action; everything else goes through `Planner` (`brain/planner.py`), bounded by `max_plan_steps`.
+6. `ActionRunner` (`brain/action_runner.py`) executes each `Action` in order, always returning an `ActionResult` (even on failure — failures are structured, not exceptions).
+7. `GroundedReasoner` (`brain/reasoner.py`) optionally runs one bounded evidence-synthesis pass between tools and generation — only for question-like, non-direct-pathway turns with at least one successful evidence action or `min_sources` supplied sources (`reasoning.enabled` in config). It emits validated claims tied to real source IDs, which the generator prompt must preserve verbatim rather than re-deriving.
+8. `ResponseGenerator` (`generator.py`) builds a source-aware prompt from the plan, action results, context, and any reasoning pass, and replays the recent conversation as chat messages so follow-ups resolve; then generates the response.
+9. The completed `Turn` + its `TraceEvent` list are queued for memory commit.
+10. Idle workers run background synthesis, promote strong discoveries to insight LTM, and decay/expire episodic memory.
 
 All contracts in `brain/contracts.py` are plain dataclasses that serialize to JSON-safe dicts for persistence/UI (`Turn`, `RouteDecision`, `ContextPack`, `Plan`, `Action`, `ActionResult`, `TraceEvent`, `SourceRef`, `SearchResult`).
 

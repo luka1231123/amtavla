@@ -20,10 +20,12 @@ from brain.contracts import (
 from brain.health import HealthReporter
 from brain.planner import Planner
 from brain.reasoner import GroundedReasoner
+from brain.resolver import TurnResolver
 from generator import (
     ResponseGenerator,
     collect_response_sources,
     render_source_summary,
+    sanitize_citations,
 )
 
 logger = logging.getLogger("brain.orchestrator")
@@ -57,6 +59,7 @@ class TurnOrchestrator:
         response_generator: Any | None = None,
         reasoner: Any | None = None,
         health_reporter: Any | None = None,
+        resolver: Any | None = None,
         debug_hook: Callable[[str, dict[str, Any]], None] | None = None,
         config: dict[str, Any] | None = None,
     ) -> None:
@@ -65,6 +68,7 @@ class TurnOrchestrator:
         self.config = config or load_brain_config()
         max_steps = int(self.config.get("routing", {}).get("max_plan_steps", 5))
         self.max_plan_steps = max(1, min(5, max_steps))
+        self.resolver = resolver or TurnResolver.from_config(self.config)
         self.planner = planner or Planner(max_steps=self.max_plan_steps)
         self.action_runner = action_runner or ActionRunner(memory_client=memory)
         self.response_generator = response_generator or ResponseGenerator()
@@ -117,6 +121,21 @@ class TurnOrchestrator:
             return "jobs"
         return "full"
 
+    async def _recent_conversation(self) -> list[dict[str, Any]]:
+        """The last few turns, for resolving context-dependent utterances.
+
+        Defensive: memory clients that predate conversational continuity (or
+        test fakes) simply yield no history, so resolution passes through.
+        """
+        recent = getattr(self.memory, "recent_dialogue", None)
+        if not callable(recent):
+            return []
+        try:
+            return await asyncio.to_thread(recent) or []
+        except Exception:
+            logger.debug("recent_dialogue lookup failed", exc_info=True)
+            return []
+
     def _bounded_plan(self, plan: Plan) -> Plan:
         if len(plan.actions) <= self.max_plan_steps:
             return plan
@@ -129,6 +148,10 @@ class TurnOrchestrator:
 
     async def _create_plan(self, turn: Turn) -> Plan:
         route = turn.route or RouteDecision("default", "planner_full")
+        # The planner and web search reason about the resolved standalone
+        # request; permission-gated actions that parse the user's literal words
+        # (REMINDER, MEMORY_WRITE, NOTE_READ) keep the original input.
+        route_text = turn.resolved_input or turn.user_input
         if route.pathway in DIRECT_PATHWAYS:
             return Plan()
         if route.pathway in SINGLE_ACTION_PATHWAYS:
@@ -141,17 +164,19 @@ class TurnOrchestrator:
                 # an action that is guaranteed to fail.
                 return await asyncio.to_thread(
                     self.planner.create_plan,
-                    turn.user_input,
+                    route_text,
                     turn.context.combined_context,
                     route.intent,
                     route.pathway,
                 )
-            return Plan(
-                actions=[Action(action_type=action_type, detail=turn.user_input)]
-            )
+            # SEARCH keys off the resolved query so "look it up" searches the
+            # actual topic and not the literal phrase; the others parse the
+            # user's own words.
+            detail = route_text if action_type == ActionType.SEARCH else turn.user_input
+            return Plan(actions=[Action(action_type=action_type, detail=detail)])
         return await asyncio.to_thread(
             self.planner.create_plan,
-            turn.user_input,
+            route_text,
             turn.context.combined_context,
             route.intent,
             route.pathway,
@@ -192,14 +217,49 @@ class TurnOrchestrator:
                 health = {"available": False, "last_error": str(exc)}
             self._record(turn, "health", started=started, outputs=health)
 
+            # Plan ahead: resolve a context-dependent utterance ("look it up",
+            # "the continuation of that phrase") into a standalone request before
+            # anything routes off it. Everything downstream keys on the resolved
+            # text; the original words survive on the turn for gates and memory.
             started = time.perf_counter()
-            raw_route = await asyncio.to_thread(self.router.route, turn.user_input)
+            conversation = await self._recent_conversation()
+            try:
+                resolved = await asyncio.to_thread(
+                    self.resolver.resolve, turn.user_input, conversation
+                )
+                resolution_output = resolved.to_dict()
+                turn.resolved_input = resolved.text or turn.user_input
+            except Exception as exc:
+                # Resolution is an optimization, never a gate: any failure falls
+                # back to the user's literal words so the turn still runs.
+                logger.debug("Turn resolution failed", exc_info=True)
+                turn.resolved_input = turn.user_input
+                resolution_output = {
+                    "original": turn.user_input,
+                    "text": turn.user_input,
+                    "is_followup": False,
+                    "source": "error",
+                    "error": str(exc),
+                }
+            self._record(
+                turn,
+                "resolution",
+                started=started,
+                inputs={
+                    "text": turn.user_input,
+                    "conversation_turns": len(conversation),
+                },
+                outputs=resolution_output,
+            )
+
+            started = time.perf_counter()
+            raw_route = await asyncio.to_thread(self.router.route, turn.resolved_input)
             turn.route = RouteDecision.from_value(raw_route)
             self._record(
                 turn,
                 "intent_decision",
                 started=started,
-                inputs={"text": turn.user_input},
+                inputs={"text": turn.resolved_input, "original": turn.user_input},
                 outputs=turn.route.to_dict(),
             )
             self._record(
@@ -230,7 +290,7 @@ class TurnOrchestrator:
                 started = time.perf_counter()
                 raw_context = await asyncio.to_thread(
                     self.memory.get_context_for_prompt,
-                    turn.user_input,
+                    turn.resolved_input,
                     False,
                     turn.route.intent,
                     turn.route.pathway,
@@ -241,7 +301,7 @@ class TurnOrchestrator:
                     turn,
                     "context",
                     started=started,
-                    inputs={"query": turn.user_input, "include_web": False},
+                    inputs={"query": turn.resolved_input, "include_web": False},
                     outputs={
                         "semantic_count": len(turn.context.semantic_facts),
                         "episodic_count": len(turn.context.episodic_context),
@@ -352,6 +412,13 @@ class TurnOrchestrator:
                             turn.context,
                             turn.route,
                         )
+                # Provenance binding: remove any citation the model invented that
+                # is not backed by a real available source, so a fabricated
+                # `[memory:item:12]` never reaches the user (or the memory commit).
+                base_response = sanitize_citations(
+                    base_response,
+                    [source.source_id for source in response_sources],
+                )
                 turn.response = base_response
                 memory_response = base_response
                 cited_sources = [
