@@ -34,10 +34,10 @@ def _write_action(tmp_path):
     )
 
 
-def test_default_tiers_have_no_t2_yet():
-    # Every shipped action is currently T0 or T1; nothing outbound has landed.
-    for action_type in ActionType:
-        assert action_tier(action_type) in {"T0", "T1"}
+def test_shell_run_is_the_only_t2_action():
+    # SHELL_RUN is the first (and currently only) approval-gated T2 action.
+    t2 = [a for a in ActionType if action_tier(a) == "T2"]
+    assert t2 == [ActionType.SHELL_RUN]
 
 
 def test_t2_action_is_blocked_and_not_executed(tmp_path):

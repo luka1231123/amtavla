@@ -70,6 +70,7 @@ All contracts in `brain/contracts.py` are plain dataclasses that serialize to JS
 | `FILE_EDIT` | Targeted find/replace in a sandbox text file; JSON detail `{path, find, replace}`; also snapshots `.bak` | Local write |
 | `WEB_FETCH` | Fetch one URL → readable text + `web:<hash>` citation (`tools/webfetch.py`; timeout/size-bounded, scripts stripped) | Network read |
 | `FILE_PARSE` | Parse a local PDF/CSV/JSON/text file → citable text (`tools/fileparse.py`, sandboxed; PDF/DOCX degrade gracefully if the optional dep is absent) | Local read |
+| `SHELL_RUN` | Run one shell command via `tools/shellrun.py` (timeout + output cap). **T2 — every command requires explicit user approval before it runs** (`tools.shell_run.enabled`) | Shell exec (gated) |
 | `CLARIFY` | One clarifying question that becomes the reply verbatim (no generation) | None |
 | `RESEARCH` | Queue a bounded background research job (2 searches + 1 synthesis); result arrives proactively | Local write, deferred network |
 
@@ -77,7 +78,7 @@ Unknown planner actions become validation warnings and are never executed. `MEMO
 
 ### Trust tiers and approvals (`brain/trust.py`, `brain/approvals.py`)
 
-Every action has a trust tier keyed off its worst-case effect (`brain/trust.py`): **T0** read/compute (runs freely), **T1** reversible local write (runs, audited), **T2** outbound/irreversible (requires approval). An unlisted action defaults to T2 — fail closed. When `ActionRunner.run` sees a T2 action it does **not** execute it: it writes a `pending` row to the catalog `approvals` table and returns an `awaiting_approval` result. `ApprovalCoordinator.resolve(id, approved)` records the decision and, only on approval, re-invokes the runner with `approved=True` exactly once (settled approvals never flip; denials never run). Every T2 decision writes an `action_audit` row. No shipped action is T2 yet — this substrate is the unlock for outbound capabilities (messaging, calendar, shell). Remaining: phone-server/CLI approve-deny UI + proactive delivery of executed results (reuse the `insight_feedback` yes/no channel).
+Every action has a trust tier keyed off its worst-case effect (`brain/trust.py`): **T0** read/compute (runs freely), **T1** reversible local write (runs, audited), **T2** outbound/irreversible (requires approval). An unlisted action defaults to T2 — fail closed. When `ActionRunner.run` sees a T2 action it does **not** execute it: it writes a `pending` row to the catalog `approvals` table and returns an `awaiting_approval` result. `ApprovalCoordinator.resolve(id, approved)` records the decision and, only on approval, re-invokes the runner with `approved=True` exactly once (settled approvals never flip; denials never run). Every T2 decision writes an `action_audit` row. `SHELL_RUN` is the first T2 action. The user approves/denies via the `/approvals`, `/approve <id>`, `/deny <id>` operator commands (they work from CLI and phone, since both share the command queue); `main.py` surfaces a pending approval after any turn that produced one. Remaining: phone-UI approve/deny buttons (currently text commands) and proactive delivery of long-running executed results.
 
 Idle-produced messages (due reminders, finished research) reach the user through `MemoryController.set_proactive_hook` — `main.py` wires it to both the CLI and Socket.IO, buffering for the UI while the socket is down. Reminders and overdue research force-starts run on a dedicated ~2s tick (`_reminder_loop`) so they don't depend on the heavier idle pipeline; idle steps in `run_idle_jobs` are individually isolated so one failing step can't starve the rest. Proactive memory-check questions ("should I keep this insight?") travel as a separate `memory_check` message — rendered with yes/no buttons in the UI (`insight_feedback` event → `apply_insight_feedback`), answered by a short yes/no in the CLI — never appended to answer text.
 
@@ -119,7 +120,7 @@ Generated `*.db` files, logs, and raw traces are gitignored — don't expect the
 
 ### Operator commands (CLI / phone UI)
 
-`/brain [status|ltm|full]`, `/health`, `/ask` (force one proactive insight ask), `/idle` (force an idle cycle now, incl. staleness pass), `/brief` (daily brief), `/loops` + `/done <id>` (open commitments), `/focus [min|off]`, `/review` (spaced drill), `/delete` (wipe raw memory, catalog, entities, jobs, vectors).
+`/brain [status|ltm|full]`, `/health`, `/ask` (force one proactive insight ask), `/idle` (force an idle cycle now, incl. staleness pass), `/brief` (daily brief), `/loops` + `/done <id>` (open commitments), `/focus [min|off]`, `/review` (spaced drill), `/approvals` + `/approve <id>` + `/deny <id>` (T2 action approvals, e.g. shell commands), `/delete` (wipe raw memory, catalog, entities, jobs, vectors).
 
 Natural-language mode triggers (routed by `IntentRouter`): brain-dump ("tell me what's in your brain"), remember ("remember this...", "don't forget..."), and recall ("where is my car...", "what do you know about...").
 

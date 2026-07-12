@@ -163,7 +163,9 @@ M3 Approvals ───┘        ▲                              ▲
   approval; "am I free Thursday?" reads the calendar.
 - **Effort:** L (1–2 weeks, mostly connector/auth plumbing).
 
-### M5 — Sandboxed code / shell runner (T2)
+### M5 — Sandboxed code / shell runner (T2) · _SHELL_RUN implemented 2026-07-12_
+**Status:** `SHELL_RUN` runs one real shell command (`tools/shellrun.py`: timeout + output cap; `tools.shell_run.enabled`). It is T2, so every command pauses at the approvals gate and executes only once the user approves it via `/approve <id>` (verified end-to-end). This trades a locked-down sandbox for "the human reads the exact command before it runs" — appropriate for a single-user local assistant, deliberately NOT for a shared/untrusted deployment. Remaining if stronger isolation is wanted: a no-network, temp-cwd, CPU/mem-limited subprocess mode (`CODE_RUN`) and per-command risk classification.
+
 **Goal:** the general-purpose "do any computer task" primitive.
 
 - **Actions:** `CODE_RUN` (evaluate code in a locked-down subprocess for a result),

@@ -8,6 +8,7 @@ sys.path.insert(0, ".")
 import llama_client
 import socketio
 from brain.action_runner import ActionRunner
+from brain.approvals import ApprovalCoordinator
 from brain.config import load_brain_config
 from brain.health import HealthReporter, render_health
 from brain.intent_router import IntentRouter
@@ -22,7 +23,10 @@ logger = logging.getLogger("amtavla.main")
 CONFIG = load_brain_config()
 MEMORY = MemoryController()
 ROUTER = IntentRouter(CONFIG)
-ACTION_RUNNER = ActionRunner(memory_client=MEMORY)
+# approvals=MEMORY makes T2 actions (e.g. SHELL_RUN) pause for explicit approval
+# instead of failing closed; the coordinator runs them once the user approves.
+ACTION_RUNNER = ActionRunner(memory_client=MEMORY, approvals=MEMORY)
+APPROVALS = ApprovalCoordinator(MEMORY, ACTION_RUNNER)
 HEALTH = HealthReporter(MEMORY, search_client=ACTION_RUNNER.search_client)
 ORCHESTRATOR = TurnOrchestrator(
     router=ROUTER,
@@ -96,6 +100,34 @@ def _send_memory_check(prompt: str, insight_id):
     _dispatch_socket_emit(
         "memory_check", {"text": prompt, "insight_id": insight_id}
     )
+
+
+def _surface_pending_approvals(turn) -> None:
+    """After a turn, tell the user about any action waiting on their approval."""
+    for result in turn.action_results:
+        output = result.output if isinstance(result.output, dict) else {}
+        if output.get("status") != "awaiting_approval":
+            continue
+        message = (
+            f"⏸  Approval needed — {output.get('summary', result.action_type.value)}\n"
+            f"    Approve with  /approve {output.get('approval_id')}   "
+            f"or reject with  /deny {output.get('approval_id')}"
+        )
+        print(f"{message}\n")
+        _send_response_to_ui(message)
+
+
+def _render_shell_result(result_dict: dict) -> str:
+    """Human-readable rendering of a SHELL_RUN action result."""
+    output = result_dict.get("output") if isinstance(result_dict, dict) else None
+    if not isinstance(output, dict):
+        return "Command finished."
+    lines = [f"$ {output.get('command', '')}", f"(exit {output.get('returncode')})"]
+    if output.get("stdout"):
+        lines.append(output["stdout"].rstrip())
+    if output.get("stderr"):
+        lines.append("[stderr]\n" + output["stderr"].rstrip())
+    return "\n".join(lines).strip()
 
 
 MEMORY.set_proactive_hook(_deliver_proactive)
@@ -238,7 +270,8 @@ async def run():
     print(
         "amtavla - CLI assistant (type 'exit' to quit, '/brain <mode>', "
         "'/health', '/ask', '/idle', '/delete', '/brief', '/loops', "
-        "'/done <id>', '/focus <min|off>', '/review')\n"
+        "'/done <id>', '/focus <min|off>', '/review', "
+        "'/approvals', '/approve <id>', '/deny <id>')\n"
     )
     print("Or use phone UI at http://127.0.0.1:8081\n")
 
@@ -360,6 +393,54 @@ async def run():
                 _send_response_to_ui(response)
                 continue
 
+            if command == "/approvals":
+                pending = await asyncio.to_thread(APPROVALS.pending)
+                if pending:
+                    lines = ["=== Pending approvals ==="]
+                    for item in pending:
+                        lines.append(f"#{item['id']}: {item['summary']}")
+                    lines.append("Approve with /approve <id> or reject with /deny <id>.")
+                    response = "\n".join(lines)
+                else:
+                    response = "No actions are waiting for approval."
+                print(f"{response}\n")
+                _send_response_to_ui(response)
+                continue
+
+            if command in ("/approve", "/deny"):
+                parts = user_input.split()
+                if len(parts) < 2 or not parts[1].lstrip("#").isdigit():
+                    response = f"Usage: {command} <approval-id> (see /approvals)."
+                else:
+                    approval_id = int(parts[1].lstrip("#"))
+                    approved = command == "/approve"
+                    try:
+                        outcome = await asyncio.to_thread(
+                            APPROVALS.resolve, approval_id, approved
+                        )
+                    except KeyError:
+                        outcome = None
+                    if outcome is None:
+                        response = f"No approval #{approval_id}."
+                    elif not approved:
+                        response = f"Denied. '{outcome['summary']}' will not run."
+                    elif not outcome["executed"]:
+                        response = (
+                            f"Approval #{approval_id} was already {outcome['state']}; "
+                            "nothing ran."
+                        )
+                    else:
+                        action_result = outcome["result"]
+                        if action_result.action_type.value == "SHELL_RUN":
+                            body = _render_shell_result(action_result.to_dict())
+                        else:
+                            body = f"Done: {outcome['summary']}"
+                        status = "✓" if action_result.ok else "✗ failed"
+                        response = f"[{status}] {body}"
+                print(f"{response}\n")
+                _send_response_to_ui(response)
+                continue
+
             if command == "/delete":
                 await asyncio.to_thread(MEMORY.clear_all_memory)
                 response = (
@@ -377,6 +458,7 @@ async def run():
             )
             print(f"{turn.response}\n")
             _send_response_to_ui(turn.response)
+            _surface_pending_approvals(turn)
             if turn.context is not None and turn.context.pending_feedback_prompt:
                 _send_memory_check(
                     turn.context.pending_feedback_prompt,

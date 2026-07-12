@@ -163,6 +163,7 @@ class ActionRunner:
         files_writer: Any | None = None,
         web_fetch_client: Any | None = None,
         file_parse_client: Any | None = None,
+        shell_runner: Any | None = None,
         approvals: Any | None = None,
         tier_for: Any | None = None,
     ) -> None:
@@ -172,6 +173,7 @@ class ActionRunner:
         self._files_writer = files_writer
         self._web_fetch_client = web_fetch_client
         self._file_parse_client = file_parse_client
+        self._shell_runner = shell_runner
         # M3: the approvals store (T2 gate) and the tier classifier. tier_for is
         # injectable so the gate can be exercised without a shipped T2 action.
         self.approvals = approvals
@@ -209,6 +211,14 @@ class ActionRunner:
 
             self._file_parse_client = FileParseClient()
         return self._file_parse_client
+
+    @property
+    def shell_runner(self):
+        if self._shell_runner is None:
+            from tools.shellrun import ShellRunner
+
+            self._shell_runner = ShellRunner()
+        return self._shell_runner
 
     def _require_memory(self) -> MemoryActionClient:
         if self.memory_client is None:
@@ -478,6 +488,22 @@ class ActionRunner:
                         title=result["path"],
                         excerpt=str(result.get("content", ""))[:200],
                         metadata={"tier": "T0", "kind": result.get("kind", "")},
+                    )
+                ]
+            elif action.action_type == ActionType.SHELL_RUN:
+                # Only reached with approved=True: the T2 gate at the top of run()
+                # short-circuits an unapproved SHELL_RUN into a pending approval.
+                result = self.shell_runner.run(action.detail or user_input)
+                output = result
+                if result.get("error"):
+                    raise ValueError(result["error"])
+                sources = [
+                    SourceRef(
+                        source_id=stable_source_id("shell", result["command"]),
+                        kind="shell",
+                        title=f"$ {result['command']}",
+                        excerpt=str(result.get("stdout") or result.get("stderr") or "")[:200],
+                        metadata={"tier": "T2", "returncode": result.get("returncode")},
                     )
                 ]
             elif action.action_type == ActionType.CLARIFY:

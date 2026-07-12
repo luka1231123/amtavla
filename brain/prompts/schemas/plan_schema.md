@@ -14,6 +14,7 @@
     {"action": "FILE_EDIT", "detail": "{\"path\": \"notes.md\", \"find\": \"old\", \"replace\": \"new\"}"},
     {"action": "WEB_FETCH", "detail": "https://example.com/page"},
     {"action": "FILE_PARSE", "detail": "report.pdf | data.csv | data.json"},
+    {"action": "SHELL_RUN", "detail": "exact shell command (needs approval)"},
     {"action": "CLARIFY", "detail": "one clarifying question"},
     {"action": "RESEARCH", "detail": "research topic"},
     {"action": "THINK", "detail": "reasoning instruction"}

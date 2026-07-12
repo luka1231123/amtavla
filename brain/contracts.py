@@ -38,6 +38,8 @@ class ActionType(str, Enum):
     # M2 — read/ingest the world (T0: read-only, bounded).
     WEB_FETCH = "WEB_FETCH"
     FILE_PARSE = "FILE_PARSE"
+    # M5 — run a shell command (T2: approval-gated per command).
+    SHELL_RUN = "SHELL_RUN"
 
     @classmethod
     def parse(cls, value: str) -> ActionType | None:

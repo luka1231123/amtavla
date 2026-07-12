@@ -30,8 +30,8 @@ TRUST_TIERS: dict[ActionType, str] = {
     ActionType.RESEARCH: "T1",
     ActionType.FILE_WRITE: "T1",
     ActionType.FILE_EDIT: "T1",
-    # T2 — outbound / irreversible: added here as M4 (messaging, calendar) and
-    # M5 (shell) land. Each new entry is gated automatically, no runner change.
+    # T2 — outbound / irreversible: gated automatically, no runner change.
+    ActionType.SHELL_RUN: "T2",
 }
 
 

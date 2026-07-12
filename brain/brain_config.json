@@ -294,5 +294,13 @@
         "\\b(weather|forecast|order|buy|near me|nearby)\\b"
       ]
     }
-  ]
+  ],
+  "tools": {
+    "shell_run": {
+      "enabled": true,
+      "timeout_seconds": 30,
+      "max_output_chars": 10000,
+      "_note": "SHELL_RUN executes real shell commands and is T2 (every command requires explicit user approval before it runs)."
+    }
+  }
 }
